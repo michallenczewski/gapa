@@ -52,6 +52,6 @@ Pliki można przeciągać z Podglądu prosto do Photoshopa, 3ds Maxa czy Findera
 
 ## Nowa wersja
 
-Zmień `version` w `package.json`, zrób commit i wypchnij tag, np. `v0.2.0`. GitHub Actions zbuduje instalatory na oba systemy i doda je do wydania.
+Każdy push do gałęzi `main` buduje instalatory na oba systemy (zakładka *Actions*, ok. 10 minut) i publikuje je jako wydanie `v<wersja>` z `package.json`. Przy nowej wersji wystarczy podbić `version`; bez tego istniejące wydanie dostaje nowe pliki.
 
 Uruchomienie z kodu: `npm install`, potem `npm start`.

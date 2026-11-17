@@ -49,6 +49,10 @@ jobs:
         with:
           node-version: 20
       - run: npm install
+      # na maszynach GitHuba XProtect potrafi trzymać obraz dysku i hdiutil nie może go odłączyć
+      - name: Zatrzymaj XProtect
+        if: runner.os == 'macOS'
+        run: sudo pkill -9 XProtect >/dev/null 2>&1 || true; while pgrep XProtect >/dev/null; do sleep 2; done
       - run: npx electron-builder --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false

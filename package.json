@@ -45,7 +45,7 @@
       "identity": null
     },
     "dmg": {
-      "title": "Podgląd ${version}"
+      "title": "Podglad ${version}"
     },
     "win": {
       "target": [

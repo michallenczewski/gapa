@@ -40,6 +40,8 @@ Po wejściu do folderu najpierw liczą się widoczne miniatury, potem w tle resz
 | kółko / gładzik w podglądzie | następny / poprzedni obraz |
 | R, E, Z, C, P w podglądzie | pokaż w Finderze, Photoshop, 100%, kopiuj obraz, kopiuj ścieżkę |
 | Tab | ukryj / pokaż interfejs |
+| I | panel informacji o zaznaczonym pliku |
+| \\ | panel boczny |
 | W / ⇧Enter na folderze | wszystko w środku: obrazy z podfolderów z nagłówkami folderów |
 | ← → ↑ ↓ | poruszanie się po siatce |
 | Backspace / ⌘↑ | folder wyżej |

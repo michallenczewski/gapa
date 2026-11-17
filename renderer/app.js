@@ -36,6 +36,7 @@ function applyTheme(){
 }
 // przyciski okna (Windows) w kolorze tła; na Macu „światła” po lewej
 if(!api.web) document.documentElement.classList.add(api.platform==='darwin'?'frame-mac':'frame-win');
+if(api.onFullscreen) api.onFullscreen(v=>document.documentElement.classList.toggle('fs',v));
 function chromeSync(){
   if(api.web||!api.chromeColors) return;
   const cs=getComputedStyle(document.documentElement), v=document.getElementById('viewer');
@@ -114,6 +115,7 @@ function markModes(){
 function setMode(m){if(S.mode===m)return;S.mode=m;save();markModes();render();}
 document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>setMode(b.dataset.v));
 function setNames(v){S.names=v;save();document.body.classList.toggle('nonames',!v);}
+function setDirNames(v){S.dirNames=v;save();document.body.classList.toggle('nodirnames',!v);}
 function setSide(v){S.side=v;save();document.body.classList.toggle('noside',!v);press($('#sideBtn'),v);}
 $('#sideBtn').onclick=()=>setSide(S.side===false);
 function setInsp(v){S.insp=v;save();document.body.classList.toggle('insp',v);press($('#inspBtn'),v);if(v)renderInsp();requestAnimationFrame(()=>{if(S.mode!=='list'&&curPath)setSize(S.size);});}
@@ -149,6 +151,7 @@ async function cacheClear(){
   for(const d of dirs) resetDir(d);
   render(); prefetch(); cacheInfo();
 }
+let curIcon='3d'; if(api.iconGet) api.iconGet().then(v=>curIcon=v);
 function settingsMenu(){
   const r=$('#setBtn').getBoundingClientRect(), t=S.theme||'auto', lim=cacheC?cacheC.limitMB:2048;
   const LIM=[[1024,'1 GB'],[2048,'2 GB'],[5120,'5 GB'],[10240,'10 GB']];
@@ -157,8 +160,12 @@ function settingsMenu(){
     {label:'Jasny',check:t==='light',run:()=>setTheme('light')},
     {label:'Ciemny',check:t==='dark',keys:['T'],run:()=>setTheme('dark')},
     '-',
-    {label:'Nazwy pod miniaturami',box:S.names!==false,keys:['N'],keep:true,run:()=>{setNames(!(S.names!==false));settingsMenu();}},
+    {label:'Nazwy plików',box:S.names!==false,keys:['N'],keep:true,run:()=>{setNames(!(S.names!==false));settingsMenu();}},
+    {label:'Nazwy folderów',box:S.dirNames!==false,keys:['⇧','N'],keep:true,run:()=>{setDirNames(!(S.dirNames!==false));settingsMenu();}},
     {label:'Ukryj interfejs',keys:['Tab'],run:toggleBare},
+    ...(api.iconSet?['-',{head:'Ikona programu'},
+      {label:'Gałka 3D',check:curIcon!=='retro',run:async()=>{curIcon=await api.iconSet('3d');}},
+      {label:'Gałka 1-bit',check:curIcon==='retro',run:async()=>{curIcon=await api.iconSet('retro');}}]:[]),
     '-',{head:'Pamięć miniatur'+(api.web?' w przeglądarce':'')},
     ...(api.web?[]:LIM.map(([mb,l])=>({label:'Limit '+l,check:lim===mb,run:async()=>{await api.cacheLimit(mb);cacheInfo();}}))),
     ...(api.web?[]:[{label:'Przenieś do innego folderu…',run:async()=>{const d=await api.cacheChoose();if(d){zoomTip('Miniatury w: '+d);cacheInfo();}}},
@@ -180,6 +187,13 @@ const blobOf=it=>fetch(api.fileUrl(it.path)).then(x=>{if(!x.ok)throw new Error('
 /* --- ulubione --- */
 const samePath=(a,b)=>a&&b&&(isMac?a===b:a.toLowerCase()===b.toLowerCase());
 const findFav=p=>S.favs.find(f=>samePath(f.path,p));
+const STAR='<svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="m7 1.8 1.6 3.3 3.6.5-2.6 2.5.6 3.6L7 10l-3.2 1.7.6-3.6-2.6-2.5 3.6-.5z"/></svg>';
+function favBtn(cls,p){
+  const b=document.createElement('button'); b.className=cls; b.innerHTML=STAR;
+  const sync=()=>{const on=!!findFav(p);b.classList.toggle('on',on);b.querySelector('path').setAttribute('fill',on?'currentColor':'none');b.title=on?'Usuń z ulubionych':'Dodaj do ulubionych';b.setAttribute('aria-label',b.title);};
+  b.onclick=e=>{e.stopPropagation();toggleFav(p);sync();for(const t of document.querySelectorAll('.tile.dir'))t._sync&&t._sync();};
+  b.ondblclick=e=>e.stopPropagation(); sync(); b._sync=sync; return b;
+}
 function toggleFav(p){
   p=p||curPath; if(!p) return;
   const f=findFav(p);
@@ -268,7 +282,7 @@ function crumbsOf(p){
 }
 function renderCrumbs(){
   const c=$('#crumbs'); c.textContent='';
-  if(!curPath){$('#fav').disabled=true;return;}
+  if(!curPath) return;
   const cs=crumbsOf(curPath);
   cs.forEach((x,i)=>{
     if(i){const s=document.createElement('i');s.textContent='/';c.appendChild(s);}
@@ -276,7 +290,6 @@ function renderCrumbs(){
     el.textContent=x.name; el.title=x.path; if(i<cs.length-1) el.onclick=()=>go(x.path);
     c.appendChild(el);
   });
-  $('#fav').disabled=false;
   document.title=cs[cs.length-1].name+' — Podgląd';
 }
 
@@ -316,7 +329,7 @@ function renderTree(){
     const tw=document.createElement('span'); tw.className='tw'+(n.open?' open':'');
     if(!(n.kids&&!n.kids.length)) tw.innerHTML=TW;
     const nm=document.createElement('span'); nm.className='nm'; nm.textContent=n.name;
-    li.append(tw,nm); if(n===treeCur) li.classList.add('on');
+    li.append(tw,nm,favBtn('rf',n.path)); if(n===treeCur) li.classList.add('on');
     tw.onclick=async e=>{e.stopPropagation();n.open=!n.open;if(n.open)await kidsOf(n);renderTree();};
     li.onclick=()=>go(n.path);
     ul.appendChild(li);
@@ -344,9 +357,8 @@ function renderSide(){
     if(samePath(f.path,curPath)) li.classList.add('on');
     fl.appendChild(li);
   }
-  if(!S.favs.length) fl.innerHTML='<li class="none"><span>Dodaj folder przyciskiem +</span></li>';
-  const fv=!!findFav(curPath), fb=$('#fav'); fb.classList.toggle('on',fv); fb.disabled=!curPath;
-  fb.title=fv?'Usuń ten folder z ulubionych':'Dodaj ten folder do ulubionych';
+  if(!S.favs.length) fl.innerHTML='<li class="none"><span>Gwiazdka przy folderze dodaje go tutaj</span></li>';
+
 }
 
 /* --- widok --- */
@@ -401,6 +413,7 @@ function renderIcons(){
     t.innerHTML='<div class="box"></div><div><span class="nm"></span><div class="sub"></div></div>';
     t.querySelector('.nm').textContent=it.kind==='dir'?it.name+'/':it.name;
     t.querySelector('.sub').textContent=it.kind==='dir'?dirSub(it):'';
+    if(it.kind==='dir'){const fb=favBtn('tf',it.path);t.appendChild(fb);t._sync=fb._sync;}
     t.title=it.name; it.tile=t; paint(it); frag.appendChild(t); io.observe(t);
   });
   grid.appendChild(frag);
@@ -667,9 +680,38 @@ function videoFrame(url){
 }
 // PDF: pierwsza strona rysowana przez pdf.js (tylko w programie — biblioteka jest dołączana przy budowaniu)
 let pdfjs=null, pdfjsTried=false;
+async function loadPdfjs(){
+  if(!pdfjsTried){ pdfjsTried=true; try{ pdfjs=await import('../node_modules/pdfjs-dist/build/pdf.min.mjs'); pdfjs.GlobalWorkerOptions.workerSrc='../node_modules/pdfjs-dist/build/pdf.worker.min.mjs'; }catch(e){ pdfjs=null; } }
+  return pdfjs;
+}
+// przeglądarka PDF: strony jedna pod drugą na tle podglądu, rysowane dopiero, gdy wjeżdżają w widok
+async function pdfViewer(it){
+  const data=new Uint8Array(await (await blobOf(it)).arrayBuffer());
+  const doc=await pdfjs.getDocument({data,isEvalSupported:false}).promise;
+  it.pages=doc.numPages;
+  const el=document.createElement('div'); el.className='pdfdoc'; el.isDoc=true; el._doc=doc; el.tabIndex=-1;
+  const pages=[];
+  const io=new IntersectionObserver(es=>{for(const e of es){ if(e.isIntersecting&&!e.target._done){ e.target._done=true; drawPage(e.target); } }},{root:el,rootMargin:'600px 0px'});
+  async function drawPage(box){
+    const page=await doc.getPage(box._n), v1=page.getViewport({scale:1});
+    const w=box.clientWidth*devicePixelRatio, vp=page.getViewport({scale:w/v1.width});
+    const c=document.createElement('canvas'); c.width=Math.ceil(vp.width); c.height=Math.ceil(vp.height);
+    await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+    box.appendChild(c);
+  }
+  for(let n=1;n<=doc.numPages;n++){
+    const p=await doc.getPage(n), v1=p.getViewport({scale:1});
+    const box=document.createElement('div'); box.className='pg'; box._n=n; box.style.aspectRatio=v1.width+' / '+v1.height;
+    el.appendChild(box); pages.push(box); io.observe(box);
+    if(n>=200) break;
+  }
+  el.addEventListener('scroll',()=>{const t=$('#vinfo'); const mid=el.scrollTop+el.clientHeight/2; let k=1; for(const b of pages){ if(b.offsetTop<=mid) k=b._n; } t.textContent=info(it)+'  ·  strona '+k+' z '+doc.numPages;},{passive:true});
+  el.addEventListener('wheel',e=>e.stopPropagation(),{passive:true});
+  return el;
+}
 async function pdfThumb(it){
   if(api.web) throw new Error('miniatury PDF są w programie; dwuklik otwiera dokument');
-  if(!pdfjsTried){ pdfjsTried=true; try{ pdfjs=await import('../node_modules/pdfjs-dist/build/pdf.min.mjs'); pdfjs.GlobalWorkerOptions.workerSrc='../node_modules/pdfjs-dist/build/pdf.worker.min.mjs'; }catch(e){ pdfjs=null; } }
+  await loadPdfjs();
   if(!pdfjs) throw new Error('brak podglądu PDF');
   const data=new Uint8Array(await (await blobOf(it)).arrayBuffer());
   const doc=await pdfjs.getDocument({data,isEvalSupported:false}).promise;
@@ -809,9 +851,12 @@ function fullOf(it){
     let v;
     if(it.type==='vid'){
       const vid=document.createElement('video'); vid.src=api.fileUrl(it.path); vid.preload='metadata'; vid.loop=true; vid.playsInline=true;
-      await new Promise((ok,no)=>{vid.onloadedmetadata=ok;vid.onerror=()=>no(new Error('tego formatu nie da się tu odtworzyć — otwórz w programie (E)'));});
+      const bad=()=>new Error('tego kodeka nie da się tu odtworzyć — otwórz w odtwarzaczu systemowym (E)');
+      await new Promise((ok,no)=>{const t=setTimeout(()=>no(bad()),15000);vid.onloadedmetadata=()=>{clearTimeout(t);vid.videoWidth?ok():no(bad());};vid.onerror=()=>{clearTimeout(t);no(bad());};});
       it.dims=[vid.videoWidth,vid.videoHeight]; v={el:videoPlayer(vid),note:'',media:true,video:vid};
-    }else if(it.type==='pdf'){ // cały dokument we wbudowanej przeglądarce PDF
+    }else if(it.type==='pdf'&&!api.web&&await loadPdfjs()){ // cały dokument, strony rysowane przez pdf.js w stylu programu
+      v={el:await pdfViewer(it),note:'',doc:true,media:true};
+    }else if(it.type==='pdf'){ // wersja HTML: wbudowana przeglądarka PDF
       const el=document.createElement('iframe'); el.src=api.fileHref(it.path); el.className='doc'; el.title=it.name;
       v={el,note:'',doc:true};
     }else if(DOCS.has(it.type)){ // model / rysunek: powiększony podgląd zapisany w pliku
@@ -848,43 +893,55 @@ function openViewer(it){
   vList=picked.size>1&&picked.has(it)?files.filter(x=>picked.has(x)):files;
   vi=Math.max(0,vList.indexOf(it)); viewer.classList.add('open'); chromeSync(); showV();
 }
-// własny, cichy odtwarzacz: film, a pod nim jedna linia — odtwórz, czas, pasek, dźwięk
-const IC_PLAY='<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 1.8v8.4L10 6z" fill="currentColor"/></svg>';
-const IC_PAUSE='<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 2h2v8H3zM7 2h2v8H7z" fill="currentColor"/></svg>';
-const IC_SND='<svg width="14" height="12" viewBox="0 0 14 12" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M1.5 4.5h2l3-2.5v8l-3-2.5h-2z" fill="currentColor" stroke="none"/><path d="M9 4a2.6 2.6 0 0 1 0 4M10.8 2.4a5 5 0 0 1 0 7.2"/></svg>';
-const IC_MUTE='<svg width="14" height="12" viewBox="0 0 14 12" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M1.5 4.5h2l3-2.5v8l-3-2.5h-2z" fill="currentColor" stroke="none"/><path d="m9 4.2 3.4 3.6M12.4 4.2 9 7.8"/></svg>';
+// odtwarzacz w stylu macOS (AVKit): pływający, przydymiony panel na dole obrazu, chowa się podczas odtwarzania
+const IC_PLAY='<svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M6.5 4.2v13.6c0 .8.9 1.3 1.6.9l11-6.8c.6-.4.6-1.3 0-1.7l-11-6.8c-.7-.4-1.6.1-1.6.8z" fill="currentColor"/></svg>';
+const IC_PAUSE='<svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect x="5" y="4" width="4.2" height="14" rx="1.2" fill="currentColor"/><rect x="12.8" y="4" width="4.2" height="14" rx="1.2" fill="currentColor"/></svg>';
+const IC_BACK='<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4.5 10a5.5 5.5 0 1 0 1.8-4.1"/><path d="M6.3 2.9v3h3"/><text x="10" y="12.6" font-size="6.2" text-anchor="middle" fill="currentColor" stroke="none" font-family="-apple-system,Inter,sans-serif" font-weight="600">10</text></svg>';
+const IC_FWD=IC_BACK.replace('M4.5 10a5.5 5.5 0 1 0 1.8-4.1','M15.5 10a5.5 5.5 0 1 1-1.8-4.1').replace('M6.3 2.9v3h3','M13.7 2.9v3h-3');
+const IC_SND='<svg width="18" height="16" viewBox="0 0 18 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M2 5.5h2.5L8.5 2v12L4.5 10.5H2z" fill="currentColor" stroke="none"/><path d="M11.5 5.2a3.6 3.6 0 0 1 0 5.6M13.8 3a6.8 6.8 0 0 1 0 10"/></svg>';
+const IC_MUTE='<svg width="18" height="16" viewBox="0 0 18 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M2 5.5h2.5L8.5 2v12L4.5 10.5H2z" fill="currentColor" stroke="none"/><path d="m11.5 5.5 5 5M16.5 5.5l-5 5"/></svg>';
+const IC_PIP='<svg width="18" height="16" viewBox="0 0 18 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="1.5" y="2" width="15" height="11" rx="2"/><rect x="9" y="7.5" width="5.5" height="3.8" rx=".8" fill="currentColor" stroke="none"/></svg>';
+const IC_FS='<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg>';
 function videoPlayer(vid){
   const w=document.createElement('div'); w.className='vwrap';
   const box=document.createElement('div'); box.className='vbox';
-  const bar=document.createElement('div'); bar.className='vbar';
-  bar.innerHTML='<button class="ib vp" aria-label="Odtwórz / pauza (K)"></button><span class="vt0">0:00</span><div class="vs"><div class="vs-f"></div></div><span class="vt1"></span><button class="ib vm" aria-label="Dźwięk (M)"></button><div class="vs vv" title="Głośność"><div class="vs-f"></div></div>';
+  const bar=document.createElement('div'); bar.className='avk';
+  bar.innerHTML='<div class="avk-r1"><div class="avk-l"><button class="avk-b vm" aria-label="Dźwięk (M)"></button><div class="avk-s vv"><div class="avk-f"></div></div></div>'
+    +'<div class="avk-c"><button class="avk-b vb" aria-label="10 s wstecz">'+IC_BACK+'</button><button class="avk-b vp big" aria-label="Odtwórz / pauza (K)"></button><button class="avk-b vf" aria-label="10 s naprzód">'+IC_FWD+'</button></div>'
+    +'<div class="avk-r"><button class="avk-b vpip" aria-label="Obraz w obrazie">'+IC_PIP+'</button><button class="avk-b vfs" aria-label="Pełny ekran">'+IC_FS+'</button></div></div>'
+    +'<div class="avk-r2"><span class="vt0">0:00</span><div class="avk-s vs"><div class="avk-f"></div></div><span class="vt1"></span></div>';
   box.append(vid,bar); w.appendChild(box);
-  const bp=bar.querySelector('.vp'), bm=bar.querySelector('.vm'), t0=bar.querySelector('.vt0'), t1=bar.querySelector('.vt1'), sc=bar.querySelector('.vs'), fill=bar.querySelector('.vs-f');
-  const vv=bar.querySelector('.vv'), vf=vv.firstChild;
+  const q=s=>bar.querySelector(s);
+  const bp=q('.vp'), bm=q('.vm'), t0=q('.vt0'), t1=q('.vt1'), sc=q('.vs'), fill=sc.firstChild, vv=q('.vv'), vf=vv.firstChild;
   vid.volume=S.vol!=null?S.vol:1; vid.muted=!!S.mute;
-  const sync=()=>{bp.innerHTML=vid.paused?IC_PLAY:IC_PAUSE; const off=vid.muted||!vid.volume; bm.innerHTML=off?IC_MUTE:IC_SND; vf.style.width=(off?0:vid.volume*100)+'%';};
-  const time=()=>{t0.textContent=fmtDur(vid.currentTime); t1.textContent=fmtDur(vid.duration); fill.style.width=(vid.duration?vid.currentTime/vid.duration*100:0)+'%';};
-  vid.addEventListener('play',sync); vid.addEventListener('pause',sync); vid.addEventListener('volumechange',sync); vid.addEventListener('timeupdate',time);
+  const sync=()=>{bp.innerHTML=vid.paused?IC_PLAY:IC_PAUSE; const off=vid.muted||!vid.volume; bm.innerHTML=off?IC_MUTE:IC_SND; vf.style.width=(off?0:vid.volume*100)+'%'; box.classList.toggle('playing',!vid.paused);};
+  const time=()=>{t0.textContent=fmtDur(vid.currentTime); t1.textContent='-'+fmtDur(Math.max(0,(vid.duration||0)-vid.currentTime)); fill.style.width=(vid.duration?vid.currentTime/vid.duration*100:0)+'%';};
+  vid.addEventListener('play',sync); vid.addEventListener('pause',sync); vid.addEventListener('volumechange',sync); vid.addEventListener('timeupdate',time); vid.addEventListener('loadedmetadata',time);
   const tog=()=>vid.paused?vid.play().catch(()=>{}):vid.pause();
-  vid.onclick=e=>{e.stopPropagation();tog();};
-  bp.onclick=e=>{e.stopPropagation();tog();};
-  bm.onclick=e=>{e.stopPropagation();vid.muted=!vid.muted;if(!vid.muted&&!vid.volume)vid.volume=.5;S.mute=vid.muted;S.vol=vid.volume;save();};
-  let vdrag=false;
-  const setVol=e=>{const r=vv.getBoundingClientRect();const k=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));vid.volume=k;vid.muted=k===0;S.vol=k;S.mute=vid.muted;};
-  vv.onpointerdown=e=>{e.stopPropagation();vdrag=true;vv.setPointerCapture(e.pointerId);vv.classList.add('drag');setVol(e);};
-  vv.onpointermove=e=>{if(vdrag)setVol(e);};
-  vv.onpointerup=()=>{vdrag=false;vv.classList.remove('drag');save();};
-  vv.onwheel=e=>{e.preventDefault();e.stopPropagation();vid.volume=Math.max(0,Math.min(1,vid.volume-Math.sign(e.deltaY)*.05));vid.muted=!vid.volume;S.vol=vid.volume;S.mute=vid.muted;save();};
-  let drag=false;
-  const seek=e=>{const r=sc.getBoundingClientRect();const k=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));if(vid.duration){vid.currentTime=k*vid.duration;time();}};
-  sc.onpointerdown=e=>{e.stopPropagation();drag=true;sc.setPointerCapture(e.pointerId);sc.classList.add('drag');seek(e);};
-  sc.onpointermove=e=>{if(drag)seek(e);};
-  sc.onpointerup=e=>{drag=false;sc.classList.remove('drag');};
+  // panel chowa się po chwili bez ruchu myszy, gdy film gra
+  let hideT; const wake=()=>{box.classList.add('awake');clearTimeout(hideT);hideT=setTimeout(()=>box.classList.remove('awake'),2200);};
+  box.onmousemove=wake; box.onmouseleave=()=>{clearTimeout(hideT);box.classList.remove('awake');};
+  vid.onclick=e=>{e.stopPropagation();tog();wake();};
+  vid.ondblclick=e=>{e.stopPropagation();box.requestFullscreen?.();};
   bar.onclick=e=>e.stopPropagation();
+  bp.onclick=()=>tog();
+  q('.vb').onclick=()=>{vid.currentTime=Math.max(0,vid.currentTime-10);time();};
+  q('.vf').onclick=()=>{vid.currentTime=Math.min(vid.duration||0,vid.currentTime+10);time();};
+  q('.vpip').onclick=()=>{if(document.pictureInPictureElement)document.exitPictureInPicture();else vid.requestPictureInPicture?.().catch(()=>{});};
+  q('.vfs').onclick=()=>{if(document.fullscreenElement)document.exitFullscreen();else box.requestFullscreen?.();};
+  bm.onclick=()=>{vid.muted=!vid.muted;if(!vid.muted&&!vid.volume)vid.volume=.5;S.mute=vid.muted;S.vol=vid.volume;save();};
+  const drag=(el,fn,end)=>{let on=false;el.onpointerdown=e=>{e.stopPropagation();on=true;el.setPointerCapture(e.pointerId);el.classList.add('drag');fn(e);};el.onpointermove=e=>{if(on)fn(e);};el.onpointerup=()=>{on=false;el.classList.remove('drag');end&&end();};};
+  const frac=(el,e)=>{const r=el.getBoundingClientRect();return Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));};
+  drag(sc,e=>{if(vid.duration){vid.currentTime=frac(sc,e)*vid.duration;time();}});
+  drag(vv,e=>{const k=frac(vv,e);vid.volume=k;vid.muted=k===0;S.vol=k;S.mute=vid.muted;},save);
+  vv.onwheel=e=>{e.preventDefault();e.stopPropagation();vid.volume=Math.max(0,Math.min(1,vid.volume-Math.sign(e.deltaY)*.05));vid.muted=!vid.volume;S.vol=vid.volume;S.mute=vid.muted;save();};
   w.onclick=e=>{if(e.target===w)closeViewer();};
-  sync(); time(); w.video=vid; return w;
+  // dźwięk gra, a obrazu brak (np. ProRes) — powiedz o tym zamiast pokazywać czarne okno
+  let frames=0; if(vid.requestVideoFrameCallback){const tick=()=>{frames++;vid.requestVideoFrameCallback(tick);};vid.requestVideoFrameCallback(tick);}
+  vid.addEventListener('playing',()=>setTimeout(()=>{if(!frames&&!vid.paused&&vid.requestVideoFrameCallback){const m=document.createElement('div');m.className='vmsg';m.textContent='Tego kodeka obrazu nie da się tu odtworzyć (np. ProRes). Naciśnij E, żeby otworzyć w odtwarzaczu systemowym.';box.appendChild(m);}},2500),{once:true});
+  sync(); time(); wake(); w.video=vid; return w;
 }
-function stopMedia(){for(const m of stage.querySelectorAll('video'))m.pause();}
+function stopMedia(){for(const m of stage.querySelectorAll('video'))m.pause(); for(const d of stage.querySelectorAll('.pdfdoc')){try{d._doc.destroy();}catch(e){}}}
 function mount(el,low,it){
   stopMedia(); stage.textContent=''; stage.appendChild(el); vEl=low?null:el;
   el.classList.toggle('low',!!low);
@@ -894,7 +951,7 @@ function mount(el,low,it){
     const [dw,dh]=it.dims||[el.width,el.height];
     const s=Math.min(aw/dw,ah/dh,1); el.style.width=Math.round(dw*s)+'px'; el.style.height=Math.round(dh*s)+'px';
   } else {
-    if(el.tagName!=='IFRAME'&&!el.video) el.onclick=ev=>{ev.stopPropagation();actual=!actual;applyZoom(true);};
+    if(el.tagName!=='IFRAME'&&!el.video&&!el.isDoc) el.onclick=ev=>{ev.stopPropagation();actual=!actual;applyZoom(true);};
     if(!el.video) el.draggable=true; el.ondragstart=ev=>{ev.preventDefault();api.dragOut([it.path]);};
     applyZoom();
     if(el.video) el.video.play().catch(()=>{});
@@ -933,7 +990,7 @@ function afterShow(it,v,tok){
 function stepV(d){if(!vList.length)return;vi=(vi+d+vList.length)%vList.length;showV();}
 function applyZoom(tip){
   stage.className=actual?'actual':'fit';
-  if(vEl&&!vEl.video){const w=(vEl.naturalWidth||vEl.width)/devicePixelRatio;vEl.style.width=actual?w+'px':'';vEl.style.height='';}
+  if(vEl&&!vEl.video&&!vEl.isDoc){const w=(vEl.naturalWidth||vEl.width)/devicePixelRatio;vEl.style.width=actual?w+'px':'';vEl.style.height='';}
   if(tip) zoomTip(actual?'100%':'Dopasuj');
 }
 function closeViewer(){stopMedia();viewer.classList.remove('open');chromeSync();vTok++;stage.textContent='';vEl=null;main.focus();}
@@ -941,7 +998,7 @@ stage.addEventListener('click',e=>{if(e.target===stage)closeViewer();});
 // kółko myszy i gładzik przewijają obrazy (w trybie 100% przewijają sam obraz)
 let wAcc=0, wT=0;
 stage.addEventListener('wheel',e=>{
-  if(actual||e.ctrlKey||e.metaKey||(vEl&&vEl.tagName==='IFRAME')) return;
+  if(actual||e.ctrlKey||e.metaKey||(vEl&&(vEl.tagName==='IFRAME'||vEl.isDoc))) return;
   e.preventDefault();
   const d=Math.abs(e.deltaY)>=Math.abs(e.deltaX)?e.deltaY:e.deltaX;
   wAcc+=e.deltaMode===1?d*30:d; clearTimeout(wT); wT=setTimeout(()=>wAcc=0,200);
@@ -1069,7 +1126,7 @@ document.addEventListener('keydown',e=>{
     else if((k==='k'||k==='m')&&vEl&&vEl.video){const m=vEl.video; if(k==='k') m.paused?m.play().catch(()=>{}):m.pause(); else {m.muted=!m.muted;if(!m.muted&&!m.volume)m.volume=.5;S.mute=m.muted;S.vol=m.volume;save();}}
     else if(k==='z'||k==='1'){actual=!actual;applyZoom(true);}
     else if(k==='r'){api.showInFolder(vList[vi].path);}
-    else if(k==='e'){openInEditor([vList[vi].path]);}
+    else if(k==='e'){const c=vList[vi]; if(c.type==='vid') api.openDefault(c.path); else openInEditor([c.path]);}
     else if(k==='c'&&!mod){copyImage(vList[vi]);}
     else if(k==='p'){copyText(vList[vi].path);}
     else if(k==='Tab'){e.preventDefault();toggleBare();}
@@ -1102,6 +1159,7 @@ document.addEventListener('keydown',e=>{
   else if(k==='-'){zstep(-1);}
   else if(k==='r'){scan(true);}
   else if(k==='t'){cycleTheme();}
+  else if(k==='N'||(k==='n'&&e.shiftKey)){setDirNames(!(S.dirNames!==false));}
   else if(k==='n'){setNames(!(S.names!==false));}
   else if(k==='l'){setMode(S.mode==='list'?'icons':'list');}
   else if(k==='/'){e.preventDefault();$('#q').focus();}
@@ -1150,7 +1208,6 @@ addEventListener('mousedown',hideTip,true); addEventListener('keydown',hideTip,t
 
 /* --- start --- */
 $('#empty-open').onclick=pickFolder;
-$('#fav').onclick=()=>toggleFav();
-markSort(); markModes(); setNames(S.names!==false); setSide(S.side!==false); setInsp(!!S.insp);
+markSort(); markModes(); setNames(S.names!==false); setDirNames(S.dirNames!==false); setSide(S.side!==false); setInsp(!!S.insp);
 renderSide(); renderCrumbs(); renderTypes(); cacheInfo();
 loadRoots().then(async()=>{ if(S.last&&await api.exists(S.last)) go(S.last); else { render(); syncTree(); } });

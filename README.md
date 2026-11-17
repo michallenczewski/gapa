@@ -51,7 +51,9 @@ Po wejściu do folderu najpierw liczą się widoczne miniatury, potem w tle resz
 | ⌘/Ctrl + A | zaznacz wszystkie |
 | + / − | wielkość miniatur |
 | L | ikony / lista |
-| N | pokaż / ukryj nazwy |
+| N | pokaż / ukryj nazwy plików |
+| Shift+N | pokaż / ukryj nazwy folderów |
+| K, M | film: odtwórz / pauza, wycisz |
 | T | jasny / ciemny |
 | R | odśwież |
 | / albo ⌘/Ctrl + F | szukaj |

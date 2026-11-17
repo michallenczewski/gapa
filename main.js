@@ -23,7 +23,7 @@ protocol.registerSchemesAsPrivileged([{
 // Na Windows dane zostają w dotychczasowym folderze „Podgląd”, żeby nie zgubić ustawień i miniatur.
 if (process.platform === 'win32') app.setPath('userData', path.join(app.getPath('appData'), 'Podgląd'));
 const settingsFile = () => path.join(app.getPath('userData'), 'ustawienia.json');
-let settings = { cacheDir: null, cacheLimitMB: 2048, editor: null, bounds: null, maximized: false };
+let settings = { cacheDir: null, cacheLimitMB: 2048, editor: null, bounds: null, maximized: false, icon: '3d' };
 function loadSettings() {
   try { Object.assign(settings, JSON.parse(fs.readFileSync(settingsFile(), 'utf8'))); } catch (e) {}
 }
@@ -102,6 +102,15 @@ ipcMain.handle('cache-clear', async () => {
   }
   idx = { items: {} }; cacheBytes = 0; idxDirty = true; saveIndexNow();
 });
+// ikona programu: „3d” (domyślna) albo „retro”; na Macu podmieniamy ikonę w Docku na czas działania programu
+const iconFile = n => path.join(__dirname, 'renderer', n === 'retro' ? 'icon-retro.png' : 'icon.png');
+function applyIcon() {
+  const img = nativeImage.createFromPath(iconFile(settings.icon));
+  if (process.platform === 'darwin') app.dock.setIcon(img);
+  else if (win) win.setIcon(img);
+}
+ipcMain.handle('icon-get', () => settings.icon || '3d');
+ipcMain.handle('icon-set', (e, n) => { settings.icon = n === 'retro' ? 'retro' : '3d'; saveSettings(); applyIcon(); return settings.icon; });
 ipcMain.handle('cache-limit', (e, mb) => { settings.cacheLimitMB = Math.max(100, mb | 0); saveSettings(); prune(); });
 ipcMain.handle('cache-choose', async e => {
   const r = await dialog.showOpenDialog(BrowserWindow.fromWebContents(e.sender), {
@@ -248,7 +257,7 @@ function createWindow() {
   win = new BrowserWindow({
     ...b, minWidth: 720, minHeight: 480, show: false,
     title: 'Podgląd', backgroundColor: '#1b1b1b',
-    icon: path.join(__dirname, 'renderer', 'icon.png'),
+    icon: iconFile(settings.icon),
     autoHideMenuBar: true,
     // pasek tytułu schowany — przyciski okna rysuje system w górnym pasku programu
     ...(process.platform === 'darwin'
@@ -261,6 +270,9 @@ function createWindow() {
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   const remember = () => { if (!win.isMaximized() && !win.isMinimized()) settings.bounds = win.getBounds(); settings.maximized = win.isMaximized(); };
   win.on('resize', remember); win.on('move', remember);
+  // pełny ekran: przyciski okna znikają, więc pasek programu oddaje zarezerwowane dla nich miejsce
+  win.on('enter-full-screen', () => win.webContents.send('fullscreen', true));
+  win.on('leave-full-screen', () => win.webContents.send('fullscreen', false));
   win.on('close', () => { remember(); saveSettings(); });
   // linki zewnętrzne w przeglądarce, nie w oknie programu
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
@@ -284,7 +296,7 @@ function buildMenu() {
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Range', 'Access-Control-Expose-Headers': 'Content-Range, Content-Length' };
 const MIME = { jpg: 'image/jpeg', jpeg: 'image/jpeg', jpe: 'image/jpeg', jfif: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp',
   avif: 'image/avif', bmp: 'image/bmp', dib: 'image/bmp', ico: 'image/x-icon', svg: 'image/svg+xml', tif: 'image/tiff', tiff: 'image/tiff',
-  mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', mkv: 'video/x-matroska', ogv: 'video/ogg' };
+  mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/mp4', webm: 'video/webm', mkv: 'video/webm', ogv: 'video/ogg' };
 
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
@@ -317,6 +329,7 @@ else {
     });
     buildMenu();
     createWindow();
+    if (settings.icon === 'retro') applyIcon();
     app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
   });
   app.on('before-quit', () => { saveIndexNow(); saveSettings(); });

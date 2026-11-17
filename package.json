@@ -22,8 +22,7 @@
     "files": [
       "main.js",
       "preload.js",
-      "renderer/**",
-      "build/icon.png"
+      "renderer/**"
     ],
     "directories": {
       "output": "dist"

@@ -224,7 +224,7 @@ ipcMain.handle('editor-name', () => {
 let dragIcon = null;
 ipcMain.on('drag-out', (e, files) => {
   if (!files || !files.length) return;
-  if (!dragIcon) dragIcon = nativeImage.createFromPath(path.join(__dirname, 'build', 'icon.png')).resize({ width: 48, height: 48 });
+  if (!dragIcon) dragIcon = nativeImage.createFromPath(path.join(__dirname, 'renderer', 'icon.png')).resize({ width: 48, height: 48 });
   e.sender.startDrag({ file: files[0], files, icon: dragIcon });
 });
 
@@ -235,7 +235,7 @@ function createWindow() {
   win = new BrowserWindow({
     ...b, minWidth: 720, minHeight: 480, show: false,
     title: 'Podgląd', backgroundColor: '#1b1b1b',
-    icon: path.join(__dirname, 'build', 'icon.png'),
+    icon: path.join(__dirname, 'renderer', 'icon.png'),
     autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: false }
   });

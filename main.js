@@ -19,6 +19,9 @@ protocol.registerSchemesAsPrivileged([{
 }]);
 
 /* ---------- ustawienia ---------- */
+// Nazwa paczki jest bez polskich znaków (ścieżki z „ą” w pakiecie macOS wywracały Electron przy starcie).
+// Na Windows dane zostają w dotychczasowym folderze „Podgląd”, żeby nie zgubić ustawień i miniatur.
+if (process.platform === 'win32') app.setPath('userData', path.join(app.getPath('appData'), 'Podgląd'));
 const settingsFile = () => path.join(app.getPath('userData'), 'ustawienia.json');
 let settings = { cacheDir: null, cacheLimitMB: 2048, editor: null, bounds: null, maximized: false };
 function loadSettings() {

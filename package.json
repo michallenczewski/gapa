@@ -1,7 +1,7 @@
 {
   "name": "podglad",
-  "productName": "Podgląd",
-  "version": "0.3.1",
+  "productName": "Podglad",
+  "version": "0.3.2",
   "description": "Prosta przeglądarka obrazów — zamiennik Adobe Bridge",
   "author": "Michał Lenczewski",
   "license": "UNLICENSED",
@@ -17,7 +17,7 @@
   },
   "build": {
     "appId": "pl.lenczewski.podglad",
-    "productName": "Podgląd",
+    "productName": "Podglad",
     "artifactName": "Podglad-${version}-${os}-${arch}.${ext}",
     "files": [
       "main.js",
@@ -42,7 +42,10 @@
         }
       ],
       "icon": "build/icon.png",
-      "identity": null
+      "identity": null,
+      "extendInfo": {
+        "CFBundleDisplayName": "Podgląd"
+      }
     },
     "dmg": {
       "title": "Podglad ${version}"

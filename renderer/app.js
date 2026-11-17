@@ -232,14 +232,16 @@ const SFX=(()=>{
       o.connect(out); o.start(t); o.stop(t+d+.01);
     }
   }
+  // wszystkie dźwięki z jednej rodziny: suche tyknięcia szumu (jak przy przełączaniu strzałkami), różnią się wysokością i rytmem
+  const tk=(bp,g=.06,at=0,d=.008)=>blip({noise:true,d,g,bp,at});
   const SOUNDS={
-    click:()=>{blip({noise:true,d:.012,g:.09,bp:4200}); blip({f:1500,to:900,d:.02,g:.025});},
-    tick:()=>blip({noise:true,d:.008,g:.06,bp:5200}),
-    tok:()=>{blip({f:520,to:380,d:.06,g:.07,type:'triangle'}); blip({noise:true,d:.01,g:.04,bp:2000});},
-    open:()=>{blip({f:520,to:780,d:.07,g:.045,type:'triangle'});},
-    close:()=>{blip({f:780,to:480,d:.07,g:.04,type:'triangle'});},
-    on:()=>{blip({f:1320,d:.08,g:.035}); blip({f:1760,d:.12,g:.035,at:.06});},
-    off:()=>{blip({f:1760,d:.07,g:.03}); blip({f:1180,d:.1,g:.03,at:.05});},
+    tick:()=>tk(5200),
+    click:()=>tk(4400,.03),
+    tok:()=>{tk(4600,.055); tk(3600,.045,.032);},
+    open:()=>{tk(3800,.04); tk(4800,.045,.022); tk(6000,.05,.044);},
+    close:()=>{tk(6000,.045); tk(4800,.04,.022); tk(3800,.035,.044);},
+    on:()=>{tk(6400,.055); tk(7200,.06,.05);},
+    off:()=>{tk(5200,.05); tk(4000,.045,.05);},
   };
   return name=>{ if(S.sound===false) return; const now=performance.now(); if(now-(last[name]||0)<28) return; last[name]=now; try{SOUNDS[name]&&SOUNDS[name]();}catch(e){} };
 })();

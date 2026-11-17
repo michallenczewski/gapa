@@ -594,9 +594,10 @@ async function buildThumb(it){
   if(DOCS.has(it.type)){
     const png=await api.osThumb(it.path,TH);
     if(png) bmp=await createImageBitmap(new Blob([png],{type:'image/png'}));
-    else if(it.type!=='pdf'){ const r=await decode(ref(it),'embedded',0); bmp=await toBitmap(r); }
+    else if(it.type==='pdf') bmp=await pdfThumb(it);
+    else { const r=await decode(ref(it),'embedded',0); bmp=await toBitmap(r); }
     if(!bmp) throw new Error('brak podglądu — '+(api.web?'w przeglądarce tylko w programie':'otwórz w programie'));
-    it.meta={format:TLABEL(it.type),mode:png?'':'podgląd zapisany w pliku'};
+    it.meta={format:TLABEL(it.type),mode:it.type==='pdf'?(it.pages?it.pages+' '+plural(it.pages,'strona','strony','stron'):''):(png?'':'podgląd zapisany w pliku')};
     const c=document.createElement('canvas'), s=Math.min(1,TH/Math.max(bmp.width,bmp.height));
     c.width=Math.max(1,Math.round(bmp.width*s)); c.height=Math.max(1,Math.round(bmp.height*s));
     const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); g.imageSmoothingQuality='high'; g.drawImage(bmp,0,0,c.width,c.height); bmp.close();
@@ -623,6 +624,24 @@ async function buildThumb(it){
   if(small!==bmp)small.close(); bmp.close();
   it.thumb=c;
   c.toBlob(b=>{ if(b) b.arrayBuffer().then(buf=>api.thumbPut(key,buf,it.dims,it.meta||null)).then(()=>newThumbs++); },'image/webp',0.82);
+}
+// PDF: pierwsza strona rysowana przez pdf.js (tylko w programie — biblioteka jest dołączana przy budowaniu)
+let pdfjs=null, pdfjsTried=false;
+async function pdfThumb(it){
+  if(api.web) throw new Error('miniatury PDF są w programie; dwuklik otwiera dokument');
+  if(!pdfjsTried){ pdfjsTried=true; try{ pdfjs=await import('../node_modules/pdfjs-dist/build/pdf.min.mjs'); pdfjs.GlobalWorkerOptions.workerSrc='../node_modules/pdfjs-dist/build/pdf.worker.min.mjs'; }catch(e){ pdfjs=null; } }
+  if(!pdfjs) throw new Error('brak podglądu PDF');
+  const data=new Uint8Array(await (await blobOf(it)).arrayBuffer());
+  const doc=await pdfjs.getDocument({data,isEvalSupported:false}).promise;
+  try{
+    const page=await doc.getPage(1), v1=page.getViewport({scale:1});
+    const vp=page.getViewport({scale:Math.min(4,TH*1.5/Math.max(v1.width,v1.height))});
+    const c=document.createElement('canvas'); c.width=Math.ceil(vp.width); c.height=Math.ceil(vp.height);
+    const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height);
+    await page.render({canvasContext:g,viewport:vp}).promise;
+    it.pages=doc.numPages;
+    return await createImageBitmap(c);
+  } finally { doc.destroy(); }
 }
 async function loadImg(url){const im=new Image();im.crossOrigin='anonymous';im.src=url;await im.decode();return im;}
 // szachownica pod przezroczystymi pikselami

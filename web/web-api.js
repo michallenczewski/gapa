@@ -9,7 +9,7 @@
   let roots=[];              // [{name,path,handle}]
   let tip=null;
   const say=t=>{ if(typeof zoomTip==='function') zoomTip(t); };
-  const onlyApp=()=>say('Dostępne w programie Podgląd');
+  const onlyApp=()=>say('Dostępne w programie Gapa');
 
   const db=new Promise((res,rej)=>{const r=indexedDB.open('podglad-web',1);
     r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('roots',{keyPath:'name'});d.createObjectStore('thumbs',{keyPath:'k'}).createIndex('t','t');};

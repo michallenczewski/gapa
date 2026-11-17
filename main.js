@@ -19,9 +19,9 @@ protocol.registerSchemesAsPrivileged([{
 }]);
 
 /* ---------- ustawienia ---------- */
-// Nazwa paczki jest bez polskich znaków (ścieżki z „ą” w pakiecie macOS wywracały Electron przy starcie).
-// Na Windows dane zostają w dotychczasowym folderze „Podgląd”, żeby nie zgubić ustawień i miniatur.
-if (process.platform === 'win32') app.setPath('userData', path.join(app.getPath('appData'), 'Podgląd'));
+// Program nazywa się „Gapa” (wcześniej „Podgląd”). Ustawienia i miniatury zostają w dotychczasowym folderze,
+// żeby nic nie przepadło. Nazwy paczek są bez polskich znaków — „ą” w pakiecie macOS wywracało Electron przy starcie.
+app.setPath('userData', path.join(app.getPath('appData'), process.platform === 'win32' ? 'Podgląd' : 'Podglad'));
 const settingsFile = () => path.join(app.getPath('userData'), 'ustawienia.json');
 let settings = { cacheDir: null, cacheLimitMB: 2048, editor: null, bounds: null, maximized: false, icon: '3d' };
 function loadSettings() {
@@ -256,7 +256,7 @@ function createWindow() {
   const b = settings.bounds || { width: 1400, height: 900 };
   win = new BrowserWindow({
     ...b, minWidth: 720, minHeight: 480, show: false,
-    title: 'Podgląd', backgroundColor: '#1b1b1b',
+    title: 'Gapa', backgroundColor: '#1b1b1b',
     icon: iconFile(settings.icon),
     autoHideMenuBar: true,
     // pasek tytułu schowany — przyciski okna rysuje system w górnym pasku programu

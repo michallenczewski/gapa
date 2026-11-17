@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="utf-8">
-<title>Podgląd (wersja w przeglądarce)</title>
+<title>Gapa (wersja w przeglądarce)</title>
 <style>
 /* ===== Podgląd — wygląd „A”: jeden cienki pasek, panel informacji na żądanie ===== */
 :root{
@@ -398,7 +398,7 @@ body.bare #grid .nm{display:none}
   let roots=[];              // [{name,path,handle}]
   let tip=null;
   const say=t=>{ if(typeof zoomTip==='function') zoomTip(t); };
-  const onlyApp=()=>say('Dostępne w programie Podgląd');
+  const onlyApp=()=>say('Dostępne w programie Gapa');
 
   const db=new Promise((res,rej)=>{const r=indexedDB.open('podglad-web',1);
     r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('roots',{keyPath:'name'});d.createObjectStore('thumbs',{keyPath:'k'}).createIndex('t','t');};
@@ -1231,7 +1231,7 @@ function renderCrumbs(){
     el.textContent=x.name; el.title=x.path; if(i<cs.length-1) el.onclick=()=>go(x.path);
     c.appendChild(el);
   });
-  document.title=cs[cs.length-1].name+' — Podgląd';
+  document.title=cs[cs.length-1].name+' — Gapa';
 }
 
 /* --- drzewo folderów: miejsca w systemie i dyski, jak zakładka Folders w Bridge --- */

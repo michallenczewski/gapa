@@ -1,4 +1,6 @@
-# Podgląd
+# Gapa
+
+*(wcześniej: Podgląd)*
 
 Prosta przeglądarka obrazów dla architektów i wizualizatorów — zamiennik Adobe Bridge.
 Działa na Windows i macOS.
@@ -20,15 +22,15 @@ Gotowe instalatory są w zakładce **Releases** tego repozytorium:
 Program nie jest podpisany płatnym certyfikatem, więc system za pierwszym razem ostrzega.
 
 - **Windows:** w oknie „System Windows ochronił ten komputer” kliknij *Więcej informacji* → *Uruchom mimo to*.
-- **macOS:** przeciągnij Podgląd do *Programów* i spróbuj go otworzyć. Gdy pojawi się komunikat, wejdź w *Ustawienia systemowe → Prywatność i ochrona*, przewiń w dół i kliknij *Otwórz mimo to*. Jeśli macOS twierdzi, że program jest „uszkodzony”, wpisz w Terminalu:
-  `xattr -cr /Applications/Podgląd.app`
+- **macOS:** przeciągnij Gapę do *Programów* i spróbuj go otworzyć. Gdy pojawi się komunikat, wejdź w *Ustawienia systemowe → Prywatność i ochrona*, przewiń w dół i kliknij *Otwórz mimo to*. Jeśli macOS twierdzi, że program jest „uszkodzony”, wpisz w Terminalu:
+  `sudo xattr -cr /Applications/Gapa.app`
 
 ## Jak działa pamięć miniatur
 
 Miniatury (480 px, WebP) zapisują się w folderze programu na dysku:
 
 - Windows: `%APPDATA%\Podgląd\miniatury`
-- macOS: `~/Library/Application Support/Podgląd/miniatury`
+- macOS: `~/Library/Application Support/Podglad/miniatury`
 
 Folder i limit (domyślnie 2 GB) zmienisz w lewej kolumnie. Gdy limit się zapełni, najdawniej oglądane miniatury są usuwane. Plik rozpoznawany jest po ścieżce, rozmiarze i dacie zmiany, więc nadpisany render dostaje nową miniaturę.
 

@@ -290,7 +290,7 @@ function renderCrumbs(){
     el.textContent=x.name; el.title=x.path; if(i<cs.length-1) el.onclick=()=>go(x.path);
     c.appendChild(el);
   });
-  document.title=cs[cs.length-1].name+' — Podgląd';
+  document.title=cs[cs.length-1].name+' — Gapa';
 }
 
 /* --- drzewo folderów: miejsca w systemie i dyski, jak zakładka Folders w Bridge --- */

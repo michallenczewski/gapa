@@ -22,7 +22,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
 body{background:var(--bg);color:var(--text);font:13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
-  -webkit-font-smoothing:antialiased;display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:52px 1fr;height:100vh;overflow:hidden}
+  -webkit-font-smoothing:antialiased;display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-rows:52px minmax(0,1fr);height:100vh;overflow:hidden}
 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 button:disabled{opacity:.35;cursor:default}
 :focus-visible{outline:2px solid var(--ring);outline-offset:2px;border-radius:6px}
@@ -31,7 +31,8 @@ svg{display:block}
 .num{font-variant-numeric:tabular-nums}
 
 /* --- pasek górny --- */
-header{grid-column:1/4;display:flex;align-items:center;gap:6px;padding:0 12px;min-width:0}
+header{grid-column:1/4;display:flex;align-items:center;gap:6px;padding:0 12px;min-width:0;overflow:hidden}
+
 .ib{width:30px;height:30px;border-radius:7px;color:var(--muted);display:flex;align-items:center;justify-content:center;flex:none}
 .ib:hover:not(:disabled){background:var(--hover);color:var(--text)}
 .ib[aria-pressed=true]{background:var(--soft);color:var(--text)}
@@ -71,7 +72,7 @@ header{grid-column:1/4;display:flex;align-items:center;gap:6px;padding:0 12px;mi
 .seg button[aria-pressed=true]{background:var(--pill);box-shadow:var(--pillsh);color:var(--text)}
 
 /* --- pasek boczny --- */
-aside{grid-row:2;width:220px;padding:6px 10px 12px 12px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+aside{grid-row:2;grid-column:1;width:220px;padding:6px 10px 12px 12px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 body.noside aside{display:none}
 .sec{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted2);padding:14px 10px 6px;width:100%;text-align:left;flex:none}
 .sec:first-child{padding-top:6px}
@@ -89,18 +90,18 @@ body.noside aside{display:none}
 .nav li .x:hover{background:var(--soft);color:var(--text)}
 .nav li.none{color:var(--muted2);cursor:default;font-size:12px}
 .nav li.none:hover{background:none}
-.tree{flex:1 1 auto;overflow:auto;min-height:60px}
+.tree{flex:0 1 auto;overflow:auto;min-height:0}
 .tree.shut,.nav.shut{display:none}
 .tw{flex:none;width:14px;height:14px;display:flex;align-items:center;justify-content:center;color:var(--muted2);border-radius:3px}
 .tw:hover{color:var(--text)}
 .tw svg{transition:transform .12s}
 .tw.open svg{transform:rotate(90deg)}
-.foot{flex:none;display:flex;align-items:center;gap:6px;margin-top:8px;padding:0 4px 0 10px}
+.foot{flex:none;display:flex;align-items:center;gap:6px;margin-top:auto;padding:12px 4px 0 10px}
 #cache{flex:1;font-size:11px;color:var(--muted2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #prog{font-size:11px;color:var(--muted);white-space:nowrap}
 
 /* --- siatka --- */
-main{grid-row:2;overflow:auto;padding:10px 24px 32px 18px;position:relative;outline:none;min-width:0}
+main{grid-row:2;grid-column:2;overflow:auto;padding:10px 24px 32px 18px;position:relative;outline:none;min-width:0}
 #grid.icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(var(--tile-w),100%),1fr));column-gap:calc(var(--tile-w)*.15);row-gap:calc(var(--tile-w)*.1)}
 #grid.list{display:block}
 .tile{display:flex;flex-direction:column;gap:8px;min-width:0;cursor:default}
@@ -161,7 +162,7 @@ tr.grp td b{margin-right:10px}
 .btn:hover{opacity:.88}
 
 /* --- panel informacji (I) --- */
-#insp{grid-row:2;width:300px;margin:0 12px 12px 0;padding:16px;background:var(--card);border-radius:12px;box-shadow:0 0 0 1px var(--cardline);display:flex;flex-direction:column;gap:16px;overflow:auto;min-height:0}
+#insp{grid-row:2;grid-column:3;width:300px;margin:0 12px 12px 0;padding:16px;background:var(--card);border-radius:12px;box-shadow:0 0 0 1px var(--cardline);display:flex;flex-direction:column;gap:16px;overflow:auto;min-height:0}
 body:not(.insp) #insp{display:none}
 #iprev{aspect-ratio:16/10;border-radius:6px;display:flex;align-items:center;justify-content:center;background:var(--soft);overflow:hidden;flex:none}
 #iprev canvas{max-width:100%;max-height:100%;display:block}
@@ -224,9 +225,14 @@ body[data-drop] .dropzone{display:block}
 /* Tab: sam obraz, bez interfejsu */
 body.bare{grid-template-columns:1fr;grid-template-rows:1fr}
 body.bare aside,body.bare header,body.bare #insp,body.bare #viewer .top{display:none}
-body.bare main{grid-row:1}
+body.bare main{grid-row:1;grid-column:1}
 body.bare #grid .nm{display:none}
 .web .apponly{display:none}
+.web.oneroot [data-sec=places],.web.oneroot #places{display:none}
+/* węższe okno: najpierw znika suwak, potem nazwy przy sortowaniu, panel boczny i panel informacji chowają się same */
+@media (max-width:1100px){.zoom,.sep{display:none}.search{width:170px}}
+@media (max-width:860px){#sortBtn span,#typesBtn span{display:none}#sortBtn,#typesBtn{padding:0 6px}.search{width:130px}#qScope{display:none}aside{display:none}}
+@media (max-width:760px){#insp{display:none!important}#count{display:none}}
 </style>
 </head>
 <body>
@@ -1131,6 +1137,7 @@ function renderTree(){
     li.onclick=()=>go(r.path); pl.appendChild(li);
   }
   if(!roots.length) pl.innerHTML='<li class="none"><span>Brak</span></li>';
+  document.documentElement.classList.toggle('oneroot',roots.length<2);
 }
 function renderSide(){
   const fl=$('#favs'); fl.textContent='';
@@ -1229,7 +1236,7 @@ function groupHead(g,tag){
   const c=document.createElement('span'); c.textContent=g.count+' '+plural(g.count,'obraz','obrazy','obrazów');
   box.append(b,c); return el;
 }
-const dirSub=d=>d.count==null?'folder':d.count?d.count+' '+plural(d.count,'obraz','obrazy','obrazów'):'brak obrazów';
+const dirSub=d=>d.count==null?'folder':d.count?d.count+' '+plural(d.count,'obraz','obrazy','obrazów'):d.sub?d.sub+' '+plural(d.sub,'folder','foldery','folderów'):'brak obrazów';
 
 function paint(it){
   const el=it.tile; if(!el) return;
@@ -1258,10 +1265,25 @@ function loadDir(d,hi){
   if(d._p){ if(hi&&d.files&&d.files[0]) enqueue(d.files[0],true); return d._p; }
   d.state='loading';
   return d._p=(async()=>{
+    const mk=f=>({kind:'file',name:f.name,path:f.path,size:f.size,mtime:f.mtime,type:EXT[extOf(f.name)],state:null,gen});
     const r=await api.list(d.path,EXTS);
-    const all=r.files.map(f=>({kind:'file',name:f.name,path:f.path,size:f.size,mtime:f.mtime,type:EXT[extOf(f.name)],state:null,gen})).filter(f=>on(f.type));
+    let all=r.files.map(mk).filter(f=>on(f.type));
     all.sort((a,b)=>coll.compare(a.name,b.name));
-    d.count=all.length;
+    d.count=all.length; d.sub=r.dirs.length;
+    // folder tylko z podfolderami: okładka i przewijanie z obrazów w podfolderach
+    if(!all.length&&r.dirs.length){
+      const queue=r.dirs.map(x=>x.path).sort(coll.compare); let seen=0;
+      while(queue.length&&all.length<SKIM*6&&seen<40){
+        const batch=queue.splice(0,4); seen+=batch.length;
+        const res=await Promise.all(batch.map(x=>api.list(x,EXTS)));
+        for(const s of res){
+          const fs=s.files.map(mk).filter(f=>on(f.type)).sort((a,b)=>coll.compare(a.name,b.name));
+          all.push(...fs.slice(0,SKIM));            // po kilka z każdego podfolderu, żeby było widać różnorodność
+          queue.push(...s.dirs.map(x=>x.path).sort(coll.compare));
+        }
+      }
+      d.deep=true;
+    }
     d.files=all.length<=SKIM?all:Array.from({length:SKIM},(_,k)=>all[Math.floor(k*all.length/SKIM)]);
     d.si=0; d.state='done';
     if(d.files[0]){ d.files[0].cb=()=>paint(d); enqueue(d.files[0],hi||d.visible); }
@@ -1275,8 +1297,9 @@ function paintDir(d){
   const box=d.tile.firstChild; box.textContent='';
   const f=d.files&&d.files[d.si||0];
   if(f&&f.thumb) box.appendChild(f.thumb);
-  else if(d.state==='done'&&!d.count){const s=document.createElement('span');s.className='ph';s.innerHTML=FOLDER_ICO;box.appendChild(s);}
-  if(d.count){const c=document.createElement('span');c.className='chip';c.innerHTML=FOLDER_ICO_S;c.appendChild(document.createTextNode(d.count));box.appendChild(c);}
+  else if(d.state==='done'&&!(d.files&&d.files.length)){const s=document.createElement('span');s.className='ph';s.innerHTML=FOLDER_ICO;box.appendChild(s);}
+  if(d.count||(d.deep&&d.sub)){const c=document.createElement('span');c.className='chip';c.innerHTML=FOLDER_ICO_S;
+    c.appendChild(document.createTextNode(d.count?d.count:d.sub+' '+plural(d.sub,'folder','foldery','folderów')));box.appendChild(c);}
   if(d.files&&d.files.length>1){
     const sk=document.createElement('div');sk.className='sk';
     for(let k=0;k<d.files.length;k++){const i=document.createElement('i');if(k===(d.si||0))i.className='on';sk.appendChild(i);}
@@ -1455,7 +1478,8 @@ function status(msg){
   if(msg){s.textContent=msg;return;}
   if(!curPath){s.textContent='';renderInsp();return;}
   const nf=view.filter(x=>x.kind==='file').length, q=$('#q').value;
-  let t=nf.toLocaleString('pl');
+  const nd=view.length-nf;
+  let t=nf?nf.toLocaleString('pl'):(nd?nd+' '+plural(nd,'folder','foldery','folderów'):'0');
   if(heads) t+=' w '+heads.size+' '+plural(heads.size,'folderze','folderach','folderach');
   if(picked.size>1) t+=' · zaznaczone '+picked.size;
   s.textContent=t; s.title=(q?'Wyniki: ':'')+nf+' '+plural(nf,'obraz','obrazy','obrazów');

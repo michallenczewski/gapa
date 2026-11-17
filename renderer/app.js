@@ -318,6 +318,7 @@ function renderTree(){
     li.onclick=()=>go(r.path); pl.appendChild(li);
   }
   if(!roots.length) pl.innerHTML='<li class="none"><span>Brak</span></li>';
+  document.documentElement.classList.toggle('oneroot',roots.length<2);
 }
 function renderSide(){
   const fl=$('#favs'); fl.textContent='';
@@ -416,7 +417,7 @@ function groupHead(g,tag){
   const c=document.createElement('span'); c.textContent=g.count+' '+plural(g.count,'obraz','obrazy','obrazów');
   box.append(b,c); return el;
 }
-const dirSub=d=>d.count==null?'folder':d.count?d.count+' '+plural(d.count,'obraz','obrazy','obrazów'):'brak obrazów';
+const dirSub=d=>d.count==null?'folder':d.count?d.count+' '+plural(d.count,'obraz','obrazy','obrazów'):d.sub?d.sub+' '+plural(d.sub,'folder','foldery','folderów'):'brak obrazów';
 
 function paint(it){
   const el=it.tile; if(!el) return;
@@ -445,10 +446,25 @@ function loadDir(d,hi){
   if(d._p){ if(hi&&d.files&&d.files[0]) enqueue(d.files[0],true); return d._p; }
   d.state='loading';
   return d._p=(async()=>{
+    const mk=f=>({kind:'file',name:f.name,path:f.path,size:f.size,mtime:f.mtime,type:EXT[extOf(f.name)],state:null,gen});
     const r=await api.list(d.path,EXTS);
-    const all=r.files.map(f=>({kind:'file',name:f.name,path:f.path,size:f.size,mtime:f.mtime,type:EXT[extOf(f.name)],state:null,gen})).filter(f=>on(f.type));
+    let all=r.files.map(mk).filter(f=>on(f.type));
     all.sort((a,b)=>coll.compare(a.name,b.name));
-    d.count=all.length;
+    d.count=all.length; d.sub=r.dirs.length;
+    // folder tylko z podfolderami: okładka i przewijanie z obrazów w podfolderach
+    if(!all.length&&r.dirs.length){
+      const queue=r.dirs.map(x=>x.path).sort(coll.compare); let seen=0;
+      while(queue.length&&all.length<SKIM*6&&seen<40){
+        const batch=queue.splice(0,4); seen+=batch.length;
+        const res=await Promise.all(batch.map(x=>api.list(x,EXTS)));
+        for(const s of res){
+          const fs=s.files.map(mk).filter(f=>on(f.type)).sort((a,b)=>coll.compare(a.name,b.name));
+          all.push(...fs.slice(0,SKIM));            // po kilka z każdego podfolderu, żeby było widać różnorodność
+          queue.push(...s.dirs.map(x=>x.path).sort(coll.compare));
+        }
+      }
+      d.deep=true;
+    }
     d.files=all.length<=SKIM?all:Array.from({length:SKIM},(_,k)=>all[Math.floor(k*all.length/SKIM)]);
     d.si=0; d.state='done';
     if(d.files[0]){ d.files[0].cb=()=>paint(d); enqueue(d.files[0],hi||d.visible); }
@@ -462,8 +478,9 @@ function paintDir(d){
   const box=d.tile.firstChild; box.textContent='';
   const f=d.files&&d.files[d.si||0];
   if(f&&f.thumb) box.appendChild(f.thumb);
-  else if(d.state==='done'&&!d.count){const s=document.createElement('span');s.className='ph';s.innerHTML=FOLDER_ICO;box.appendChild(s);}
-  if(d.count){const c=document.createElement('span');c.className='chip';c.innerHTML=FOLDER_ICO_S;c.appendChild(document.createTextNode(d.count));box.appendChild(c);}
+  else if(d.state==='done'&&!(d.files&&d.files.length)){const s=document.createElement('span');s.className='ph';s.innerHTML=FOLDER_ICO;box.appendChild(s);}
+  if(d.count||(d.deep&&d.sub)){const c=document.createElement('span');c.className='chip';c.innerHTML=FOLDER_ICO_S;
+    c.appendChild(document.createTextNode(d.count?d.count:d.sub+' '+plural(d.sub,'folder','foldery','folderów')));box.appendChild(c);}
   if(d.files&&d.files.length>1){
     const sk=document.createElement('div');sk.className='sk';
     for(let k=0;k<d.files.length;k++){const i=document.createElement('i');if(k===(d.si||0))i.className='on';sk.appendChild(i);}
@@ -642,7 +659,8 @@ function status(msg){
   if(msg){s.textContent=msg;return;}
   if(!curPath){s.textContent='';renderInsp();return;}
   const nf=view.filter(x=>x.kind==='file').length, q=$('#q').value;
-  let t=nf.toLocaleString('pl');
+  const nd=view.length-nf;
+  let t=nf?nf.toLocaleString('pl'):(nd?nd+' '+plural(nd,'folder','foldery','folderów'):'0');
   if(heads) t+=' w '+heads.size+' '+plural(heads.size,'folderze','folderach','folderach');
   if(picked.size>1) t+=' · zaznaczone '+picked.size;
   s.textContent=t; s.title=(q?'Wyniki: ':'')+nf+' '+plural(nf,'obraz','obrazy','obrazów');

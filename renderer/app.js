@@ -83,7 +83,7 @@ function setSort(k){ if(S.sort===k) S.dir=-S.dir; else {S.sort=k;S.dir=DEF_DIR[k
 function markSort(){
   const s=SORTS.find(x=>x[0]===S.sort)||SORTS[0], b=$('#sortBtn');
   b.innerHTML='<span></span><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="'+(S.dir>0?'M5 8V2M2.5 4.5 5 2l2.5 2.5':'M5 2v6M2.5 5.5 5 8l2.5-2.5')+'"/></svg>';
-  b.firstChild.textContent=s[1]; b.title='Sortowanie: '+s[1]+', '+(S.dir>0?s[2]:s[3]).toLowerCase();
+  b.firstChild.textContent=s[1]; b.title='Sortowanie: '+s[1]+', '+(S.dir>0?s[2]:s[3]).replace(/^Od /,'od ');
 }
 function sortMenu(){
   const r=$('#sortBtn').getBoundingClientRect(), s=SORTS.find(x=>x[0]===S.sort)||SORTS[0];
@@ -469,12 +469,17 @@ function loadDir(d,hi){
     }
     d.files=all.length<=SKIM?all:Array.from({length:SKIM},(_,k)=>all[Math.floor(k*all.length/SKIM)]);
     d.si=0; d.state='done';
-    if(d.files[0]){ d.files[0].cb=()=>paint(d); enqueue(d.files[0],hi||d.visible); }
+    coverFrom(d,0,hi||d.visible);
     paint(d);
   })();
 }
 const FOLDER_ICO='<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width=".9" aria-hidden="true"><path d="M1.5 3.5a1 1 0 0 1 1-1h2.2l1 1.2h3.8a1 1 0 0 1 1 1v4.3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1z"/></svg>';
 const FOLDER_ICO_S='<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M1.5 3.5a1 1 0 0 1 1-1h2.2l1 1.2h3.8a1 1 0 0 1 1 1v4.3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1z"/></svg>';
+function coverFrom(d,i,hi){ // okładka: pierwszy plik, który da się pokazać (najwyżej 6 prób)
+  const f=d.files&&d.files[i]; if(!f||i>5){ paint(d); return; }
+  f.cb=()=>{ if(f.thumb){ if(i){ d.files.splice(i,1); d.files.unshift(f); } paint(d); } else coverFrom(d,i+1,hi); };
+  enqueue(f,hi);
+}
 function paintDir(d){
   if(!d.tile||d.tile.tagName==='TR'){ if(d.tile) paint(d); return; }
   const box=d.tile.firstChild; box.textContent='';
@@ -1037,6 +1042,30 @@ document.addEventListener('drop',async e=>{
   const p=api.pathForFile(f); if(!p) return;
   if(await api.exists(p)) go(p); else go(api.dirname(p),p);
 });
+
+/* --- dymki: własne zamiast systemowych; przy nazwach tylko, gdy są ucięte --- */
+let tipBox=null, tipFor=null, tipT2=0;
+function hideTip(){ clearTimeout(tipT2); tipFor=null; if(tipBox) tipBox.classList.remove('on'); }
+function showTip(el){
+  if(!el.isConnected) return;
+  if(!tipBox){ tipBox=document.createElement('div'); tipBox.className='tip'; tipBox.setAttribute('role','tooltip'); document.body.appendChild(tipBox); }
+  tipBox.textContent=el.dataset.tip; tipBox.classList.add('on');
+  const r=el.getBoundingClientRect(), b=tipBox.getBoundingClientRect();
+  let x=r.left+r.width/2-b.width/2, y=r.bottom+6;
+  if(el.closest('.nav')){ x=r.left+8; }
+  if(y+b.height>innerHeight-6) y=r.top-b.height-6;
+  tipBox.style.left=Math.max(6,Math.min(x,innerWidth-b.width-6))+'px'; tipBox.style.top=y+'px';
+}
+document.addEventListener('mouseover',e=>{
+  const el=e.target.closest('[title],[data-tip]'); if(!el||el===tipFor) return;
+  if(el.hasAttribute('title')){ el.dataset.tip=el.getAttribute('title'); el.removeAttribute('title'); }
+  hideTip(); if(!el.dataset.tip) return;
+  const nm=el.matches('.nav li,.tile,tr')?el.querySelector('.nm'):null;
+  if(nm&&getComputedStyle(nm).display!=='none'&&nm.scrollWidth<=nm.clientWidth+1) return; // nazwa widoczna w całości
+  tipFor=el; tipT2=setTimeout(()=>showTip(el),450);
+});
+document.addEventListener('mouseout',e=>{ if(tipFor&&!(e.relatedTarget&&tipFor.contains(e.relatedTarget))) hideTip(); });
+addEventListener('mousedown',hideTip,true); addEventListener('keydown',hideTip,true); addEventListener('blur',hideTip); main.addEventListener('scroll',hideTip,{passive:true});
 
 /* --- start --- */
 $('#empty-open').onclick=pickFolder;

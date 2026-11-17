@@ -40,6 +40,7 @@ Po wejściu do folderu najpierw liczą się widoczne miniatury, potem w tle resz
 | kółko / gładzik w podglądzie | następny / poprzedni obraz |
 | R, E, Z, C, P w podglądzie | pokaż w Finderze, Photoshop, 100%, kopiuj obraz, kopiuj ścieżkę |
 | Tab | ukryj / pokaż interfejs |
+| W / ⇧Enter na folderze | wszystko w środku: obrazy z podfolderów z nagłówkami folderów |
 | ← → ↑ ↓ | poruszanie się po siatce |
 | Backspace / ⌘↑ | folder wyżej |
 | ⌘/Ctrl + E | otwórz w Photoshopie |
@@ -53,8 +54,14 @@ Po wejściu do folderu najpierw liczą się widoczne miniatury, potem w tle resz
 
 Pliki można przeciągać z Podglądu prosto do Photoshopa, 3ds Maxa czy Findera/Eksploratora.
 
-## Nowa wersja
+## Wersja w przeglądarce (do testowania interfejsu)
 
-Każdy push do gałęzi `main` buduje instalatory na oba systemy (zakładka *Actions*, ok. 10 minut) i publikuje je jako wydanie `v<wersja>` z `package.json`. Przy nowej wersji wystarczy podbić `version`; bez tego istniejące wydanie dostaje nowe pliki.
+`web/podglad.html` to ten sam interfejs w jednym pliku HTML. Otwórz go w Chrome albo Edge (dwuklik na pobranym pliku) i wskaż folder. Miniatury zapisują się w pamięci przeglądarki; funkcje systemowe (Finder/Eksplorator, Photoshop, przeciąganie plików) działają tylko w programie.
+
+Plik powstaje z kodu programu: `node scripts/build-web.js`.
+
+## Nowa wersja programu
+
+Instalatory budują się tylko przy nowej wersji: wystarczy podbić `version` w `package.json` i wypchnąć zmiany. GitHub Actions zbuduje wtedy instalatory na oba systemy (ok. 10 minut) i opublikuje wydanie `v<wersja>`. Push bez zmiany wersji nic nie buduje. Budowanie można też uruchomić ręcznie: *Actions → Buduj instalatory → Run workflow*.
 
 Uruchomienie z kodu: `npm install`, potem `npm start`.

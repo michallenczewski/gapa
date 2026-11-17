@@ -53,10 +53,20 @@ header>#crumbs{flex:0 1 auto}
 #fav.on{color:#c9a227}
 .gap{flex:1 1 0}
 .search{display:inline-flex;align-items:center;position:relative}
-.search input{font:inherit;color:var(--text);background:var(--btn);border:1px solid var(--line);border-radius:3px;padding:0 24px 0 9px;height:28px;width:170px;outline:0}
+.search input{font:inherit;color:var(--text);background:var(--btn);border:1px solid var(--line);border-radius:3px;padding:0 84px 0 9px;height:28px;width:230px;outline:0}
 .search input:focus{border-color:var(--muted)}
 .search input::-webkit-search-cancel-button{display:none}
-#qClear{position:absolute;right:2px;border:0;background:none;height:24px;padding:0 6px;color:var(--muted)}
+#qClear{position:absolute;right:58px;border:0;background:none;height:24px;padding:0 6px;color:var(--muted)}
+#qScope{position:absolute;right:3px;height:22px;padding:0 7px;font-size:11px;border:0;border-radius:2px;background:var(--tile);color:var(--muted);min-width:52px}
+#qScope[aria-pressed=true]{background:var(--on);color:var(--text)}
+#deepChip{background:var(--on);font-size:12px;height:26px}
+div.grp{grid-column:1/-1;display:flex;align-items:baseline;gap:10px;padding:18px 4px 6px;margin:0 3px 4px;border-bottom:1px solid var(--line);color:var(--muted);font-size:12px}
+div.grp:first-child{padding-top:2px}
+.grp b{color:var(--text);font-weight:600;font-size:13px;cursor:pointer}
+.grp b:hover{text-decoration:underline;text-underline-offset:3px}
+tr.grp td{padding:18px 8px 6px;background:none!important;color:var(--muted);font-size:12px}
+tr.grp td b{margin-right:10px}
+.web #cacheDir,.web #cacheShow{display:none}
 #typesBtn.on{background:var(--on)}
 .sortw{display:inline-flex}
 select{font:inherit;color:var(--text);background:var(--btn);border:1px solid var(--line);border-radius:3px 0 0 3px;height:28px;padding:0 6px;outline:0}
@@ -213,8 +223,9 @@ aside .tree{flex:1 1 auto;overflow:auto;min-height:80px}
   <button id="up" class="ico" title="Folder wyżej (Backspace)" disabled>↑</button>
   <h1 id="crumbs"></h1>
   <button id="fav" class="ico" title="Dodaj ten folder do ulubionych" disabled>☆</button>
+  <button id="deepChip" hidden title="Wróć do zwykłego widoku folderu (W)">Wszystko w środku ✕</button>
   <span class="gap"></span>
-  <label class="search"><input id="q" type="search" placeholder="Szukaj" autocomplete="off" spellcheck="false"><button type="button" id="qClear" hidden title="Wyczyść">×</button></label>
+  <label class="search"><input id="q" type="search" placeholder="Szukaj" autocomplete="off" spellcheck="false"><button type="button" id="qClear" hidden title="Wyczyść">×</button><button type="button" id="qScope"></button></label>
   <button id="typesBtn" title="Pokaż lub ukryj typy plików">Typy ▾</button>
   <span class="sortw"><select id="sortSel" title="Sortowanie">
     <option value="name">Nazwa</option><option value="date">Data</option><option value="size">Rozmiar pliku</option><option value="dims">Wymiary</option><option value="type">Rodzaj</option>

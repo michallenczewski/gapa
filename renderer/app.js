@@ -89,6 +89,10 @@ $('#names').onchange=e=>setNames(e.target.checked);
 let qt=0;
 $('#q').oninput=()=>{$('#qClear').hidden=!$('#q').value;clearTimeout(qt);qt=setTimeout(()=>applyView(keep()),120);};
 $('#qClear').onclick=()=>{$('#q').value='';$('#qClear').hidden=true;applyView(keep());$('#q').focus();};
+function markScope(){const b=$('#qScope');press(b,!!S.qAll);b.textContent=S.qAll?'wszędzie':'tu';b.title=S.qAll?'Szukam też w podfolderach — kliknij, żeby szukać tylko tutaj':'Szukam tylko w tym folderze — kliknij, żeby szukać też w podfolderach';}
+$('#qScope').onclick=()=>{S.qAll=!S.qAll;save();markScope();if($('#q').value)applyView(keep());$('#q').focus();};
+markScope();
+$('#deepChip').onclick=()=>setDeep(false);
 
 /* --- pamięć miniatur (folder na dysku, obsługuje ją proces główny) --- */
 const fmtSize=b=>b<1024?b+' B':b<1048576?(b/1024).toFixed(0)+' KB':b<1073741824?(b/1048576).toLocaleString('pl',{maximumFractionDigits:1})+' MB':(b/1073741824).toLocaleString('pl',{maximumFractionDigits:1})+' GB';
@@ -136,13 +140,18 @@ async function openFav(f){
 
 /* --- foldery i pliki --- */
 let curPath=null, dirs=[], items=[], view=[], sel=-1, anchor=-1, picked=new Set(), scanTok=0, gen=0;
+// „wszystko w środku”: obrazy z podfolderów w jednej siatce, pogrupowane nagłówkami folderów
+let deep=false, deepItems=null, deepFor=null, deepTok=0, heads=null;
 const keep=()=>{const it=view[sel];return it?it.path:null;};
 
-async function pickFolder(){ const p=await api.pickFolder(); if(p) go(p); }
-function go(p,selectPath){ curPath=p; S.last=p; save(); $('#q').value='';$('#qClear').hidden=true; scan(false,selectPath); }
+async function pickFolder(){ const p=await api.pickFolder(); if(p){ if(api.web) await loadRoots(); go(p); } }
+function go(p,selectPath,inside){ curPath=p; S.last=p; save(); deep=!!inside; deepItems=null; deepFor=null; $('#q').value='';$('#qClear').hidden=true; markDeep(); scan(false,selectPath); }
+function setDeep(v){ deep=v; markDeep(); applyView(keep()); main.scrollTop=0; prefetch(); }
+function markDeep(){ const c=$('#deepChip'); c.hidden=!deep; }
 async function scan(keepScroll,selectPath){
   if(!curPath) return;
   const tok=++scanTok, prevPath=selectPath||keep(), prevTop=main.scrollTop, here=curPath;
+  if(keepScroll){ deepItems=null; deepFor=null; }
   status('Wczytywanie…');
   const r=await api.list(here,EXTS);
   if(tok!==scanTok) return;
@@ -168,13 +177,39 @@ async function scan(keepScroll,selectPath){
 }
 api.onDirChanged(d=>{ if(samePath(d,curPath)&&!viewer.classList.contains('open')) scan(true); });
 function goUp(){
-  if(!curPath) return; const p=api.dirname(curPath); if(!p||p===curPath) return;
-  const from=curPath; curPath=p; S.last=p; save(); scan(false,from);
+  if(!curPath) return;
+  if(deep&&!$('#q').value){ setDeep(false); return; }
+  const p=api.dirname(curPath); if(!p||p===curPath) return;
+  const from=curPath; curPath=p; S.last=p; save(); deep=false; deepItems=null; deepFor=null; markDeep(); scan(false,from);
+}
+// wczytanie całego drzewa pod bieżącym folderem
+async function loadDeep(){
+  if(deepFor===curPath&&deepItems) return true;
+  const here=curPath, tok=++deepTok, out=[], known=new Map(items.map(it=>[it.path,it]));
+  const base=here.replace(/[\\/]+$/,'');
+  const relOf=p=>{const d=api.dirname(p); return d.length>base.length?d.slice(base.length+1):'';};
+  let queue=[here], n=0;
+  while(queue.length){
+    const batch=queue.splice(0,6);
+    const res=await Promise.all(batch.map(d=>api.list(d,EXTS)));
+    if(tok!==deepTok||here!==curPath) return false;
+    for(const r of res){
+      for(const f of r.files){
+        const o=known.get(f.path);
+        const it=o&&o.size===f.size&&o.mtime===f.mtime?o:{kind:'file',name:f.name,path:f.path,size:f.size,mtime:f.mtime,type:EXT[extOf(f.name)],gen,state:null};
+        it.rel=relOf(f.path); out.push(it);
+      }
+      for(const d of r.dirs) queue.push(d.path);
+    }
+    n=out.length; status('Wczytywanie podfolderów… '+n+' '+plural(n,'obraz','obrazy','obrazów'));
+    if(out.length>40000) break;
+  }
+  deepItems=out; deepFor=here; return true;
 }
 
 function crumbsOf(p){
   const out=[], pr=api.parse(p);
-  let acc=pr.root; out.push({name:pr.root.replace(/[\\/]+$/,'')||(isMac?'Dysk':'/'),path:pr.root});
+  let acc=pr.root; out.push({name:(api.web?pr.root.replace(/^\/|\/$/g,''):pr.root.replace(/[\\/]+$/,''))||(isMac?'Dysk':'/'),path:api.web?pr.root.replace(/\/$/,''):pr.root});
   for(const seg of p.slice(pr.root.length).split(/[\\/]+/).filter(Boolean)){ acc=acc.endsWith(SEP)?acc+seg:acc+SEP+seg; out.push({name:seg,path:acc}); }
   return out;
 }
@@ -252,8 +287,15 @@ function renderSide(){
 /* --- widok --- */
 function applyView(keepPath){
   const q=norm($('#q').value.trim());
-  const ds=dirs.filter(d=>!q||norm(d.name).includes(q));
-  const fs=items.filter(it=>on(it.type)&&(!q||norm(it.name).includes(q)));
+  const isDeep=deep||(S.qAll&&!!q);
+  if(isDeep&&!(deepFor===curPath&&deepItems)){
+    loadDeep().then(ok=>{ if(ok){ applyView(keepPath); prefetch(); } });
+    if(!view.length) status('Wczytywanie podfolderów…');
+    return;
+  }
+  heads=null;
+  const ds=isDeep?[]:dirs.filter(d=>!q||norm(d.name).includes(q));
+  const fs=(isDeep?deepItems:items).filter(it=>on(it.type)&&(!q||norm(isDeep?(it.rel+'/'+it.name):it.name).includes(q)));
   const d=S.dir, byName=(a,b)=>coll.compare(a.name,b.name);
   const by={
     name:(a,b)=>byName(a,b)*d,
@@ -264,7 +306,12 @@ function applyView(keepPath){
   }[S.sort];
   fs.sort(by);
   if(S.sort==='name'&&d<0) ds.reverse();
-  view=[...ds,...fs];
+  if(isDeep){ // grupy według podfolderów, najpierw sam folder
+    const g=new Map(); for(const it of fs){ if(!g.has(it.rel)) g.set(it.rel,[]); g.get(it.rel).push(it); }
+    const keys=[...g.keys()].sort((a,b)=>a===''?-1:b===''?1:coll.compare(a,b));
+    view=[]; heads=new Map();
+    for(const k of keys){ heads.set(view.length,{rel:k,count:g.get(k).length}); view.push(...g.get(k)); }
+  } else view=[...ds,...fs];
   sel=keepPath?view.findIndex(it=>samePath(it.path,keepPath)):-1; anchor=sel;
   picked=new Set(sel>=0?[view[sel]]:[]);
   render();
@@ -283,6 +330,7 @@ function render(){
 function renderIcons(){
   const frag=document.createDocumentFragment();
   view.forEach((it,i)=>{
+    if(heads&&heads.has(i)) frag.appendChild(groupHead(heads.get(i),'div'));
     const t=document.createElement('div'); t.className='tile'+(it.kind==='dir'?' dir':'')+(picked.has(it)?' sel':''); t.dataset.i=i; t._it=it;
     if(it.kind==='file') t.draggable=true;
     t.innerHTML='<div class="box"></div><div><span class="nm"></span><div class="sub"></div></div>';
@@ -299,6 +347,7 @@ function renderList(){
   tb.querySelectorAll('th button').forEach(b=>b.onclick=()=>setSort(b.dataset.sort));
   const body=tb.lastChild, frag=document.createDocumentFragment();
   view.forEach((it,i)=>{
+    if(heads&&heads.has(i)) frag.appendChild(groupHead(heads.get(i),'tr'));
     const r=document.createElement('tr'); r.dataset.i=i; r._it=it; if(picked.has(it)) r.className='sel';
     if(it.kind==='file') r.draggable=true;
     r.innerHTML='<td><div class="cell"><span class="ic"></span><span class="nm"></span></div></td><td class="m"></td><td class="num m"></td><td class="num m"></td><td class="m"></td>';
@@ -306,6 +355,15 @@ function renderList(){
     r.title=it.name; it.tile=r; paint(it); frag.appendChild(r); io.observe(r);
   });
   body.appendChild(frag); grid.appendChild(tb);
+}
+function groupHead(g,tag){
+  const el=document.createElement(tag); el.className='grp';
+  const box=tag==='tr'?el.appendChild(document.createElement('td')):el; if(tag==='tr') box.colSpan=5;
+  const b=document.createElement('b'); b.textContent=g.rel?g.rel.split(/[\\/]/).join(' / '):(api.basename(curPath)||curPath);
+  const target=g.rel?curPath.replace(/[\\/]+$/,'')+SEP+g.rel:curPath;
+  b.title='Otwórz ten folder'; b.onclick=()=>go(target);
+  const c=document.createElement('span'); c.textContent=g.count+' '+plural(g.count,'obraz','obrazy','obrazów');
+  box.append(b,c); return el;
 }
 const dirSub=d=>d.count==null?'folder':d.count?d.count+' '+plural(d.count,'obraz','obrazy','obrazów'):'brak obrazów';
 
@@ -453,7 +511,7 @@ async function buildThumb(it){
   const hit=await api.thumbGet(key);
   if(hit){
     try{
-      const b=await fetch(hit.url).then(x=>{if(!x.ok)throw 0;return x.blob();});
+      const b=await fetch(hit.url).then(x=>{if(!x.ok)throw 0;return x.blob();}).finally(()=>{if(hit.url.startsWith('blob:'))URL.revokeObjectURL(hit.url);});
       const bmp=await createImageBitmap(b);
       const c=document.createElement('canvas');c.width=bmp.width;c.height=bmp.height;c.getContext('2d').drawImage(bmp,0,0);bmp.close();
       it.thumb=c; it.dims=hit.dims||it.dims; it.meta=hit.meta||it.meta; return;
@@ -533,6 +591,9 @@ function status(msg){
     s.textContent='Zaznaczone: '+n+'  ·  '+fmtSize(b);}
   else if(it&&it.kind==='dir'){s.innerHTML='<b></b>  ·  ';s.firstChild.textContent=it.name+'/';s.appendChild(document.createTextNode(dirSub(it)));}
   else if(it){s.innerHTML='<b></b>  ·  ';s.firstChild.textContent=it.name;s.appendChild(document.createTextNode(info(it)));}
+  else if(curPath&&heads){
+    const nf=view.length, q=$('#q').value;
+    s.textContent=(q?'Wyniki we wszystkich podfolderach: ':'Wszystko w środku: ')+nf+' '+plural(nf,'obraz','obrazy','obrazów')+'  ·  '+heads.size+' '+plural(heads.size,'folder','foldery','folderów');}
   else if(curPath){
     const nf=view.filter(x=>x.kind==='file').length, nd=view.length-nf, q=$('#q').value;
     s.textContent=(q?'Wyniki: ':'')+nf+' '+plural(nf,'obraz','obrazy','obrazów')+(nd?'  ·  '+nd+' '+plural(nd,'folder','foldery','folderów'):'');}
@@ -699,6 +760,7 @@ document.addEventListener('contextmenu',e=>{
     showMenu(e.clientX,e.clientY,api.basename(curPath)||curPath,[
       {label:'Odśwież',key:'R',run:()=>scan(true)},
       {label:'Pokaż folder w '+FINDER,run:()=>api.openDefault(curPath)},
+      {label:deep?'Pokaż tylko ten folder':'Pokaż wszystko z podfolderów',key:'W',run:()=>setDeep(!deep)},
       {label:'Zaznacz wszystkie obrazy',key:MOD+'A',run:selectAll},
       {label:S.mode==='list'?'Pokaż jako ikony':'Pokaż jako listę',key:'L',run:()=>setMode(S.mode==='list'?'icons':'list')},
       '-',{label:'Otwórz inny folder…',key:MOD+'O',run:pickFolder}]);
@@ -710,6 +772,7 @@ document.addEventListener('contextmenu',e=>{
     const f=findFav(it.path);
     showMenu(e.clientX,e.clientY,it.name+'/',[
       {label:'Otwórz',key:'Enter',run:()=>go(it.path)},
+      {label:'Pokaż wszystko w środku',key:'⇧Enter',run:()=>go(it.path,null,true)},
       {label:f?'Usuń z ulubionych':'Dodaj do ulubionych',run:()=>toggleFav(it.path)},
       {label:'Pokaż w '+FINDER,run:()=>api.showInFolder(it.path)},
       '-',{label:'Kopiuj ścieżkę',run:()=>copyText(it.path)}]);
@@ -720,6 +783,7 @@ document.addEventListener('contextmenu',e=>{
   else en.push({label:'Otwórz podgląd',key:'Enter',run:()=>openViewer(it)});
   en.push({label:'Otwórz w '+(editorName||'Photoshopie')+(n>1?' ('+n+')':''),key:MOD+'E',run:()=>openInEditor(many.map(x=>x.path))});
   if(n===1) en.push({label:'Otwórz w domyślnym programie',run:()=>api.openDefault(it.path)});
+  if(n===1&&heads&&it.rel) en.push({label:'Przejdź do folderu „'+it.rel.split(/[\\/]/).pop()+'”',run:()=>go(api.dirname(it.path),it.path)});
   en.push({label:'Pokaż w '+FINDER,run:()=>api.showInFolder(it.path)});
   en.push('-');
   en.push({label:n>1?'Kopiuj nazwy ('+n+')':'Kopiuj nazwę',run:()=>copyText(many.map(x=>x.name).join('\n'))});
@@ -770,7 +834,9 @@ document.addEventListener('keydown',e=>{
   else if(k==='ArrowDown')mv(c); else if(k==='ArrowUp')mv(-c);
   else if(k==='Home'){e.preventDefault();select(0,how);}
   else if(k==='End'){e.preventDefault();select(view.length-1,how);}
+  else if(k==='Enter'&&e.shiftKey&&view[sel]&&view[sel].kind==='dir'){e.preventDefault();go(view[sel].path,null,true);}
   else if(k===' '||k==='Enter'){e.preventDefault();if(sel>=0)open(sel);}
+  else if(k==='w'){setDeep(!deep);}
   else if(k==='Backspace'){e.preventDefault();goUp();}
   else if(k==='+'||k==='='){zstep(1);}
   else if(k==='-'){zstep(-1);}
@@ -792,6 +858,7 @@ document.addEventListener('dragover',e=>e.preventDefault());
 document.addEventListener('drop',async e=>{
   e.preventDefault(); dragN=0; delete document.body.dataset.drop;
   if(draggingOut){draggingOut=false;return;}
+  if(api.addDropped){ const it=[...e.dataTransfer.items].find(i=>i.kind==='file'); if(it){ const p=await api.addDropped(it); if(p){ await loadRoots(); go(p); } } return; }
   const f=e.dataTransfer.files[0]; if(!f) return;
   const p=api.pathForFile(f); if(!p) return;
   if(await api.exists(p)) go(p); else go(api.dirname(p),p);

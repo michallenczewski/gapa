@@ -857,16 +857,24 @@ function videoPlayer(vid){
   const w=document.createElement('div'); w.className='vwrap';
   const box=document.createElement('div'); box.className='vbox';
   const bar=document.createElement('div'); bar.className='vbar';
-  bar.innerHTML='<button class="ib vp" aria-label="Odtwórz / pauza (K)"></button><span class="vt0">0:00</span><div class="vs"><div class="vs-f"></div></div><span class="vt1"></span><button class="ib vm" aria-label="Dźwięk (M)"></button>';
+  bar.innerHTML='<button class="ib vp" aria-label="Odtwórz / pauza (K)"></button><span class="vt0">0:00</span><div class="vs"><div class="vs-f"></div></div><span class="vt1"></span><button class="ib vm" aria-label="Dźwięk (M)"></button><div class="vs vv" title="Głośność"><div class="vs-f"></div></div>';
   box.append(vid,bar); w.appendChild(box);
   const bp=bar.querySelector('.vp'), bm=bar.querySelector('.vm'), t0=bar.querySelector('.vt0'), t1=bar.querySelector('.vt1'), sc=bar.querySelector('.vs'), fill=bar.querySelector('.vs-f');
-  const sync=()=>{bp.innerHTML=vid.paused?IC_PLAY:IC_PAUSE; bm.innerHTML=vid.muted||!vid.volume?IC_MUTE:IC_SND;};
+  const vv=bar.querySelector('.vv'), vf=vv.firstChild;
+  vid.volume=S.vol!=null?S.vol:1; vid.muted=!!S.mute;
+  const sync=()=>{bp.innerHTML=vid.paused?IC_PLAY:IC_PAUSE; const off=vid.muted||!vid.volume; bm.innerHTML=off?IC_MUTE:IC_SND; vf.style.width=(off?0:vid.volume*100)+'%';};
   const time=()=>{t0.textContent=fmtDur(vid.currentTime); t1.textContent=fmtDur(vid.duration); fill.style.width=(vid.duration?vid.currentTime/vid.duration*100:0)+'%';};
   vid.addEventListener('play',sync); vid.addEventListener('pause',sync); vid.addEventListener('volumechange',sync); vid.addEventListener('timeupdate',time);
   const tog=()=>vid.paused?vid.play().catch(()=>{}):vid.pause();
   vid.onclick=e=>{e.stopPropagation();tog();};
   bp.onclick=e=>{e.stopPropagation();tog();};
-  bm.onclick=e=>{e.stopPropagation();vid.muted=!vid.muted;};
+  bm.onclick=e=>{e.stopPropagation();vid.muted=!vid.muted;if(!vid.muted&&!vid.volume)vid.volume=.5;S.mute=vid.muted;S.vol=vid.volume;save();};
+  let vdrag=false;
+  const setVol=e=>{const r=vv.getBoundingClientRect();const k=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));vid.volume=k;vid.muted=k===0;S.vol=k;S.mute=vid.muted;};
+  vv.onpointerdown=e=>{e.stopPropagation();vdrag=true;vv.setPointerCapture(e.pointerId);vv.classList.add('drag');setVol(e);};
+  vv.onpointermove=e=>{if(vdrag)setVol(e);};
+  vv.onpointerup=()=>{vdrag=false;vv.classList.remove('drag');save();};
+  vv.onwheel=e=>{e.preventDefault();e.stopPropagation();vid.volume=Math.max(0,Math.min(1,vid.volume-Math.sign(e.deltaY)*.05));vid.muted=!vid.volume;S.vol=vid.volume;S.mute=vid.muted;save();};
   let drag=false;
   const seek=e=>{const r=sc.getBoundingClientRect();const k=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));if(vid.duration){vid.currentTime=k*vid.duration;time();}};
   sc.onpointerdown=e=>{e.stopPropagation();drag=true;sc.setPointerCapture(e.pointerId);sc.classList.add('drag');seek(e);};
@@ -1058,7 +1066,7 @@ document.addEventListener('keydown',e=>{
     if(k==='Escape'||k===' '){e.preventDefault();closeViewer();}
     else if(k==='ArrowRight'||k==='ArrowDown'){e.preventDefault();stepV(1);}
     else if(k==='ArrowLeft'||k==='ArrowUp'){e.preventDefault();stepV(-1);}
-    else if((k==='k'||k==='m')&&vEl&&vEl.video){const m=vEl.video; if(k==='k') m.paused?m.play().catch(()=>{}):m.pause(); else m.muted=!m.muted;}
+    else if((k==='k'||k==='m')&&vEl&&vEl.video){const m=vEl.video; if(k==='k') m.paused?m.play().catch(()=>{}):m.pause(); else {m.muted=!m.muted;if(!m.muted&&!m.volume)m.volume=.5;S.mute=m.muted;S.vol=m.volume;save();}}
     else if(k==='z'||k==='1'){actual=!actual;applyZoom(true);}
     else if(k==='r'){api.showInFolder(vList[vi].path);}
     else if(k==='e'){openInEditor([vList[vi].path]);}

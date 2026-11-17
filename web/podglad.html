@@ -1104,6 +1104,7 @@ function settingsMenu(){
     {label:'Nazwy plików',box:S.names!==false,keys:['N'],keep:true,run:()=>{setNames(!(S.names!==false));settingsMenu();}},
     {label:'Nazwy folderów',box:S.dirNames!==false,keys:['⇧','N'],keep:true,run:()=>{setDirNames(!(S.dirNames!==false));settingsMenu();}},
     {label:'Ukryj interfejs',keys:['Tab'],run:toggleBare},
+    {label:'Dźwięki',box:S.sound!==false,keys:['S'],keep:true,run:()=>{S.sound=!(S.sound!==false);save();if(S.sound)SFX('on');settingsMenu();}},
     ...(api.iconSet?['-',{head:'Ikona programu'},
       {label:'Gałka 3D',check:curIcon!=='retro',run:async()=>{curIcon=await api.iconSet('3d');}},
       {label:'Gałka 1-bit',check:curIcon==='retro',run:async()=>{curIcon=await api.iconSet('retro');}}]:[]),
@@ -1139,6 +1140,7 @@ function toggleFav(p){
   p=p||curPath; if(!p) return;
   const f=findFav(p);
   if(f) S.favs=S.favs.filter(x=>x!==f); else S.favs.push({name:api.basename(p)||p,path:p});
+  SFX(f?'off':'on');
   save(); renderSide();
 }
 async function openFav(f){
@@ -1153,7 +1155,38 @@ let deep=false, deepItems=null, deepFor=null, deepTok=0, heads=null;
 const keep=()=>{const it=view[sel];return it?it.path:null;};
 
 async function pickFolder(){ const p=await api.pickFolder(); if(p){ if(api.web) await loadRoots(); go(p); } }
-function go(p,selectPath,inside){ curPath=p; S.last=p; save(); deep=!!inside; deepItems=null; deepFor=null; $('#q').value='';$('#qClear').hidden=true; markDeep(); scan(false,selectPath); }
+/* --- dźwięki interfejsu: krótkie kliki syntezowane na żywo (Web Audio), bez plików; wyciszane w ustawieniach --- */
+const SFX=(()=>{
+  let ctx=null, last={};
+  const ac=()=>{ if(!ctx){ try{ctx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} } if(ctx&&ctx.state==='suspended') ctx.resume(); return ctx; };
+  // jeden dźwięk: krótki ton z szybkim wygaszeniem albo trzask szumu przez filtr
+  function blip({f=1200,to=null,d=.035,g=.05,type='sine',noise=false,bp=3000,at=0}){
+    const c=ac(); if(!c) return; const t=c.currentTime+at;
+    const out=c.createGain(); out.gain.setValueAtTime(0,t); out.gain.linearRampToValueAtTime(g,t+.003); out.gain.exponentialRampToValueAtTime(.0001,t+d); out.connect(c.destination);
+    if(noise){
+      const n=Math.ceil(c.sampleRate*d), buf=c.createBuffer(1,n,c.sampleRate), ch=buf.getChannelData(0);
+      for(let i=0;i<n;i++) ch[i]=Math.random()*2-1;
+      const src=c.createBufferSource(); src.buffer=buf; const fl=c.createBiquadFilter(); fl.type='bandpass'; fl.frequency.value=bp; fl.Q.value=1.2;
+      src.connect(fl); fl.connect(out); src.start(t); src.stop(t+d);
+    }else{
+      const o=c.createOscillator(); o.type=type; o.frequency.setValueAtTime(f,t); if(to) o.frequency.exponentialRampToValueAtTime(to,t+d);
+      o.connect(out); o.start(t); o.stop(t+d+.01);
+    }
+  }
+  const SOUNDS={
+    click:()=>{blip({noise:true,d:.012,g:.09,bp:4200}); blip({f:1500,to:900,d:.02,g:.025});},
+    tick:()=>blip({noise:true,d:.008,g:.06,bp:5200}),
+    tok:()=>{blip({f:520,to:380,d:.06,g:.07,type:'triangle'}); blip({noise:true,d:.01,g:.04,bp:2000});},
+    open:()=>{blip({f:520,to:780,d:.07,g:.045,type:'triangle'});},
+    close:()=>{blip({f:780,to:480,d:.07,g:.04,type:'triangle'});},
+    on:()=>{blip({f:1320,d:.08,g:.035}); blip({f:1760,d:.12,g:.035,at:.06});},
+    off:()=>{blip({f:1760,d:.07,g:.03}); blip({f:1180,d:.1,g:.03,at:.05});},
+  };
+  return name=>{ if(S.sound===false) return; const now=performance.now(); if(now-(last[name]||0)<28) return; last[name]=now; try{SOUNDS[name]&&SOUNDS[name]();}catch(e){} };
+})();
+// klik każdego przycisku interfejsu (poza tymi, które mają własny dźwięk)
+document.addEventListener('pointerdown',e=>{ const b=e.target.closest('button,.seg button,.sec,#tree li,#favs li,#places li'); if(b&&!b.closest('.rf,.tf')) SFX('click'); },true);
+function go(p,selectPath,inside){ SFX('tok'); curPath=p; S.last=p; save(); deep=!!inside; deepItems=null; deepFor=null; $('#q').value='';$('#qClear').hidden=true; markDeep(); scan(false,selectPath); }
 function setDeep(v){ deep=v; markDeep(); applyView(keep()); main.scrollTop=0; prefetch(); }
 function markDeep(){ const c=$('#deepChip'); c.hidden=!deep; }
 async function scan(keepScroll,selectPath){
@@ -1476,6 +1509,7 @@ grid.addEventListener('pointerout',e=>{
 /* --- zaznaczanie: klik, ⌘/Ctrl+klik, Shift+klik, ⌘/Ctrl+A --- */
 function markSel(){for(const it of view) if(it.tile) it.tile.classList.toggle('sel',picked.has(it));}
 function select(i,how){
+  SFX('tick');
   if(!view.length) return;
   i=Math.max(0,Math.min(view.length-1,i)); const it=view[i];
   if(how==='toggle'){picked.has(it)?picked.delete(it):picked.add(it);anchor=i;}
@@ -1830,6 +1864,7 @@ function fullOf(it){
   vLoading.set(it,p); return p;
 }
 function openViewer(it){
+  SFX('open');
   const files=view.filter(x=>x.kind==='file');
   vList=picked.size>1&&picked.has(it)?files.filter(x=>picked.has(x)):files;
   vi=Math.max(0,vList.indexOf(it)); viewer.classList.add('open'); chromeSync(); showV();
@@ -1928,13 +1963,13 @@ function afterShow(it,v,tok){
     }
   },60);
 }
-function stepV(d){if(!vList.length)return;vi=(vi+d+vList.length)%vList.length;showV();}
+function stepV(d){if(!vList.length)return;SFX('tick');vi=(vi+d+vList.length)%vList.length;showV();}
 function applyZoom(tip){
   stage.className=actual?'actual':'fit';
   if(vEl&&!vEl.video&&!vEl.isDoc){const w=(vEl.naturalWidth||vEl.width)/devicePixelRatio;vEl.style.width=actual?w+'px':'';vEl.style.height='';}
   if(tip) zoomTip(actual?'100%':'Dopasuj');
 }
-function closeViewer(){stopMedia();viewer.classList.remove('open');chromeSync();vTok++;stage.textContent='';vEl=null;main.focus();}
+function closeViewer(){if(viewer.classList.contains('open'))SFX('close');stopMedia();viewer.classList.remove('open');chromeSync();vTok++;stage.textContent='';vEl=null;main.focus();}
 stage.addEventListener('click',e=>{if(e.target===stage)closeViewer();});
 // kółko myszy i gładzik przewijają obrazy (w trybie 100% przewijają sam obraz)
 let wAcc=0, wT=0;
@@ -2100,6 +2135,7 @@ document.addEventListener('keydown',e=>{
   else if(k==='-'){zstep(-1);}
   else if(k==='r'){scan(true);}
   else if(k==='t'){cycleTheme();}
+  else if(k==='s'&&!mod){S.sound=!(S.sound!==false);save();if(S.sound)SFX('on');zoomTip(S.sound?'Dźwięki włączone':'Dźwięki wyciszone');}
   else if(k==='N'||(k==='n'&&e.shiftKey)){setDirNames(!(S.dirNames!==false));}
   else if(k==='n'){setNames(!(S.names!==false));}
   else if(k==='l'){setMode(S.mode==='list'?'icons':'list');}

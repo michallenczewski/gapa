@@ -56,6 +56,7 @@ Po wejściu do folderu najpierw liczą się widoczne miniatury, potem w tle resz
 | N | pokaż / ukryj nazwy plików |
 | Shift+N | pokaż / ukryj nazwy folderów |
 | K, M | film: odtwórz / pauza, wycisz |
+| S | dźwięki interfejsu: włącz / wycisz |
 | T | jasny / ciemny |
 | R | odśwież |
 | / albo ⌘/Ctrl + F | szukaj |

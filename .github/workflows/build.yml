@@ -60,8 +60,10 @@ jobs:
             dist/*.exe
           if-no-files-found: error
 
+  # wydanie powstaje z tego, co się zbudowało — brak maszyny z macOS nie blokuje wersji dla Windows
   release:
     needs: [check, build]
+    if: always() && needs.check.outputs.build == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -76,3 +78,4 @@ jobs:
           name: Podgląd ${{ needs.check.outputs.version }}
           make_latest: true
           files: out/*
+          fail_on_unmatched_files: false

@@ -4,6 +4,7 @@ const path = require('path');
 
 contextBridge.exposeInMainWorld('api', {
   platform: process.platform,
+  chromeColors: (bg, fg) => ipcRenderer.send('chrome-colors', { bg, fg }),
   sep: path.sep,
   dirname: p => path.dirname(p),
   basename: p => path.basename(p),

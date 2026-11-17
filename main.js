@@ -183,6 +183,7 @@ ipcMain.handle('os-thumb', async (e, p, size) => {
 });
 
 /* ---------- system: Finder/Eksplorator, programy, przeciąganie ---------- */
+ipcMain.on('chrome-colors', (e, c) => { try { if (win && process.platform !== 'darwin') win.setTitleBarOverlay({ color: c.bg, symbolColor: c.fg, height: 52 }); } catch (_) {} });
 ipcMain.handle('show-in-folder', (e, p) => shell.showItemInFolder(p));
 ipcMain.handle('open-default', (e, p) => shell.openPath(p));
 
@@ -246,6 +247,10 @@ function createWindow() {
     title: 'Podgląd', backgroundColor: '#1b1b1b',
     icon: path.join(__dirname, 'renderer', 'icon.png'),
     autoHideMenuBar: true,
+    // pasek tytułu schowany — przyciski okna rysuje system w górnym pasku programu
+    ...(process.platform === 'darwin'
+      ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 18, y: 19 } }
+      : { titleBarStyle: 'hidden', titleBarOverlay: { color: '#f7f7f5', symbolColor: '#4a4945', height: 52 } }),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: false, plugins: true }
   });
   if (settings.maximized) win.maximize();
@@ -275,7 +280,8 @@ function buildMenu() {
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Range', 'Access-Control-Expose-Headers': 'Content-Range, Content-Length' };
 const MIME = { jpg: 'image/jpeg', jpeg: 'image/jpeg', jpe: 'image/jpeg', jfif: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp',
-  avif: 'image/avif', bmp: 'image/bmp', dib: 'image/bmp', ico: 'image/x-icon', svg: 'image/svg+xml', tif: 'image/tiff', tiff: 'image/tiff' };
+  avif: 'image/avif', bmp: 'image/bmp', dib: 'image/bmp', ico: 'image/x-icon', svg: 'image/svg+xml', tif: 'image/tiff', tiff: 'image/tiff',
+  mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', mkv: 'video/x-matroska', ogv: 'video/ogg' };
 
 if (!app.requestSingleInstanceLock()) app.quit();
 else {

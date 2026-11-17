@@ -42,8 +42,21 @@ header{grid-column:1/4;display:flex;align-items:center;gap:6px;padding:0 12px;mi
 #crumbs i{font-style:normal;color:var(--muted2);opacity:.6;flex:none}
 #crumbs span{font-weight:500;padding:4px 6px;flex:none}
 #count{color:var(--muted2);font-size:12px;white-space:nowrap;flex:none;margin-left:2px}
-#fav{width:26px;height:26px;color:var(--muted2)}
-#fav.on{color:#c49a2c}
+#hspace{flex:none;width:calc(220px - 40px)}
+/* okno bez paska tytułu: miejsce na przyciski systemu, przeciąganie za górny pasek */
+.frame-win header,.frame-win #viewer .top{padding-right:150px}
+.frame-mac header{padding-left:84px}
+.frame-mac #viewer .top{padding-left:84px}
+.frame-mac #hspace{width:calc(220px - 112px)}
+.frame-win header,.frame-mac header,.frame-win #viewer .top,.frame-mac #viewer .top{-webkit-app-region:drag}
+header button,header input,header a,header .seg,header .zoom,header .search,#viewer .top button{-webkit-app-region:no-drag}
+body.noside #hspace{display:none}
+.sechead{display:flex;align-items:center;flex:none}
+.sechead .sec{flex:1}
+.addfav{width:20px;height:20px;border-radius:5px;color:var(--muted2);display:flex;align-items:center;justify-content:center;margin:8px 4px 0 0;opacity:0;transition:opacity .15s}
+aside:hover .addfav:not(:disabled),.addfav:focus-visible{opacity:1}
+.addfav:hover{background:var(--hover);color:var(--text)}
+.addfav.on{display:none}
 #deepChip{height:26px;padding:0 10px;border-radius:7px;background:var(--soft);font-size:12px;flex:none;color:var(--text2)}
 #deepChip:hover{background:var(--hover);color:var(--text)}
 .gap{flex:1 1 0;min-width:8px}
@@ -92,6 +105,8 @@ body.noside aside{display:none}
 .nav li.none:hover{background:none}
 .tree{flex:0 1 auto;overflow:auto;min-height:0}
 .tree.shut,.nav.shut{display:none}
+.tree li{position:relative}
+.tree li .g{position:absolute;top:0;bottom:0;width:1px;background:var(--line)}
 .tw{flex:none;width:14px;height:14px;display:flex;align-items:center;justify-content:center;color:var(--muted2);border-radius:3px}
 .tw:hover{color:var(--text)}
 .tw svg{transition:transform .12s}
@@ -101,11 +116,14 @@ body.noside aside{display:none}
 #prog{font-size:11px;color:var(--muted);white-space:nowrap}
 
 /* --- siatka --- */
-main{grid-row:2;grid-column:2;overflow:auto;padding:10px 24px 32px 18px;position:relative;outline:none;min-width:0}
+main{grid-row:2;grid-column:2;overflow:auto;padding:10px 24px 32px 24px;position:relative;outline:none;min-width:0}
 #grid.icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(var(--tile-w),100%),1fr));column-gap:calc(var(--tile-w)*.15);row-gap:calc(var(--tile-w)*.1)}
 #grid.list{display:block}
 .tile{display:flex;flex-direction:column;gap:8px;min-width:0;cursor:default}
 .tile .box{aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;position:relative}
+.tile .dur{position:absolute;right:6px;bottom:6px;display:flex;align-items:center;gap:5px;padding:2px 6px;border-radius:4px;background:rgba(0,0,0,.55);color:#fff;font-size:10.5px;font-variant-numeric:tabular-nums;line-height:15px;pointer-events:none}
+#stage video.vid{cursor:default;outline:none;border-radius:4px}
+#stage.fit>video.vid{position:relative;inset:auto;margin:auto;width:auto;height:auto;max-width:calc(100% - 128px);max-height:calc(100% - 38px);transform:translateY(-5px)}
 .tile:not(.dir) canvas{max-width:100%;max-height:100%;width:auto;height:auto;display:block;border-radius:3px;transition:transform .18s cubic-bezier(.2,.7,.3,1),box-shadow .18s}
 .tile:not(.dir):hover canvas{transform:scale(1.04);box-shadow:0 8px 24px rgba(0,0,0,.14)}
 .tile.sel:not(.dir) canvas{box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--ring)}
@@ -235,7 +253,7 @@ body.bare #grid .nm{display:none}
 .web.oneroot [data-sec=places],.web.oneroot #places{display:none}
 /* węższe okno: najpierw znika suwak, potem nazwy przy sortowaniu, panel boczny i panel informacji chowają się same */
 @media (max-width:1100px){.zoom,.sep{display:none}.search{width:170px}}
-@media (max-width:860px){#sortBtn span,#typesBtn span{display:none}#sortBtn,#typesBtn{padding:0 6px}.search{width:130px}#qScope{display:none}aside{display:none}}
+@media (max-width:860px){#hspace{display:none}#sortBtn span,#typesBtn span{display:none}#sortBtn,#typesBtn{padding:0 6px}.search{width:130px}#qScope{display:none}aside{display:none}}
 @media (max-width:760px){#insp{display:none!important}#count{display:none}}
 </style>
 </head>
@@ -245,11 +263,9 @@ body.bare #grid .nm{display:none}
   <button id="sideBtn" class="ib" aria-label="Panel boczny" title="Panel boczny">
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="M6 3v10"/></svg>
   </button>
+  <span id="hspace" aria-hidden="true"></span>
   <nav id="crumbs" aria-label="Ścieżka"></nav>
-  <span id="count"></span>
-  <button id="fav" class="ib" aria-label="Ulubione" title="Dodaj ten folder do ulubionych" disabled>
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="m7 1.8 1.6 3.3 3.6.5-2.6 2.5.6 3.6L7 10l-3.2 1.7.6-3.6-2.6-2.5 3.6-.5z"/></svg>
-  </button>
+  <span id="count" hidden></span>
   <button id="deepChip" hidden title="Wróć do zwykłego widoku folderu (W)">Wszystko w środku ✕</button>
   <span class="gap"></span>
   <label class="search">
@@ -273,7 +289,7 @@ body.bare #grid .nm{display:none}
 </header>
 
 <aside>
-  <button class="sec" data-sec="favs"><svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="m1.5 3 2.5 2.5L6.5 3"/></svg>Ulubione</button>
+  <div class="sechead"><button class="sec" data-sec="favs"><svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="m1.5 3 2.5 2.5L6.5 3"/></svg>Ulubione</button><button id="fav" class="addfav" aria-label="Dodaj bieżący folder do ulubionych" title="Dodaj bieżący folder do ulubionych (Ctrl+D)" disabled><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M6 2v8M2 6h8"/></svg></button></div>
   <ul class="nav" id="favs"></ul>
   <button class="sec" data-sec="tree"><svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="m1.5 3 2.5 2.5L6.5 3"/></svg>Foldery</button>
   <ul class="nav tree" id="tree"></ul>
@@ -880,9 +896,10 @@ const EXT={jpg:'jpg',jpeg:'jpg',jpe:'jpg',jfif:'jpg',png:'png',psd:'psd',psb:'ps
   webp:'webp',avif:'avif',gif:'gif',bmp:'bmp',dib:'bmp',ico:'ico',svg:'svg',
   dng:'raw',cr2:'raw',cr3:'raw',nef:'raw',nrw:'raw',arw:'raw',sr2:'raw',srf:'raw',orf:'raw',rw2:'raw',raf:'raw',pef:'raw',srw:'raw',
   '3fr':'raw',iiq:'raw',erf:'raw',kdc:'raw',mrw:'raw',rwl:'raw',x3f:'raw',
-  pdf:'pdf',dwg:'dwg',skp:'skp',max:'max','3dm':'3dm',pln:'pln',pla:'pln',tpl:'pln'};
+  pdf:'pdf',dwg:'dwg',skp:'skp',max:'max','3dm':'3dm',pln:'pln',pla:'pln',tpl:'pln',
+  mp4:'vid',m4v:'vid',mov:'vid',webm:'vid',mkv:'vid',avi:'vid',wmv:'vid',mpg:'vid',mpeg:'vid',ogv:'vid','3gp':'vid',mts:'vid',m2ts:'vid'};
 const EXTS=Object.keys(EXT);
-const TYPES=['jpg','png','psd','tif','tga','exr','hdr','raw','webp','avif','gif','bmp','ico','svg','pdf','dwg','skp','max','3dm','pln'];
+const TYPES=['jpg','png','psd','tif','tga','exr','hdr','raw','webp','avif','gif','bmp','ico','svg','pdf','dwg','skp','max','3dm','pln','vid'];
 const DOCS=new Set(['pdf','dwg','skp','max','3dm','pln']);   // pliki projektowe: miniatura systemowa albo zapisana w pliku // kolejność filtrów
 const NATIVE=new Set(['jpg','png','webp','avif','gif','bmp','ico','svg']);           // dekoduje silnik przeglądarki
 const OPAQUE=new Set(['jpg','raw','hdr','exr']);                                     // nie mają przezroczystości
@@ -907,6 +924,15 @@ function applyTheme(){
   const t=S.theme||'auto';
   const dark=t==='auto'?matchMedia('(prefers-color-scheme: dark)').matches:t==='dark';
   document.documentElement.dataset.theme=dark?'dark':'light';
+  chromeSync();
+}
+// przyciski okna (Windows) w kolorze tła; na Macu „światła” po lewej
+if(!api.web) document.documentElement.classList.add(api.platform==='darwin'?'frame-mac':'frame-win');
+function chromeSync(){
+  if(api.web||!api.chromeColors) return;
+  const cs=getComputedStyle(document.documentElement), v=document.getElementById('viewer');
+  const bg=(v&&v.classList.contains('open')?cs.getPropertyValue('--stage'):cs.getPropertyValue('--bg')).trim();
+  api.chromeColors(bg,cs.getPropertyValue('--text2').trim());
 }
 applyTheme();
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);
@@ -934,7 +960,8 @@ main.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefa
 
 /* filtry, sortowanie, widoki */
 function typeCounts(){const n={}; for(const it of items) n[it.type]=(n[it.type]||0)+1; return n;}
-const TLABEL=t=>t==='tif'?'TIFF':t==='pln'?'Archicad':t.toUpperCase();
+const TLABEL=t=>t==='tif'?'TIFF':t==='pln'?'Archicad':t==='vid'?'Wideo':t.toUpperCase();
+const fmtDur=s=>{if(!isFinite(s))return '';s=Math.round(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0');};
 const ICO_DOWN='<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="m2.5 4 2.5 2.5L7.5 4"/></svg>';
 function renderTypes(){
   const n=typeCounts(), present=TYPES.filter(t=>n[t]), shown=present.filter(t=>on(t));
@@ -1177,7 +1204,8 @@ function renderTree(){
   treeRoot=best;
   if(!best){ul.innerHTML='<li class="none"><span>Otwórz folder, żeby zobaczyć drzewo</span></li>';}
   const add=(n,d)=>{
-    const li=document.createElement('li'); li.style.paddingLeft=(4+d*14)+'px'; li.title=n.path;
+    const li=document.createElement('li'); li.style.paddingLeft=(4+d*16)+'px'; li.title=n.path;
+    for(let k=1;k<=d;k++){const g=document.createElement('i');g.className='g';g.style.left=(4+(k-1)*16+7)+'px';li.appendChild(g);} // linie poziomów
     const tw=document.createElement('span'); tw.className='tw'+(n.open?' open':'');
     if(!(n.kids&&!n.kids.length)) tw.innerHTML=TW;
     const nm=document.createElement('span'); nm.className='nm'; nm.textContent=n.name;
@@ -1209,8 +1237,8 @@ function renderSide(){
     if(samePath(f.path,curPath)) li.classList.add('on');
     fl.appendChild(li);
   }
-  if(!S.favs.length) fl.innerHTML='<li class="none"><span>Kliknij ☆ przy ścieżce</span></li>';
-  const fv=!!findFav(curPath), fb=$('#fav'); fb.classList.toggle('on',fv); fb.querySelector('path').setAttribute('fill',fv?'currentColor':'none');
+  if(!S.favs.length) fl.innerHTML='<li class="none"><span>Dodaj folder przyciskiem +</span></li>';
+  const fv=!!findFav(curPath), fb=$('#fav'); fb.classList.toggle('on',fv); fb.disabled=!curPath;
   fb.title=fv?'Usuń ten folder z ulubionych':'Dodaj ten folder do ulubionych';
 }
 
@@ -1311,7 +1339,7 @@ function paint(it){
   const box=el.firstChild;
   if(it.kind==='dir'){ el.querySelector('.sub').textContent=dirSub(it); return paintDir(it); }
   box.textContent='';
-  if(it.thumb){box.appendChild(it.thumb);return;}
+  if(it.thumb){box.appendChild(it.thumb);if(it.type==='vid'){const d=document.createElement('span');d.className='dur';d.innerHTML='<svg width="7" height="8" viewBox="0 0 7 8" aria-hidden="true"><path d="M0 0v8l7-4z" fill="currentColor"/></svg>';d.append(it.meta&&it.meta.mode||'');box.appendChild(d);}return;}
   const s=document.createElement('span'); s.className='ph';
   s.textContent=(it.state==='error'?extOf(it.name)+' · brak podglądu':extOf(it.name));
   if(it.err) el.title=it.name+'\n'+it.err;
@@ -1472,6 +1500,19 @@ async function buildThumb(it){
     }catch(e){ api.thumbForget(hit.hash); }
   }
   let bmp;
+  if(it.type==='vid'){ // klatka z ~10% długości filmu; gdy przeglądarka nie zna kodeka — miniatura systemowa
+    let f=null; try{f=await videoFrame(api.fileUrl(it.path));}catch(e){}
+    const fmt=extOf(it.name).toUpperCase();
+    if(f){bmp=f.bmp;it.dims=[f.w,f.h];it.meta={format:fmt,mode:fmtDur(f.dur)};}
+    else{const png=await api.osThumb(it.path,TH); if(!png) throw new Error('nie można odtworzyć tego formatu — otwórz w programie');
+      bmp=await createImageBitmap(new Blob([png],{type:'image/png'})); it.meta={format:fmt,mode:'',noplay:true};}
+    const s=Math.min(1,TH/Math.max(bmp.width,bmp.height)), c=document.createElement('canvas');
+    c.width=Math.max(1,Math.round(bmp.width*s)); c.height=Math.max(1,Math.round(bmp.height*s));
+    const g=c.getContext('2d'); g.imageSmoothingQuality='high'; g.drawImage(bmp,0,0,c.width,c.height); bmp.close();
+    it.thumb=c;
+    c.toBlob(b=>{ if(b) b.arrayBuffer().then(buf=>api.thumbPut(key,buf,it.dims||null,it.meta)).then(()=>newThumbs++); },'image/webp',0.82);
+    return;
+  }
   if(DOCS.has(it.type)){
     const png=await api.osThumb(it.path,TH);
     if(png) bmp=await createImageBitmap(new Blob([png],{type:'image/png'}));
@@ -1505,6 +1546,17 @@ async function buildThumb(it){
   if(small!==bmp)small.close(); bmp.close();
   it.thumb=c;
   c.toBlob(b=>{ if(b) b.arrayBuffer().then(buf=>api.thumbPut(key,buf,it.dims,it.meta||null)).then(()=>newThumbs++); },'image/webp',0.82);
+}
+function videoFrame(url){
+  return new Promise((res,rej)=>{
+    const v=document.createElement('video'); v.muted=true; v.preload='auto'; v.crossOrigin='anonymous';
+    let done=false; const end=(e,r)=>{if(done)return;done=true;clearTimeout(t);v.removeAttribute('src');v.load();e?rej(e):res(r);};
+    const t=setTimeout(()=>end(new Error('limit czasu')),12000);
+    v.onerror=()=>end(new Error('kodek'));
+    v.onloadedmetadata=()=>{ if(!v.videoWidth) return end(new Error('brak obrazu')); v.currentTime=Math.min((v.duration||0)*0.1,8); };
+    v.onseeked=async()=>{try{const b=await createImageBitmap(v);end(null,{bmp:b,dur:v.duration,w:v.videoWidth,h:v.videoHeight});}catch(e){end(e);}};
+    v.src=url;
+  });
 }
 // PDF: pierwsza strona rysowana przez pdf.js (tylko w programie — biblioteka jest dołączana przy budowaniu)
 let pdfjs=null, pdfjsTried=false;
@@ -1572,7 +1624,7 @@ function info(it){
 }
 function status(msg){
   const s=$('#count');
-  if(msg){s.textContent=msg;return;}
+  if(msg){if(/^(Folderu|Błąd)/.test(msg))zoomTip(msg);return;}
   if(!curPath){s.textContent='';renderInsp();return;}
   const nf=view.filter(x=>x.kind==='file').length, q=$('#q').value;
   const nd=view.length-nf;
@@ -1641,14 +1693,18 @@ let vTok=0, vEl=null, actual=false, vList=[], vi=0, lastStep=0;
 const vCache=new Map(); // pełne obrazy ostatnio oglądane i wczytane z wyprzedzeniem
 const VC_PX=180e6;      // limit pamięci podglądów (w pikselach)
 const bigCell=(w,h)=>Math.max(8,Math.round(Math.max(w,h)/80));
-const vpx=v=>(v.el.naturalWidth||v.el.width)*(v.el.naturalHeight||v.el.height);
+const vpx=v=>v.media?0:(v.el.naturalWidth||v.el.width)*(v.el.naturalHeight||v.el.height);
 const vLoading=new Map();
 function fullOf(it){
   if(vCache.has(it)){const v=vCache.get(it);vCache.delete(it);vCache.set(it,v);return Promise.resolve(v);}
   if(vLoading.has(it)) return vLoading.get(it);
   const p=(async()=>{
     let v;
-    if(it.type==='pdf'){ // cały dokument we wbudowanej przeglądarce PDF
+    if(it.type==='vid'){
+      const el=document.createElement('video'); el.src=api.fileUrl(it.path); el.controls=true; el.preload='metadata'; el.loop=true; el.className='vid'; el.playsInline=true;
+      await new Promise((ok,no)=>{el.onloadedmetadata=ok;el.onerror=()=>no(new Error('tego formatu nie da się tu odtworzyć — otwórz w programie (E)'));});
+      it.dims=[el.videoWidth,el.videoHeight]; v={el,note:'',media:true};
+    }else if(it.type==='pdf'){ // cały dokument we wbudowanej przeglądarce PDF
       const el=document.createElement('iframe'); el.src=api.fileHref(it.path); el.className='doc'; el.title=it.name;
       v={el,note:'',doc:true};
     }else if(DOCS.has(it.type)){ // model / rysunek: powiększony podgląd zapisany w pliku
@@ -1672,6 +1728,7 @@ function fullOf(it){
       else el=paintOn(bmp,bmp.width,bmp.height,bigCell(bmp.width,bmp.height));
       bmp.close(); v={el,note:r.note||''};
     }
+    if(v.media) return v; // filmów nie trzymamy w pamięci
     vCache.set(it,v);
     let tot=0; for(const x of vCache.values()) tot+=vpx(x);
     for(const k of vCache.keys()){ if(tot<=VC_PX||vCache.size<=2) break; if(vList[vi]===k) continue; tot-=vpx(vCache.get(k)); vCache.delete(k); }
@@ -1682,10 +1739,11 @@ function fullOf(it){
 function openViewer(it){
   const files=view.filter(x=>x.kind==='file');
   vList=picked.size>1&&picked.has(it)?files.filter(x=>picked.has(x)):files;
-  vi=Math.max(0,vList.indexOf(it)); viewer.classList.add('open'); showV();
+  vi=Math.max(0,vList.indexOf(it)); viewer.classList.add('open'); chromeSync(); showV();
 }
+function stopMedia(){for(const m of stage.querySelectorAll('video'))m.pause();}
 function mount(el,low,it){
-  stage.textContent=''; stage.appendChild(el); vEl=low?null:el;
+  stopMedia(); stage.textContent=''; stage.appendChild(el); vEl=low?null:el;
   el.classList.toggle('low',!!low);
   el.style.width=el.style.height='';
   if(low){ // miniatura powiększona do docelowego rozmiaru, żeby nic nie skakało
@@ -1693,9 +1751,10 @@ function mount(el,low,it){
     const [dw,dh]=it.dims||[el.width,el.height];
     const s=Math.min(aw/dw,ah/dh,1); el.style.width=Math.round(dw*s)+'px'; el.style.height=Math.round(dh*s)+'px';
   } else {
-    if(el.tagName!=='IFRAME') el.onclick=ev=>{ev.stopPropagation();actual=!actual;applyZoom(true);};
+    if(el.tagName!=='IFRAME'&&el.tagName!=='VIDEO') el.onclick=ev=>{ev.stopPropagation();actual=!actual;applyZoom(true);};
     el.draggable=true; el.ondragstart=ev=>{ev.preventDefault();api.dragOut([it.path]);};
     applyZoom();
+    if(el.tagName==='VIDEO') el.play().catch(()=>{});
   }
 }
 async function showV(){
@@ -1711,7 +1770,7 @@ async function showV(){
   // przy szybkim przewijaniu czekamy chwilę, zanim zaczniemy dekodować pełny plik
   if(fast){ await new Promise(r=>setTimeout(r,140)); if(tok!==vTok) return; }
   let v;
-  try{v=await fullOf(it);}catch(e){if(tok===vTok&&!it.thumb){stage.innerHTML='<div class="msg"></div>';stage.firstChild.textContent='Nie udało się otworzyć: '+(e.message||e);}return;}
+  try{v=await fullOf(it);}catch(e){if(tok!==vTok)return;if(!it.thumb){stage.innerHTML='<div class="msg"></div>';stage.firstChild.textContent='Nie udało się otworzyć: '+(e.message||e);}else $('#vinfo').textContent=info(it)+'  ·  '+(e.message||e);return;}
   if(tok!==vTok) return;
   mount(v.el,false,it); afterShow(it,v,tok);
 }
@@ -1731,10 +1790,10 @@ function afterShow(it,v,tok){
 function stepV(d){if(!vList.length)return;vi=(vi+d+vList.length)%vList.length;showV();}
 function applyZoom(tip){
   stage.className=actual?'actual':'fit';
-  if(vEl){const w=(vEl.naturalWidth||vEl.width)/devicePixelRatio;vEl.style.width=actual?w+'px':'';vEl.style.height='';}
+  if(vEl&&vEl.tagName!=='VIDEO'){const w=(vEl.naturalWidth||vEl.width)/devicePixelRatio;vEl.style.width=actual?w+'px':'';vEl.style.height='';}
   if(tip) zoomTip(actual?'100%':'Dopasuj');
 }
-function closeViewer(){viewer.classList.remove('open');vTok++;stage.textContent='';vEl=null;main.focus();}
+function closeViewer(){stopMedia();viewer.classList.remove('open');chromeSync();vTok++;stage.textContent='';vEl=null;main.focus();}
 stage.addEventListener('click',e=>{if(e.target===stage)closeViewer();});
 // kółko myszy i gładzik przewijają obrazy (w trybie 100% przewijają sam obraz)
 let wAcc=0, wT=0;
@@ -1880,6 +1939,7 @@ document.addEventListener('keydown',e=>{
   if(mod&&k==='ArrowUp'){e.preventDefault();goUp();return;}
   if(mod&&k==='ArrowDown'){e.preventDefault();if(sel>=0)open(sel);return;}
   if(mod&&k.toLowerCase()==='f'){e.preventDefault();$('#q').focus();return;}
+  if(mod&&k.toLowerCase()==='d'){e.preventDefault();if(curPath){const had=!!findFav(curPath);toggleFav();zoomTip(had?'Usunięto z ulubionych':'Dodano do ulubionych');}return;}
   if(mod||e.altKey) return;
   const c=cols(), how=e.shiftKey?'range':undefined;
   const mv=d=>{e.preventDefault();select(sel<0?0:sel+d,how);};

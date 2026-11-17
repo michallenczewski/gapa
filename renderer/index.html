@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' pgf: blob: data:; script-src 'self' blob: 'unsafe-inline'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' pgf: blob: data:; connect-src pgf: blob: data:; frame-src file: blob: pgf:; object-src file: blob: pgf:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' pgf: blob: data:; script-src 'self' blob: 'unsafe-inline'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' pgf: blob: data:; connect-src pgf: blob: data:; media-src 'self' pgf: blob: file:; frame-src file: blob: pgf:; object-src file: blob: pgf:">
 <title>Podgląd</title>
 <style>
 /* ===== Podgląd — wygląd „A”: jeden cienki pasek, panel informacji na żądanie ===== */
@@ -43,8 +43,21 @@ header{grid-column:1/4;display:flex;align-items:center;gap:6px;padding:0 12px;mi
 #crumbs i{font-style:normal;color:var(--muted2);opacity:.6;flex:none}
 #crumbs span{font-weight:500;padding:4px 6px;flex:none}
 #count{color:var(--muted2);font-size:12px;white-space:nowrap;flex:none;margin-left:2px}
-#fav{width:26px;height:26px;color:var(--muted2)}
-#fav.on{color:#c49a2c}
+#hspace{flex:none;width:calc(220px - 40px)}
+/* okno bez paska tytułu: miejsce na przyciski systemu, przeciąganie za górny pasek */
+.frame-win header,.frame-win #viewer .top{padding-right:150px}
+.frame-mac header{padding-left:84px}
+.frame-mac #viewer .top{padding-left:84px}
+.frame-mac #hspace{width:calc(220px - 112px)}
+.frame-win header,.frame-mac header,.frame-win #viewer .top,.frame-mac #viewer .top{-webkit-app-region:drag}
+header button,header input,header a,header .seg,header .zoom,header .search,#viewer .top button{-webkit-app-region:no-drag}
+body.noside #hspace{display:none}
+.sechead{display:flex;align-items:center;flex:none}
+.sechead .sec{flex:1}
+.addfav{width:20px;height:20px;border-radius:5px;color:var(--muted2);display:flex;align-items:center;justify-content:center;margin:8px 4px 0 0;opacity:0;transition:opacity .15s}
+aside:hover .addfav:not(:disabled),.addfav:focus-visible{opacity:1}
+.addfav:hover{background:var(--hover);color:var(--text)}
+.addfav.on{display:none}
 #deepChip{height:26px;padding:0 10px;border-radius:7px;background:var(--soft);font-size:12px;flex:none;color:var(--text2)}
 #deepChip:hover{background:var(--hover);color:var(--text)}
 .gap{flex:1 1 0;min-width:8px}
@@ -93,6 +106,8 @@ body.noside aside{display:none}
 .nav li.none:hover{background:none}
 .tree{flex:0 1 auto;overflow:auto;min-height:0}
 .tree.shut,.nav.shut{display:none}
+.tree li{position:relative}
+.tree li .g{position:absolute;top:0;bottom:0;width:1px;background:var(--line)}
 .tw{flex:none;width:14px;height:14px;display:flex;align-items:center;justify-content:center;color:var(--muted2);border-radius:3px}
 .tw:hover{color:var(--text)}
 .tw svg{transition:transform .12s}
@@ -102,11 +117,14 @@ body.noside aside{display:none}
 #prog{font-size:11px;color:var(--muted);white-space:nowrap}
 
 /* --- siatka --- */
-main{grid-row:2;grid-column:2;overflow:auto;padding:10px 24px 32px 18px;position:relative;outline:none;min-width:0}
+main{grid-row:2;grid-column:2;overflow:auto;padding:10px 24px 32px 24px;position:relative;outline:none;min-width:0}
 #grid.icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(var(--tile-w),100%),1fr));column-gap:calc(var(--tile-w)*.15);row-gap:calc(var(--tile-w)*.1)}
 #grid.list{display:block}
 .tile{display:flex;flex-direction:column;gap:8px;min-width:0;cursor:default}
 .tile .box{aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;position:relative}
+.tile .dur{position:absolute;right:6px;bottom:6px;display:flex;align-items:center;gap:5px;padding:2px 6px;border-radius:4px;background:rgba(0,0,0,.55);color:#fff;font-size:10.5px;font-variant-numeric:tabular-nums;line-height:15px;pointer-events:none}
+#stage video.vid{cursor:default;outline:none;border-radius:4px}
+#stage.fit>video.vid{position:relative;inset:auto;margin:auto;width:auto;height:auto;max-width:calc(100% - 128px);max-height:calc(100% - 38px);transform:translateY(-5px)}
 .tile:not(.dir) canvas{max-width:100%;max-height:100%;width:auto;height:auto;display:block;border-radius:3px;transition:transform .18s cubic-bezier(.2,.7,.3,1),box-shadow .18s}
 .tile:not(.dir):hover canvas{transform:scale(1.04);box-shadow:0 8px 24px rgba(0,0,0,.14)}
 .tile.sel:not(.dir) canvas{box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--ring)}
@@ -236,7 +254,7 @@ body.bare #grid .nm{display:none}
 .web.oneroot [data-sec=places],.web.oneroot #places{display:none}
 /* węższe okno: najpierw znika suwak, potem nazwy przy sortowaniu, panel boczny i panel informacji chowają się same */
 @media (max-width:1100px){.zoom,.sep{display:none}.search{width:170px}}
-@media (max-width:860px){#sortBtn span,#typesBtn span{display:none}#sortBtn,#typesBtn{padding:0 6px}.search{width:130px}#qScope{display:none}aside{display:none}}
+@media (max-width:860px){#hspace{display:none}#sortBtn span,#typesBtn span{display:none}#sortBtn,#typesBtn{padding:0 6px}.search{width:130px}#qScope{display:none}aside{display:none}}
 @media (max-width:760px){#insp{display:none!important}#count{display:none}}
 </style>
 </head>
@@ -246,11 +264,9 @@ body.bare #grid .nm{display:none}
   <button id="sideBtn" class="ib" aria-label="Panel boczny" title="Panel boczny">
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="M6 3v10"/></svg>
   </button>
+  <span id="hspace" aria-hidden="true"></span>
   <nav id="crumbs" aria-label="Ścieżka"></nav>
-  <span id="count"></span>
-  <button id="fav" class="ib" aria-label="Ulubione" title="Dodaj ten folder do ulubionych" disabled>
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="m7 1.8 1.6 3.3 3.6.5-2.6 2.5.6 3.6L7 10l-3.2 1.7.6-3.6-2.6-2.5 3.6-.5z"/></svg>
-  </button>
+  <span id="count" hidden></span>
   <button id="deepChip" hidden title="Wróć do zwykłego widoku folderu (W)">Wszystko w środku ✕</button>
   <span class="gap"></span>
   <label class="search">
@@ -274,7 +290,7 @@ body.bare #grid .nm{display:none}
 </header>
 
 <aside>
-  <button class="sec" data-sec="favs"><svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="m1.5 3 2.5 2.5L6.5 3"/></svg>Ulubione</button>
+  <div class="sechead"><button class="sec" data-sec="favs"><svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="m1.5 3 2.5 2.5L6.5 3"/></svg>Ulubione</button><button id="fav" class="addfav" aria-label="Dodaj bieżący folder do ulubionych" title="Dodaj bieżący folder do ulubionych (Ctrl+D)" disabled><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M6 2v8M2 6h8"/></svg></button></div>
   <ul class="nav" id="favs"></ul>
   <button class="sec" data-sec="tree"><svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="m1.5 3 2.5 2.5L6.5 3"/></svg>Foldery</button>
   <ul class="nav tree" id="tree"></ul>

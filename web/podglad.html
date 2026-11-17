@@ -216,6 +216,8 @@ body[data-drop] .dropzone{display:block}
 #stage.fit>*{position:absolute;inset:14px 64px 24px;width:calc(100% - 128px);height:calc(100% - 38px);object-fit:scale-down;cursor:zoom-in}
 #stage.fit>.low{margin:auto;object-fit:fill}
 #stage.actual>*{margin:auto;flex:none;cursor:zoom-out}
+#stage.fit>iframe.doc,#stage.actual>iframe.doc{position:absolute;inset:8px 64px 16px;width:calc(100% - 128px);height:calc(100% - 24px);border:0;border-radius:6px;background:#fff;margin:0;cursor:auto}
+#stage.fit>canvas.docthumb{object-fit:contain;image-rendering:auto}
 #stage .msg{margin:auto;color:var(--muted);position:static!important;width:auto!important;height:auto!important}
 #viewer .navb{position:absolute;top:calc(50% - 28px);width:44px;height:56px;color:var(--muted);z-index:2;opacity:0;transition:opacity .2s;display:flex;align-items:center;justify-content:center}
 #viewer:hover .navb{opacity:1}
@@ -289,7 +291,7 @@ body.bare #grid .nm{display:none}
   <div id="empty">
     <div>Wybierz folder z lewej albo przeciągnij go tutaj.</div>
     <button id="empty-open" class="btn">Otwórz folder…</button>
-    <small>JPG · PNG · PSD · TIFF · TGA · EXR · HDR · RAW · WebP · AVIF · GIF · BMP · SVG</small>
+    <small>JPG · PNG · PSD · TIFF · TGA · EXR · HDR · RAW · WebP · AVIF · GIF · BMP · SVG<br>PDF · DWG · SKP · MAX · 3DM · Archicad</small>
   </div>
 </main>
 
@@ -370,7 +372,7 @@ body.bare #grid .nm{display:none}
   window.api={
     platform:/Mac/.test(navigator.platform)?'darwin':'win32', sep:'/', web:true,
     dirname, basename, parse:p=>{const r=roots.find(x=>p===x.path||p.startsWith(x.path+'/'));return {root:r?r.path+'/':'/'};},
-    fileUrl:p=>{ if(urls.has(p)) return urls.get(p); const f=files.get(p); if(!f) return ''; const u=URL.createObjectURL(f); urls.set(p,u); return u; },
+    fileUrl:p=>{ if(urls.has(p)) return urls.get(p); const f=files.get(p); if(!f) return ''; const u=URL.createObjectURL(/\.pdf$/i.test(p)&&f.type!=='application/pdf'?new Blob([f],{type:'application/pdf'}):f); urls.set(p,u); return u; },
 
     async list(dir,exts){
       const h=await resolve(dir,true); if(!h) return {error:'brak dostępu do folderu',dirs:[],files:[]};
@@ -422,6 +424,8 @@ body.bare #grid .nm{display:none}
     openEditor:async()=>{ onlyApp(); return null; },
     editorName:async()=>null,
     dragOut:()=>{},
+    osThumb:async()=>null,
+    fileHref:p=>window.api.fileUrl(p),
     pathForFile:()=>null
   };
 })();
@@ -436,12 +440,14 @@ function decoderLib(){
   async function decode(file,type,max){
     if(type==='psd') return decodePSD(file,max);
     if(type==='psdthumb') return quickPSD(file);
-    const u=new Uint8Array(await file.arrayBuffer());
+    // bardzo duże pliki projektowe: podgląd jest na początku, czytamy najwyżej 64 MB
+    const u=new Uint8Array(type==='embedded'&&file.size>96*1048576?await file.slice(0,64*1048576).arrayBuffer():await file.arrayBuffer());
     if(type==='tga') return decodeTGA(u,max);
     if(type==='tif') return decodeTIFF(u,max);
     if(type==='exr') return decodeEXR(u,max);
     if(type==='hdr') return decodeHDR(u,max);
     if(type==='raw') return decodeRAW(u,file.name||'');
+    if(type==='embedded') return decodeEmbedded(u,file.name||'');
     throw new Error('Nieobsługiwany format');
   }
 
@@ -812,6 +818,55 @@ function decoderLib(){
     const ext=(name.split('.').pop()||'').toUpperCase();
     return {jpeg:u.slice(best.s,best.e),meta:{format:ext||'RAW',width:best.w,height:best.h,mode:'podgląd JPEG z pliku'}};
   }
+
+  // --- podglądy zapisane w plikach projektowych: DWG (BMP/PNG w nagłówku), SKP/3DM/PLN (PNG),
+  //     MAX/3DM (bitmapa DIB w informacjach o pliku). Bierzemy największy znaleziony obraz.
+  function dibToBmp(dib){
+    const v=dv(dib), hs=v.getUint32(0,true), bpp=v.getUint16(14,true);
+    let pal=v.getUint32(32,true); if(!pal&&bpp<=8) pal=1<<bpp;
+    const off=14+hs+pal*4, out=new Uint8Array(14+dib.length), o=dv(out);
+    out[0]=0x42;out[1]=0x4D; o.setUint32(2,out.length,true); o.setUint32(10,off,true); out.set(dib,14);
+    return out;
+  }
+  function dwgPreview(u){
+    if(u.length<0x40||u[0]!==0x41||u[1]!==0x43) return null;
+    const v=dv(u), ptr=v.getUint32(0x0D,true);
+    if(!ptr||ptr+21>u.length) return null;
+    let p=ptr+16+4; const n=u[p++]; let best=null;
+    for(let i=0;i<n&&p+9<=u.length;i++,p+=9){
+      const code=u[p], st=v.getUint32(p+1,true), sz=v.getUint32(p+5,true);
+      if(!sz||st+sz>u.length) continue;
+      if(code===6) best={img:u.slice(st,st+sz),mime:'image/png',w:2,h:2};
+      else if(code===2&&!best){ const dib=u.subarray(st,st+sz); const w=dv(dib).getInt32(4,true),h=Math.abs(dv(dib).getInt32(8,true)); best={img:dibToBmp(dib),mime:'image/bmp',w,h}; }
+    }
+    return best;
+  }
+  function decodeEmbedded(u,name){
+    const ext=(name.split('.').pop()||'').toLowerCase(), v=dv(u);
+    let best=null; const take=c=>{ if(c&&c.w>0&&c.h>0&&(!best||c.w*c.h>best.w*best.h)) best=c; };
+    if(ext==='dwg') take(dwgPreview(u));
+    const dib=ext==='max'||ext==='3dm';
+    const lim=u.length-8;
+    for(let p=0;p<lim;p++){
+      const b=u[p];
+      if(b===0x89&&u[p+1]===0x50&&u[p+2]===0x4E&&u[p+3]===0x47&&u[p+4]===0x0D&&u[p+5]===0x0A&&u[p+6]===0x1A&&u[p+7]===0x0A){
+        const w=v.getUint32(p+16),h=v.getUint32(p+20);
+        let e=-1; for(let q=p+8;q+8<=u.length;){ const len=v.getUint32(q); if(q+12+len>u.length) break; if(u[q+4]===0x49&&u[q+5]===0x45&&u[q+6]===0x4E&&u[q+7]===0x44){e=q+12;break;} q+=12+len; }
+        if(e>0&&w<20000&&h<20000){ take({img:u.slice(p,e),mime:'image/png',w,h}); p=e-1; }
+      } else if(b===0xFF&&u[p+1]===0xD8&&u[p+2]===0xFF){
+        const j=jpegAt(u,p); if(j){ take({img:u.slice(j.s,j.e),mime:'image/jpeg',w:j.w,h:j.h}); p=j.e-1; }
+      } else if(dib&&b===40&&u[p+1]===0&&u[p+2]===0&&u[p+3]===0&&p+40<=u.length){
+        const w=v.getInt32(p+4,true), h=Math.abs(v.getInt32(p+8,true)), pl=v.getUint16(p+12,true), bpp=v.getUint16(p+14,true), cmp=v.getUint32(p+16,true);
+        if(pl===1&&(bpp===24||bpp===32||bpp===8)&&cmp===0&&w>=16&&w<=2048&&h>=16&&h<=2048){
+          let pal=v.getUint32(p+32,true); if(!pal&&bpp===8) pal=256; if(pal>256) continue;
+          const size=40+pal*4+(((w*bpp+31)>>5)<<2)*h;
+          if(p+size<=u.length){ take({img:dibToBmp(u.subarray(p,p+size)),mime:'image/bmp',w,h}); p+=size-1; }
+        }
+      }
+    }
+    if(!best) throw new Error('brak podglądu zapisanego w pliku — otwórz go w programie');
+    return {img:best.img,mime:best.mime,meta:{format:ext.toUpperCase(),mode:'podgląd zapisany w pliku'}};
+  }
   return {decode};
 }
 
@@ -822,9 +877,11 @@ const $=s=>document.querySelector(s);
 const EXT={jpg:'jpg',jpeg:'jpg',jpe:'jpg',jfif:'jpg',png:'png',psd:'psd',psb:'psd',tif:'tif',tiff:'tif',tga:'tga',exr:'exr',hdr:'hdr',
   webp:'webp',avif:'avif',gif:'gif',bmp:'bmp',dib:'bmp',ico:'ico',svg:'svg',
   dng:'raw',cr2:'raw',cr3:'raw',nef:'raw',nrw:'raw',arw:'raw',sr2:'raw',srf:'raw',orf:'raw',rw2:'raw',raf:'raw',pef:'raw',srw:'raw',
-  '3fr':'raw',iiq:'raw',erf:'raw',kdc:'raw',mrw:'raw',rwl:'raw',x3f:'raw'};
+  '3fr':'raw',iiq:'raw',erf:'raw',kdc:'raw',mrw:'raw',rwl:'raw',x3f:'raw',
+  pdf:'pdf',dwg:'dwg',skp:'skp',max:'max','3dm':'3dm',pln:'pln',pla:'pln',tpl:'pln'};
 const EXTS=Object.keys(EXT);
-const TYPES=['jpg','png','psd','tif','tga','exr','hdr','raw','webp','avif','gif','bmp','ico','svg']; // kolejność filtrów
+const TYPES=['jpg','png','psd','tif','tga','exr','hdr','raw','webp','avif','gif','bmp','ico','svg','pdf','dwg','skp','max','3dm','pln'];
+const DOCS=new Set(['pdf','dwg','skp','max','3dm','pln']);   // pliki projektowe: miniatura systemowa albo zapisana w pliku // kolejność filtrów
 const NATIVE=new Set(['jpg','png','webp','avif','gif','bmp','ico','svg']);           // dekoduje silnik przeglądarki
 const OPAQUE=new Set(['jpg','raw','hdr','exr']);                                     // nie mają przezroczystości
 const on=t=>S.types[t]!==false;
@@ -875,7 +932,7 @@ main.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefa
 
 /* filtry, sortowanie, widoki */
 function typeCounts(){const n={}; for(const it of items) n[it.type]=(n[it.type]||0)+1; return n;}
-const TLABEL=t=>t==='tif'?'TIFF':t.toUpperCase();
+const TLABEL=t=>t==='tif'?'TIFF':t==='pln'?'Archicad':t.toUpperCase();
 const ICO_DOWN='<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="m2.5 4 2.5 2.5L7.5 4"/></svg>';
 function renderTypes(){
   const n=typeCounts(), present=TYPES.filter(t=>n[t]), shown=present.filter(t=>on(t));
@@ -1408,6 +1465,19 @@ async function buildThumb(it){
     }catch(e){ api.thumbForget(hit.hash); }
   }
   let bmp;
+  if(DOCS.has(it.type)){
+    const png=await api.osThumb(it.path,TH);
+    if(png) bmp=await createImageBitmap(new Blob([png],{type:'image/png'}));
+    else if(it.type!=='pdf'){ const r=await decode(ref(it),'embedded',0); bmp=await toBitmap(r); }
+    if(!bmp) throw new Error('brak podglądu — '+(api.web?'w przeglądarce tylko w programie':'otwórz w programie'));
+    it.meta={format:TLABEL(it.type),mode:png?'':'podgląd zapisany w pliku'};
+    const c=document.createElement('canvas'), s=Math.min(1,TH/Math.max(bmp.width,bmp.height));
+    c.width=Math.max(1,Math.round(bmp.width*s)); c.height=Math.max(1,Math.round(bmp.height*s));
+    const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); g.imageSmoothingQuality='high'; g.drawImage(bmp,0,0,c.width,c.height); bmp.close();
+    it.thumb=c;
+    c.toBlob(b=>{ if(b) b.arrayBuffer().then(buf=>api.thumbPut(key,buf,null,it.meta)).then(()=>newThumbs++); },'image/webp',0.85);
+    return;
+  }
   if(it.type==='svg'){const im=await loadImg(api.fileUrl(it.path));const w=im.naturalWidth||1024,h=im.naturalHeight||1024;
     const k=Math.min(4,TH*2/Math.max(w,h));const c=new OffscreenCanvas(Math.round(w*k),Math.round(h*k));c.getContext('2d').drawImage(im,0,0,c.width,c.height);
     bmp=c.transferToImageBitmap();it.dims=[w,h];}
@@ -1439,6 +1509,7 @@ function paintOn(bmp,w,h,cell){
   g.drawImage(bmp,0,0,w,h);return c;
 }
 function toBitmap(r){
+  if(r.img) return createImageBitmap(new Blob([r.img],{type:r.mime}));
   return r.jpeg?createImageBitmap(new Blob([r.jpeg],{type:'image/jpeg'})):createImageBitmap(new ImageData(r.data,r.width,r.height));
 }
 
@@ -1551,7 +1622,15 @@ function fullOf(it){
   if(vLoading.has(it)) return vLoading.get(it);
   const p=(async()=>{
     let v;
-    if(NATIVE.has(it.type)&&it.type!=='jpg'&&it.type!=='gif'&&it.type!=='svg'){
+    if(it.type==='pdf'){ // cały dokument we wbudowanej przeglądarce PDF
+      const el=document.createElement('iframe'); el.src=api.fileHref(it.path); el.className='doc'; el.title=it.name;
+      v={el,note:'',doc:true};
+    }else if(DOCS.has(it.type)){ // model / rysunek: powiększony podgląd zapisany w pliku
+      await thumbOf(it).catch(()=>{});
+      if(!it.thumb) throw new Error('brak podglądu — otwórz plik w programie');
+      const el=document.createElement('canvas'); el.width=it.thumb.width; el.height=it.thumb.height; el.getContext('2d').drawImage(it.thumb,0,0);
+      el.className='docthumb'; v={el,note:'pełny plik otworzysz w programie (E)',doc:true};
+    }else if(NATIVE.has(it.type)&&it.type!=='jpg'&&it.type!=='gif'&&it.type!=='svg'){
       const bmp=await createImageBitmap(await blobOf(it)); it.dims=[bmp.width,bmp.height];
       v={el:paintOn(bmp,bmp.width,bmp.height,bigCell(bmp.width,bmp.height)),note:''}; bmp.close();
     }else if(NATIVE.has(it.type)){
@@ -1588,7 +1667,7 @@ function mount(el,low,it){
     const [dw,dh]=it.dims||[el.width,el.height];
     const s=Math.min(aw/dw,ah/dh,1); el.style.width=Math.round(dw*s)+'px'; el.style.height=Math.round(dh*s)+'px';
   } else {
-    el.onclick=ev=>{ev.stopPropagation();actual=!actual;applyZoom(true);};
+    if(el.tagName!=='IFRAME') el.onclick=ev=>{ev.stopPropagation();actual=!actual;applyZoom(true);};
     el.draggable=true; el.ondragstart=ev=>{ev.preventDefault();api.dragOut([it.path]);};
     applyZoom();
   }
@@ -1634,7 +1713,7 @@ stage.addEventListener('click',e=>{if(e.target===stage)closeViewer();});
 // kółko myszy i gładzik przewijają obrazy (w trybie 100% przewijają sam obraz)
 let wAcc=0, wT=0;
 stage.addEventListener('wheel',e=>{
-  if(actual||e.ctrlKey||e.metaKey) return;
+  if(actual||e.ctrlKey||e.metaKey||(vEl&&vEl.tagName==='IFRAME')) return;
   e.preventDefault();
   const d=Math.abs(e.deltaY)>=Math.abs(e.deltaX)?e.deltaY:e.deltaX;
   wAcc+=e.deltaMode===1?d*30:d; clearTimeout(wT); wT=setTimeout(()=>wAcc=0,200);

@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' pgf: blob: data:; script-src 'self' blob: 'unsafe-inline'; worker-src blob:; style-src 'self' 'unsafe-inline'; img-src 'self' pgf: blob: data:; connect-src pgf: blob: data:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' pgf: blob: data:; script-src 'self' blob: 'unsafe-inline'; worker-src blob:; style-src 'self' 'unsafe-inline'; img-src 'self' pgf: blob: data:; connect-src pgf: blob: data:; frame-src file: blob: pgf:; object-src file: blob: pgf:">
 <title>Podgląd</title>
 <style>
 /* ===== Podgląd — wygląd „A”: jeden cienki pasek, panel informacji na żądanie ===== */
@@ -217,6 +217,8 @@ body[data-drop] .dropzone{display:block}
 #stage.fit>*{position:absolute;inset:14px 64px 24px;width:calc(100% - 128px);height:calc(100% - 38px);object-fit:scale-down;cursor:zoom-in}
 #stage.fit>.low{margin:auto;object-fit:fill}
 #stage.actual>*{margin:auto;flex:none;cursor:zoom-out}
+#stage.fit>iframe.doc,#stage.actual>iframe.doc{position:absolute;inset:8px 64px 16px;width:calc(100% - 128px);height:calc(100% - 24px);border:0;border-radius:6px;background:#fff;margin:0;cursor:auto}
+#stage.fit>canvas.docthumb{object-fit:contain;image-rendering:auto}
 #stage .msg{margin:auto;color:var(--muted);position:static!important;width:auto!important;height:auto!important}
 #viewer .navb{position:absolute;top:calc(50% - 28px);width:44px;height:56px;color:var(--muted);z-index:2;opacity:0;transition:opacity .2s;display:flex;align-items:center;justify-content:center}
 #viewer:hover .navb{opacity:1}
@@ -290,7 +292,7 @@ body.bare #grid .nm{display:none}
   <div id="empty">
     <div>Wybierz folder z lewej albo przeciągnij go tutaj.</div>
     <button id="empty-open" class="btn">Otwórz folder…</button>
-    <small>JPG · PNG · PSD · TIFF · TGA · EXR · HDR · RAW · WebP · AVIF · GIF · BMP · SVG</small>
+    <small>JPG · PNG · PSD · TIFF · TGA · EXR · HDR · RAW · WebP · AVIF · GIF · BMP · SVG<br>PDF · DWG · SKP · MAX · 3DM · Archicad</small>
   </div>
 </main>
 

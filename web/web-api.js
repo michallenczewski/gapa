@@ -50,7 +50,7 @@
   window.api={
     platform:/Mac/.test(navigator.platform)?'darwin':'win32', sep:'/', web:true,
     dirname, basename, parse:p=>{const r=roots.find(x=>p===x.path||p.startsWith(x.path+'/'));return {root:r?r.path+'/':'/'};},
-    fileUrl:p=>{ if(urls.has(p)) return urls.get(p); const f=files.get(p); if(!f) return ''; const u=URL.createObjectURL(f); urls.set(p,u); return u; },
+    fileUrl:p=>{ if(urls.has(p)) return urls.get(p); const f=files.get(p); if(!f) return ''; const u=URL.createObjectURL(/\.pdf$/i.test(p)&&f.type!=='application/pdf'?new Blob([f],{type:'application/pdf'}):f); urls.set(p,u); return u; },
 
     async list(dir,exts){
       const h=await resolve(dir,true); if(!h) return {error:'brak dostępu do folderu',dirs:[],files:[]};
@@ -102,6 +102,8 @@
     openEditor:async()=>{ onlyApp(); return null; },
     editorName:async()=>null,
     dragOut:()=>{},
+    osThumb:async()=>null,
+    fileHref:p=>window.api.fileUrl(p),
     pathForFile:()=>null
   };
 })();

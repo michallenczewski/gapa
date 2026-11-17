@@ -3,9 +3,11 @@ const $=s=>document.querySelector(s);
 const EXT={jpg:'jpg',jpeg:'jpg',jpe:'jpg',jfif:'jpg',png:'png',psd:'psd',psb:'psd',tif:'tif',tiff:'tif',tga:'tga',exr:'exr',hdr:'hdr',
   webp:'webp',avif:'avif',gif:'gif',bmp:'bmp',dib:'bmp',ico:'ico',svg:'svg',
   dng:'raw',cr2:'raw',cr3:'raw',nef:'raw',nrw:'raw',arw:'raw',sr2:'raw',srf:'raw',orf:'raw',rw2:'raw',raf:'raw',pef:'raw',srw:'raw',
-  '3fr':'raw',iiq:'raw',erf:'raw',kdc:'raw',mrw:'raw',rwl:'raw',x3f:'raw'};
+  '3fr':'raw',iiq:'raw',erf:'raw',kdc:'raw',mrw:'raw',rwl:'raw',x3f:'raw',
+  pdf:'pdf',dwg:'dwg',skp:'skp',max:'max','3dm':'3dm',pln:'pln',pla:'pln',tpl:'pln'};
 const EXTS=Object.keys(EXT);
-const TYPES=['jpg','png','psd','tif','tga','exr','hdr','raw','webp','avif','gif','bmp','ico','svg']; // kolejność filtrów
+const TYPES=['jpg','png','psd','tif','tga','exr','hdr','raw','webp','avif','gif','bmp','ico','svg','pdf','dwg','skp','max','3dm','pln'];
+const DOCS=new Set(['pdf','dwg','skp','max','3dm','pln']);   // pliki projektowe: miniatura systemowa albo zapisana w pliku // kolejność filtrów
 const NATIVE=new Set(['jpg','png','webp','avif','gif','bmp','ico','svg']);           // dekoduje silnik przeglądarki
 const OPAQUE=new Set(['jpg','raw','hdr','exr']);                                     // nie mają przezroczystości
 const on=t=>S.types[t]!==false;
@@ -56,7 +58,7 @@ main.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefa
 
 /* filtry, sortowanie, widoki */
 function typeCounts(){const n={}; for(const it of items) n[it.type]=(n[it.type]||0)+1; return n;}
-const TLABEL=t=>t==='tif'?'TIFF':t.toUpperCase();
+const TLABEL=t=>t==='tif'?'TIFF':t==='pln'?'Archicad':t.toUpperCase();
 const ICO_DOWN='<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="m2.5 4 2.5 2.5L7.5 4"/></svg>';
 function renderTypes(){
   const n=typeCounts(), present=TYPES.filter(t=>n[t]), shown=present.filter(t=>on(t));
@@ -589,6 +591,19 @@ async function buildThumb(it){
     }catch(e){ api.thumbForget(hit.hash); }
   }
   let bmp;
+  if(DOCS.has(it.type)){
+    const png=await api.osThumb(it.path,TH);
+    if(png) bmp=await createImageBitmap(new Blob([png],{type:'image/png'}));
+    else if(it.type!=='pdf'){ const r=await decode(ref(it),'embedded',0); bmp=await toBitmap(r); }
+    if(!bmp) throw new Error('brak podglądu — '+(api.web?'w przeglądarce tylko w programie':'otwórz w programie'));
+    it.meta={format:TLABEL(it.type),mode:png?'':'podgląd zapisany w pliku'};
+    const c=document.createElement('canvas'), s=Math.min(1,TH/Math.max(bmp.width,bmp.height));
+    c.width=Math.max(1,Math.round(bmp.width*s)); c.height=Math.max(1,Math.round(bmp.height*s));
+    const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); g.imageSmoothingQuality='high'; g.drawImage(bmp,0,0,c.width,c.height); bmp.close();
+    it.thumb=c;
+    c.toBlob(b=>{ if(b) b.arrayBuffer().then(buf=>api.thumbPut(key,buf,null,it.meta)).then(()=>newThumbs++); },'image/webp',0.85);
+    return;
+  }
   if(it.type==='svg'){const im=await loadImg(api.fileUrl(it.path));const w=im.naturalWidth||1024,h=im.naturalHeight||1024;
     const k=Math.min(4,TH*2/Math.max(w,h));const c=new OffscreenCanvas(Math.round(w*k),Math.round(h*k));c.getContext('2d').drawImage(im,0,0,c.width,c.height);
     bmp=c.transferToImageBitmap();it.dims=[w,h];}
@@ -620,6 +635,7 @@ function paintOn(bmp,w,h,cell){
   g.drawImage(bmp,0,0,w,h);return c;
 }
 function toBitmap(r){
+  if(r.img) return createImageBitmap(new Blob([r.img],{type:r.mime}));
   return r.jpeg?createImageBitmap(new Blob([r.jpeg],{type:'image/jpeg'})):createImageBitmap(new ImageData(r.data,r.width,r.height));
 }
 
@@ -732,7 +748,15 @@ function fullOf(it){
   if(vLoading.has(it)) return vLoading.get(it);
   const p=(async()=>{
     let v;
-    if(NATIVE.has(it.type)&&it.type!=='jpg'&&it.type!=='gif'&&it.type!=='svg'){
+    if(it.type==='pdf'){ // cały dokument we wbudowanej przeglądarce PDF
+      const el=document.createElement('iframe'); el.src=api.fileHref(it.path); el.className='doc'; el.title=it.name;
+      v={el,note:'',doc:true};
+    }else if(DOCS.has(it.type)){ // model / rysunek: powiększony podgląd zapisany w pliku
+      await thumbOf(it).catch(()=>{});
+      if(!it.thumb) throw new Error('brak podglądu — otwórz plik w programie');
+      const el=document.createElement('canvas'); el.width=it.thumb.width; el.height=it.thumb.height; el.getContext('2d').drawImage(it.thumb,0,0);
+      el.className='docthumb'; v={el,note:'pełny plik otworzysz w programie (E)',doc:true};
+    }else if(NATIVE.has(it.type)&&it.type!=='jpg'&&it.type!=='gif'&&it.type!=='svg'){
       const bmp=await createImageBitmap(await blobOf(it)); it.dims=[bmp.width,bmp.height];
       v={el:paintOn(bmp,bmp.width,bmp.height,bigCell(bmp.width,bmp.height)),note:''}; bmp.close();
     }else if(NATIVE.has(it.type)){
@@ -769,7 +793,7 @@ function mount(el,low,it){
     const [dw,dh]=it.dims||[el.width,el.height];
     const s=Math.min(aw/dw,ah/dh,1); el.style.width=Math.round(dw*s)+'px'; el.style.height=Math.round(dh*s)+'px';
   } else {
-    el.onclick=ev=>{ev.stopPropagation();actual=!actual;applyZoom(true);};
+    if(el.tagName!=='IFRAME') el.onclick=ev=>{ev.stopPropagation();actual=!actual;applyZoom(true);};
     el.draggable=true; el.ondragstart=ev=>{ev.preventDefault();api.dragOut([it.path]);};
     applyZoom();
   }
@@ -815,7 +839,7 @@ stage.addEventListener('click',e=>{if(e.target===stage)closeViewer();});
 // kółko myszy i gładzik przewijają obrazy (w trybie 100% przewijają sam obraz)
 let wAcc=0, wT=0;
 stage.addEventListener('wheel',e=>{
-  if(actual||e.ctrlKey||e.metaKey) return;
+  if(actual||e.ctrlKey||e.metaKey||(vEl&&vEl.tagName==='IFRAME')) return;
   e.preventDefault();
   const d=Math.abs(e.deltaY)>=Math.abs(e.deltaX)?e.deltaY:e.deltaX;
   wAcc+=e.deltaMode===1?d*30:d; clearTimeout(wT); wT=setTimeout(()=>wAcc=0,200);

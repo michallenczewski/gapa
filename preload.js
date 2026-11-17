@@ -32,5 +32,7 @@ contextBridge.exposeInMainWorld('api', {
   openEditor: (files, choose) => ipcRenderer.invoke('open-editor', files, choose),
   editorName: () => ipcRenderer.invoke('editor-name'),
   dragOut: files => ipcRenderer.send('drag-out', files),
+  osThumb: (p, size) => ipcRenderer.invoke('os-thumb', p, size),
+  fileHref: p => require('url').pathToFileURL(p).href,
   pathForFile: f => { try { return webUtils.getPathForFile(f); } catch (e) { return null; } }
 });

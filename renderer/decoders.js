@@ -6,12 +6,14 @@ function decoderLib(){
   async function decode(file,type,max){
     if(type==='psd') return decodePSD(file,max);
     if(type==='psdthumb') return quickPSD(file);
-    const u=new Uint8Array(await file.arrayBuffer());
+    // bardzo duże pliki projektowe: podgląd jest na początku, czytamy najwyżej 64 MB
+    const u=new Uint8Array(type==='embedded'&&file.size>96*1048576?await file.slice(0,64*1048576).arrayBuffer():await file.arrayBuffer());
     if(type==='tga') return decodeTGA(u,max);
     if(type==='tif') return decodeTIFF(u,max);
     if(type==='exr') return decodeEXR(u,max);
     if(type==='hdr') return decodeHDR(u,max);
     if(type==='raw') return decodeRAW(u,file.name||'');
+    if(type==='embedded') return decodeEmbedded(u,file.name||'');
     throw new Error('Nieobsługiwany format');
   }
 
@@ -381,6 +383,55 @@ function decoderLib(){
     if(!best) throw new Error('w pliku RAW nie ma podglądu JPEG');
     const ext=(name.split('.').pop()||'').toUpperCase();
     return {jpeg:u.slice(best.s,best.e),meta:{format:ext||'RAW',width:best.w,height:best.h,mode:'podgląd JPEG z pliku'}};
+  }
+
+  // --- podglądy zapisane w plikach projektowych: DWG (BMP/PNG w nagłówku), SKP/3DM/PLN (PNG),
+  //     MAX/3DM (bitmapa DIB w informacjach o pliku). Bierzemy największy znaleziony obraz.
+  function dibToBmp(dib){
+    const v=dv(dib), hs=v.getUint32(0,true), bpp=v.getUint16(14,true);
+    let pal=v.getUint32(32,true); if(!pal&&bpp<=8) pal=1<<bpp;
+    const off=14+hs+pal*4, out=new Uint8Array(14+dib.length), o=dv(out);
+    out[0]=0x42;out[1]=0x4D; o.setUint32(2,out.length,true); o.setUint32(10,off,true); out.set(dib,14);
+    return out;
+  }
+  function dwgPreview(u){
+    if(u.length<0x40||u[0]!==0x41||u[1]!==0x43) return null;
+    const v=dv(u), ptr=v.getUint32(0x0D,true);
+    if(!ptr||ptr+21>u.length) return null;
+    let p=ptr+16+4; const n=u[p++]; let best=null;
+    for(let i=0;i<n&&p+9<=u.length;i++,p+=9){
+      const code=u[p], st=v.getUint32(p+1,true), sz=v.getUint32(p+5,true);
+      if(!sz||st+sz>u.length) continue;
+      if(code===6) best={img:u.slice(st,st+sz),mime:'image/png',w:2,h:2};
+      else if(code===2&&!best){ const dib=u.subarray(st,st+sz); const w=dv(dib).getInt32(4,true),h=Math.abs(dv(dib).getInt32(8,true)); best={img:dibToBmp(dib),mime:'image/bmp',w,h}; }
+    }
+    return best;
+  }
+  function decodeEmbedded(u,name){
+    const ext=(name.split('.').pop()||'').toLowerCase(), v=dv(u);
+    let best=null; const take=c=>{ if(c&&c.w>0&&c.h>0&&(!best||c.w*c.h>best.w*best.h)) best=c; };
+    if(ext==='dwg') take(dwgPreview(u));
+    const dib=ext==='max'||ext==='3dm';
+    const lim=u.length-8;
+    for(let p=0;p<lim;p++){
+      const b=u[p];
+      if(b===0x89&&u[p+1]===0x50&&u[p+2]===0x4E&&u[p+3]===0x47&&u[p+4]===0x0D&&u[p+5]===0x0A&&u[p+6]===0x1A&&u[p+7]===0x0A){
+        const w=v.getUint32(p+16),h=v.getUint32(p+20);
+        let e=-1; for(let q=p+8;q+8<=u.length;){ const len=v.getUint32(q); if(q+12+len>u.length) break; if(u[q+4]===0x49&&u[q+5]===0x45&&u[q+6]===0x4E&&u[q+7]===0x44){e=q+12;break;} q+=12+len; }
+        if(e>0&&w<20000&&h<20000){ take({img:u.slice(p,e),mime:'image/png',w,h}); p=e-1; }
+      } else if(b===0xFF&&u[p+1]===0xD8&&u[p+2]===0xFF){
+        const j=jpegAt(u,p); if(j){ take({img:u.slice(j.s,j.e),mime:'image/jpeg',w:j.w,h:j.h}); p=j.e-1; }
+      } else if(dib&&b===40&&u[p+1]===0&&u[p+2]===0&&u[p+3]===0&&p+40<=u.length){
+        const w=v.getInt32(p+4,true), h=Math.abs(v.getInt32(p+8,true)), pl=v.getUint16(p+12,true), bpp=v.getUint16(p+14,true), cmp=v.getUint32(p+16,true);
+        if(pl===1&&(bpp===24||bpp===32||bpp===8)&&cmp===0&&w>=16&&w<=2048&&h>=16&&h<=2048){
+          let pal=v.getUint32(p+32,true); if(!pal&&bpp===8) pal=256; if(pal>256) continue;
+          const size=40+pal*4+(((w*bpp+31)>>5)<<2)*h;
+          if(p+size<=u.length){ take({img:dibToBmp(u.subarray(p,p+size)),mime:'image/bmp',w,h}); p+=size-1; }
+        }
+      }
+    }
+    if(!best) throw new Error('brak podglądu zapisanego w pliku — otwórz go w programie');
+    return {img:best.img,mime:best.mime,meta:{format:ext.toUpperCase(),mode:'podgląd zapisany w pliku'}};
   }
   return {decode};
 }

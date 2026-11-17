@@ -173,6 +173,15 @@ ipcMain.handle('watch', (e, dir) => {
   } catch (err) {}
 });
 
+/* ---------- miniatury systemowe (Eksplorator / Quick Look): PDF, DWG, SKP, MAX, 3DM, Archicad… ---------- */
+ipcMain.handle('os-thumb', async (e, p, size) => {
+  try {
+    const img = await nativeImage.createThumbnailFromPath(p, { width: size, height: size });
+    if (!img || img.isEmpty()) return null;
+    return img.toPNG();
+  } catch (err) { return null; }
+});
+
 /* ---------- system: Finder/Eksplorator, programy, przeciąganie ---------- */
 ipcMain.handle('show-in-folder', (e, p) => shell.showItemInFolder(p));
 ipcMain.handle('open-default', (e, p) => shell.openPath(p));
@@ -237,7 +246,7 @@ function createWindow() {
     title: 'Podgląd', backgroundColor: '#1b1b1b',
     icon: path.join(__dirname, 'renderer', 'icon.png'),
     autoHideMenuBar: true,
-    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: false }
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: false, plugins: true }
   });
   if (settings.maximized) win.maximize();
   win.once('ready-to-show', () => win.show());

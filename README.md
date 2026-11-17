@@ -5,6 +5,8 @@ Działa na Windows i macOS.
 
 **Formaty:** JPG, PNG, PSD/PSB, TIFF, TGA, EXR, HDR, pliki RAW z aparatów (podgląd JPEG zapisany w pliku), WebP, AVIF, GIF, BMP, ICO, SVG.
 
+**Pliki projektowe:** PDF (cały dokument w podglądzie), DWG, SKP, MAX, 3DM, Archicad (PLN/PLA/TPL). Program bierze miniatury systemowe (te same co Eksplorator/Finder — działają dla formatów, których program jest zainstalowany), a gdy ich nie ma, wyciąga podgląd zapisany w pliku.
+
 ## Pobieranie
 
 Gotowe instalatory są w zakładce **Releases** tego repozytorium:

@@ -464,7 +464,12 @@ async function buildThumb(it){
     const k=Math.min(4,TH*2/Math.max(w,h));const c=new OffscreenCanvas(Math.round(w*k),Math.round(h*k));c.getContext('2d').drawImage(im,0,0,c.width,c.height);
     bmp=c.transferToImageBitmap();it.dims=[w,h];}
   else if(NATIVE.has(it.type)){bmp=await createImageBitmap(await blobOf(it));it.dims=[bmp.width,bmp.height];}
-  else{const r=await decode(ref(it),it.type,TH*2);it.meta=r.meta;it.dims=[r.meta.width,r.meta.height];bmp=await toBitmap(r);}
+  else{
+    if(it.type==='psd'&&!it.thumb){ // od razu mała miniatura zapisana w PSD, potem ostra
+      try{const q=await decode(ref(it),'psdthumb',0); const b=await toBitmap(q); const c=document.createElement('canvas');c.width=b.width;c.height=b.height;c.getContext('2d').drawImage(b,0,0);b.close();
+        it.thumb=c; it.dims=[q.meta.width,q.meta.height]; it.meta=q.meta; if(it.tile&&it.tile.isConnected) paint(it);}catch(e){}
+    }
+    const r=await decode(ref(it),it.type,TH*2);it.meta=r.meta;it.dims=[r.meta.width,r.meta.height];bmp=await toBitmap(r);}
   const s=Math.min(1,TH/Math.max(bmp.width,bmp.height));
   const w=Math.max(1,Math.round(bmp.width*s)),h=Math.max(1,Math.round(bmp.height*s));
   const small=s<1?await createImageBitmap(bmp,{resizeWidth:w,resizeHeight:h,resizeQuality:'high'}):bmp;
@@ -534,70 +539,137 @@ function status(msg){
   else s.textContent='';
 }
 
-/* --- podgląd pełnoekranowy --- */
+/* --- podgląd powiększony: natychmiast miniatura, potem pełny obraz; sąsiedzi wczytywani z wyprzedzeniem --- */
 const viewer=$('#viewer'), stage=$('#stage');
-let vTok=0, vEl=null, actual=false, vList=[], vi=0;
-const vCache=new Map(); // ostatnio otwarte obrazy, żeby powrót był natychmiastowy
+let vTok=0, vEl=null, actual=false, vList=[], vi=0, lastStep=0;
+const vCache=new Map(); // pełne obrazy ostatnio oglądane i wczytane z wyprzedzeniem
+const VC_PX=180e6;      // limit pamięci podglądów (w pikselach)
 const bigCell=(w,h)=>Math.max(8,Math.round(Math.max(w,h)/80));
-async function fullOf(it){
-  if(vCache.has(it)){const v=vCache.get(it);vCache.delete(it);vCache.set(it,v);return v;}
-  let v;
-  if(NATIVE.has(it.type)&&it.type!=='jpg'&&it.type!=='gif'&&it.type!=='svg'){
-    const bmp=await createImageBitmap(await blobOf(it)); it.dims=[bmp.width,bmp.height];
-    v={el:paintOn(bmp,bmp.width,bmp.height,bigCell(bmp.width,bmp.height)),note:''}; bmp.close();
-  }else if(NATIVE.has(it.type)){
-    const el=await loadImg(api.fileUrl(it.path));
-    if(el.naturalWidth) it.dims=[el.naturalWidth,el.naturalHeight];
-    if(it.type==='svg'&&!el.naturalWidth){el.style.width='80%';}
-    v={el,note:''};
-  }else{
-    const r=await decode(ref(it),it.type,0);
-    it.meta=r.meta; it.dims=[r.meta.width,r.meta.height];
-    const bmp=await toBitmap(r); let el;
-    if(OPAQUE.has(it.type)||r.jpeg){el=document.createElement('canvas');el.width=bmp.width;el.height=bmp.height;el.getContext('2d').drawImage(bmp,0,0);}
-    else el=paintOn(bmp,bmp.width,bmp.height,bigCell(bmp.width,bmp.height));
-    bmp.close(); v={el,note:r.note||''};
-  }
-  vCache.set(it,v);
-  while(vCache.size>4){const k=vCache.keys().next().value;vCache.delete(k);}
-  return v;
+const vpx=v=>(v.el.naturalWidth||v.el.width)*(v.el.naturalHeight||v.el.height);
+const vLoading=new Map();
+function fullOf(it){
+  if(vCache.has(it)){const v=vCache.get(it);vCache.delete(it);vCache.set(it,v);return Promise.resolve(v);}
+  if(vLoading.has(it)) return vLoading.get(it);
+  const p=(async()=>{
+    let v;
+    if(NATIVE.has(it.type)&&it.type!=='jpg'&&it.type!=='gif'&&it.type!=='svg'){
+      const bmp=await createImageBitmap(await blobOf(it)); it.dims=[bmp.width,bmp.height];
+      v={el:paintOn(bmp,bmp.width,bmp.height,bigCell(bmp.width,bmp.height)),note:''}; bmp.close();
+    }else if(NATIVE.has(it.type)){
+      const el=await loadImg(api.fileUrl(it.path));
+      if(el.naturalWidth) it.dims=[el.naturalWidth,el.naturalHeight];
+      if(it.type==='svg'&&!el.naturalWidth){el.style.width='80%';}
+      v={el,note:''};
+    }else{
+      const r=await decode(ref(it),it.type,0);
+      it.meta=r.meta; it.dims=[r.meta.width,r.meta.height];
+      const bmp=await toBitmap(r); let el;
+      if(OPAQUE.has(it.type)||r.jpeg){el=document.createElement('canvas');el.width=bmp.width;el.height=bmp.height;el.getContext('2d').drawImage(bmp,0,0);}
+      else el=paintOn(bmp,bmp.width,bmp.height,bigCell(bmp.width,bmp.height));
+      bmp.close(); v={el,note:r.note||''};
+    }
+    vCache.set(it,v);
+    let tot=0; for(const x of vCache.values()) tot+=vpx(x);
+    for(const k of vCache.keys()){ if(tot<=VC_PX||vCache.size<=2) break; if(vList[vi]===k) continue; tot-=vpx(vCache.get(k)); vCache.delete(k); }
+    return v;
+  })().finally(()=>vLoading.delete(it));
+  vLoading.set(it,p); return p;
 }
 function openViewer(it){
   const files=view.filter(x=>x.kind==='file');
   vList=picked.size>1&&picked.has(it)?files.filter(x=>picked.has(x)):files;
   vi=Math.max(0,vList.indexOf(it)); viewer.classList.add('open'); showV();
 }
+function mount(el,low,it){
+  stage.textContent=''; stage.appendChild(el); vEl=low?null:el;
+  el.classList.toggle('low',!!low);
+  el.style.width=el.style.height='';
+  if(low){ // miniatura powiększona do docelowego rozmiaru, żeby nic nie skakało
+    const r=stage.getBoundingClientRect(), aw=r.width-128, ah=r.height-38;
+    const [dw,dh]=it.dims||[el.width,el.height];
+    const s=Math.min(aw/dw,ah/dh,1); el.style.width=Math.round(dw*s)+'px'; el.style.height=Math.round(dh*s)+'px';
+  } else {
+    el.onclick=ev=>{ev.stopPropagation();actual=!actual;applyZoom(true);};
+    el.draggable=true; el.ondragstart=ev=>{ev.preventDefault();api.dragOut([it.path]);};
+    applyZoom();
+  }
+}
 async function showV(){
   const it=vList[vi]; if(!it) return; const tok=++vTok;
+  const now=performance.now(), fast=now-lastStep<180; lastStep=now;
   const i=view.indexOf(it); if(i>=0&&picked.size<=1) select(i); else if(i>=0){sel=i;}
-  $('#vname').textContent=it.name; $('#vname').title=it.path; $('#vinfo').textContent=info(it); $('#vcount').textContent=(vi+1)+'/'+vList.length;
-  if(!vCache.has(it)){stage.innerHTML='<div class="msg">Wczytywanie…</div>';vEl=null;}
+  $('#vname').textContent=it.name; $('#vname').title=it.path; $('#vinfo').textContent=info(it); $('#vcount').textContent=(vi+1)+' / '+vList.length;
+  stage.className=actual?'actual':'fit';
+  if(vCache.has(it)){ const v=await fullOf(it); if(tok!==vTok) return; mount(v.el,false,it); afterShow(it,v,tok); return; }
+  // od razu: miniatura z pamięci
+  if(it.thumb){ const c=document.createElement('canvas'); c.width=it.thumb.width; c.height=it.thumb.height; c.getContext('2d').drawImage(it.thumb,0,0); mount(c,true,it); }
+  else { stage.innerHTML='<div class="msg">Wczytywanie…</div>'; vEl=null; enqueue(it,true,true); }
+  // przy szybkim przewijaniu czekamy chwilę, zanim zaczniemy dekodować pełny plik
+  if(fast){ await new Promise(r=>setTimeout(r,140)); if(tok!==vTok) return; }
   let v;
-  try{v=await fullOf(it);}catch(e){if(tok===vTok){stage.innerHTML='<div class="msg"></div>';stage.firstChild.textContent='Nie udało się otworzyć: '+(e.message||e);}return;}
+  try{v=await fullOf(it);}catch(e){if(tok===vTok&&!it.thumb){stage.innerHTML='<div class="msg"></div>';stage.firstChild.textContent='Nie udało się otworzyć: '+(e.message||e);}return;}
   if(tok!==vTok) return;
-  stage.textContent=''; stage.appendChild(v.el); vEl=v.el; v.el.onclick=ev=>{ev.stopPropagation();actual=!actual;applyZoom();};
-  v.el.draggable=true; v.el.ondragstart=ev=>{ev.preventDefault();api.dragOut([it.path]);};
-  applyZoom(); $('#vinfo').textContent=info(it)+(v.note?'  ·  '+v.note:''); status();
-  const nx=vList[(vi+1)%vList.length]; if(nx&&nx!==it&&!vCache.has(nx)) setTimeout(()=>{if(tok===vTok)fullOf(nx).catch(()=>{});},150);
+  mount(v.el,false,it); afterShow(it,v,tok);
+}
+function afterShow(it,v,tok){
+  $('#vinfo').textContent=info(it)+(v.note?'  ·  '+v.note:''); status();
+  // wczytaj z wyprzedzeniem: następny, poprzedni, jeszcze jeden dalej
+  setTimeout(async()=>{
+    const n=vList.length;
+    for(const d of [1,-1,2,3]){
+      if(tok!==vTok||n<2) return;
+      const nx=vList[((vi+d)%n+n)%n]; if(nx===it) continue;
+      if(!nx.thumb) enqueue(nx,true);
+      try{await fullOf(nx);}catch(e){}
+    }
+  },60);
 }
 function stepV(d){if(!vList.length)return;vi=(vi+d+vList.length)%vList.length;showV();}
-function applyZoom(){
+function applyZoom(tip){
   stage.className=actual?'actual':'fit';
-  if(vEl){const w=(vEl.naturalWidth||vEl.width)/devicePixelRatio;vEl.style.width=actual?w+'px':'';}
-  $('#vzoom').textContent=actual?'100%':'Dopasuj';
+  if(vEl){const w=(vEl.naturalWidth||vEl.width)/devicePixelRatio;vEl.style.width=actual?w+'px':'';vEl.style.height='';}
+  if(tip) zoomTip(actual?'100%':'Dopasuj');
 }
 function closeViewer(){viewer.classList.remove('open');vTok++;stage.textContent='';vEl=null;main.focus();}
 stage.addEventListener('click',e=>{if(e.target===stage)closeViewer();});
-$('#vzoom').onclick=()=>{actual=!actual;applyZoom();};
-$('#vedit').onclick=()=>{const it=vList[vi];if(it)openInEditor([it.path]);};
+// kółko myszy i gładzik przewijają obrazy (w trybie 100% przewijają sam obraz)
+let wAcc=0, wT=0;
+stage.addEventListener('wheel',e=>{
+  if(actual||e.ctrlKey||e.metaKey) return;
+  e.preventDefault();
+  const d=Math.abs(e.deltaY)>=Math.abs(e.deltaX)?e.deltaY:e.deltaX;
+  wAcc+=e.deltaMode===1?d*30:d; clearTimeout(wT); wT=setTimeout(()=>wAcc=0,200);
+  while(Math.abs(wAcc)>=70){ const s=Math.sign(wAcc); wAcc-=s*70; stepV(s); }
+},{passive:false});
 $('#vprev').onclick=()=>stepV(-1); $('#vnext').onclick=()=>stepV(1); $('#vclose').onclick=closeViewer;
+async function copyImage(it){
+  try{
+    const v=await fullOf(it); let c=v.el;
+    if(c.tagName==='IMG'){const k=document.createElement('canvas');k.width=c.naturalWidth;k.height=c.naturalHeight;k.getContext('2d').drawImage(c,0,0);c=k;}
+    const b=await new Promise(r=>c.toBlob(r,'image/png'));
+    await navigator.clipboard.write([new ClipboardItem({'image/png':b})]);
+    zoomTip('Skopiowano obraz');
+  }catch(e){zoomTip('Nie udało się skopiować');}
+}
+function viewerMenu(){
+  const it=vList[vi]; if(!it) return; const r=$('#vmore').getBoundingClientRect();
+  showMenu(r.right-230,r.bottom+6,null,[
+    {label:'Pokaż w '+FINDER,key:'R',run:()=>api.showInFolder(it.path)},
+    {label:'Otwórz w '+(editorName||'Photoshopie'),key:'E',run:()=>openInEditor([it.path])},
+    {label:actual?'Dopasuj do okna':'Rozmiar oryginalny',key:'Z',run:()=>{actual=!actual;applyZoom(true);}},
+    {label:'Kopiuj obraz',key:'C',run:()=>copyImage(it)},
+    {label:'Kopiuj ścieżkę',key:'P',run:()=>copyText(it.path)},
+    '-',{label:'Ukryj interfejs',key:'Tab',run:toggleBare}]);
+}
+$('#vmore').onclick=e=>{e.stopPropagation();ctx.hidden?viewerMenu():hideMenu();};
+function toggleBare(){document.body.classList.toggle('bare');zoomTip(document.body.classList.contains('bare')?'Tab — pokaż interfejs':'Interfejs widoczny');}
 
 /* --- programy zewnętrzne --- */
 let editorName=null;
-api.editorName().then(n=>{editorName=n;$('#vedit').textContent='Otwórz w '+(n||'Photoshopie');});
+api.editorName().then(n=>{editorName=n;});
 async function openInEditor(paths,choose){
   const n=await api.openEditor(paths,choose);
-  if(n){editorName=n;$('#vedit').textContent='Otwórz w '+n;zoomTip('Otwieram w: '+n);}
+  if(n){editorName=n;zoomTip('Otwieram w: '+n);}
 }
 
 /* --- menu pod prawym przyciskiem --- */
@@ -655,7 +727,7 @@ document.addEventListener('contextmenu',e=>{
   en.push('-',{label:'Zmień program do edycji…',run:()=>openInEditor(many.map(x=>x.path),true)});
   showMenu(e.clientX,e.clientY,n>1?'Zaznaczone: '+n:it.name,en);
 });
-document.addEventListener('pointerdown',e=>{if(!ctx.hidden&&!ctx.contains(e.target)&&e.target!==$('#typesBtn'))hideMenu();});
+document.addEventListener('pointerdown',e=>{if(!ctx.hidden&&!ctx.contains(e.target)&&e.target!==$('#typesBtn')&&e.target!==$('#vmore'))hideMenu();});
 addEventListener('blur',hideMenu); main.addEventListener('scroll',hideMenu);
 
 /* --- klawiatura --- */
@@ -674,7 +746,16 @@ document.addEventListener('keydown',e=>{
     if(k==='Escape'||k===' '){e.preventDefault();closeViewer();}
     else if(k==='ArrowRight'||k==='ArrowDown'){e.preventDefault();stepV(1);}
     else if(k==='ArrowLeft'||k==='ArrowUp'){e.preventDefault();stepV(-1);}
-    else if(k==='z'||k==='1'){actual=!actual;applyZoom();}
+    else if(k==='z'||k==='1'){actual=!actual;applyZoom(true);}
+    else if(k==='r'){api.showInFolder(vList[vi].path);}
+    else if(k==='e'){openInEditor([vList[vi].path]);}
+    else if(k==='c'&&!mod){copyImage(vList[vi]);}
+    else if(k==='p'){copyText(vList[vi].path);}
+    else if(k==='Tab'){e.preventDefault();toggleBare();}
+    else if(k==='PageDown'){e.preventDefault();stepV(1);}
+    else if(k==='PageUp'){e.preventDefault();stepV(-1);}
+    else if(k==='Home'){e.preventDefault();vi=0;showV();}
+    else if(k==='End'){e.preventDefault();vi=vList.length-1;showV();}
     return;
   }
   if(e.target.matches('input,select')) return;
@@ -698,6 +779,7 @@ document.addEventListener('keydown',e=>{
   else if(k==='n'){setNames(!(S.names!==false));}
   else if(k==='l'){setMode(S.mode==='list'?'icons':'list');}
   else if(k==='/'){e.preventDefault();$('#q').focus();}
+  else if(k==='Tab'){e.preventDefault();toggleBare();}
 });
 api.onMenu(a=>{ if(a==='open') pickFolder(); });
 

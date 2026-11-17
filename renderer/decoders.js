@@ -5,6 +5,7 @@ function decoderLib(){
 
   async function decode(file,type,max){
     if(type==='psd') return decodePSD(file,max);
+    if(type==='psdthumb') return quickPSD(file);
     const u=new Uint8Array(await file.arrayBuffer());
     if(type==='tga') return decodeTGA(u,max);
     if(type==='tif') return decodeTIFF(u,max);
@@ -90,6 +91,15 @@ function decoderLib(){
     if(o<outLen) dst.fill(0,o);
   }
 
+  async function quickPSD(file){
+    const rd=async(a,b)=>new Uint8Array(await file.slice(a,b).arrayBuffer());
+    const h=await rd(0,30), hv=dv(h);
+    if(h.length<30||hv.getUint32(0)!==0x38425053) throw new Error('To nie jest plik PSD');
+    const ver=hv.getUint16(4), W=hv.getUint32(18), H=hv.getUint32(14), depth=hv.getUint16(22), mode=hv.getUint16(24);
+    const p=30+hv.getUint32(26), resLen=dv(await rd(p,p+4)).getUint32(0);
+    const j=await psdThumb(rd,p+4,resLen); if(!j) throw new Error('brak miniatury w pliku');
+    return {jpeg:j,meta:{format:ver===2?'PSB':'PSD',width:W,height:H,depth,mode:MODES[mode]||String(mode)}};
+  }
   async function psdThumb(rd,start,len){ // zasób 1036: miniatura JPEG
     const r=await rd(start,start+len), v=dv(r); let p=0;
     while(p+12<=r.length){

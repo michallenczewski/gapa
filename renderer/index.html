@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' pgf: blob: data:; script-src 'self' blob: 'unsafe-inline'; worker-src blob:; style-src 'self' 'unsafe-inline'; img-src 'self' pgf: blob: data:; connect-src pgf: blob: data:">
+<title>Podgląd</title>
+<style>
+:root{
+  --bg:#f4f4f2; --side:#ecebe8; --panel:#fafaf9; --line:#dcdbd7; --text:#1d1d1b; --muted:#8a8984;
+  --tile:#e6e5e1; --sel:#d6d5cf; --selh:#e3e2dd; --btn:#fff; --btnh:#f0efec; --on:#e2e1dc; --accent:#1d1d1b; --stage:#e9e8e4;
+  --tile-w:180px; --lic:28px; color-scheme:light;
+}
+[data-theme=dark]{
+  --bg:#1b1b1b; --side:#202020; --panel:#232323; --line:#323232; --text:#dedede; --muted:#7d7d7d;
+  --tile:#242424; --sel:#383838; --selh:#2a2a2a; --btn:#2b2b2b; --btnh:#333; --on:#3a3a3a; --accent:#e8e8e8; --stage:#121212;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased;
+  display:grid;grid-template-columns:210px 1fr;grid-template-rows:auto 1fr auto;height:100vh}
+button{font:inherit;color:var(--text);background:var(--btn);border:1px solid var(--line);border-radius:3px;padding:0 10px;height:28px;cursor:pointer;white-space:nowrap}
+button:hover:not(:disabled){background:var(--btnh)}
+button:disabled{opacity:.4;cursor:default}
+:focus-visible{outline:2px solid var(--muted);outline-offset:1px}
+main:focus-visible{outline:none}
+
+/* pasek boczny */
+aside{grid-row:1/4;background:var(--side);border-right:1px solid var(--line);overflow:auto;padding:16px 0}
+aside h2{font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 16px 6px}
+.nav{list-style:none;margin:0;padding:0}
+.nav li{display:flex;align-items:center;gap:6px;padding:4px 10px 4px 16px;cursor:pointer}
+.nav li:hover{background:var(--btnh)}
+.nav li.on{background:var(--sel)}
+.nav li span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav li .x{flex:none;opacity:0;color:var(--muted);border:0;background:none;height:auto;padding:0 2px}
+.nav li:hover .x{opacity:1}
+.nav li.none{color:var(--muted);cursor:default}
+.nav li.none:hover{background:none}
+#side-open{margin:12px 16px 0;width:calc(100% - 32px)}
+.cachebox{margin:20px 16px 0;color:var(--muted);font-size:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cachebox button{height:22px;font-size:12px;padding:0 8px}
+
+/* pasek górny: wszystko w jednej linii */
+header{background:var(--panel);border-bottom:1px solid var(--line);padding:9px 16px;display:flex;align-items:center;gap:8px;flex-wrap:nowrap;min-width:0}
+header>*{flex:none}
+header>#crumbs{flex:0 1 auto}
+.ico{width:28px;padding:0;text-align:center}
+#crumbs{display:flex;align-items:center;margin:0 4px;font-size:13px;font-weight:400;min-width:0;flex:0 1 auto;white-space:nowrap;overflow:hidden}
+#crumbs a{color:var(--muted);cursor:pointer;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis}
+#crumbs a:hover{color:var(--text)}
+#crumbs span{font-weight:600;flex:0 0 auto}
+#fav.on{color:#c9a227}
+.gap{flex:1 1 0}
+.search{display:inline-flex;align-items:center;position:relative}
+.search input{font:inherit;color:var(--text);background:var(--btn);border:1px solid var(--line);border-radius:3px;padding:0 24px 0 9px;height:28px;width:170px;outline:0}
+.search input:focus{border-color:var(--muted)}
+.search input::-webkit-search-cancel-button{display:none}
+#qClear{position:absolute;right:2px;border:0;background:none;height:24px;padding:0 6px;color:var(--muted)}
+#typesBtn.on{background:var(--on)}
+.sortw{display:inline-flex}
+select{font:inherit;color:var(--text);background:var(--btn);border:1px solid var(--line);border-radius:3px 0 0 3px;height:28px;padding:0 6px;outline:0}
+#sortDir{border-radius:0 3px 3px 0;margin-left:-1px}
+.zoom{display:inline-flex;align-items:center;gap:0}
+.zoom button{width:22px;padding:0;border:0;background:none;color:var(--muted);font-size:15px}
+.zoom button:hover:not(:disabled){background:none;color:var(--text)}
+.zoom input{width:96px;accent-color:var(--accent)}
+.seg{display:inline-flex}
+.seg button{border-radius:0;margin-left:-1px;color:var(--muted);width:30px;padding:0}
+.seg button:first-child{border-radius:3px 0 0 3px;margin-left:0}
+.seg button:last-child{border-radius:0 3px 3px 0}
+.seg button[aria-pressed=true]{background:var(--on);color:var(--text)}
+/* drzewo folderów */
+aside h2+.nav{margin-bottom:18px}
+.tree li{padding-left:0}
+.tree .tw{flex:none;width:14px;text-align:center;color:var(--muted);font-size:10px;cursor:pointer}
+.tree .tw:hover{color:var(--text)}
+.chk{display:inline-flex;align-items:center;gap:5px;cursor:pointer;user-select:none}
+body.nonames .tile .nm,body.nonames .tile .sub{display:none}
+
+/* siatka */
+main{overflow:auto;padding:14px;position:relative;outline:none}
+#grid.icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(var(--tile-w),100%),1fr));gap:4px}
+#grid.list{display:block}
+.tile{padding:7px;border-radius:4px;min-width:0;cursor:default}
+.tile:hover{background:var(--selh)}
+.tile.sel{background:var(--sel)}
+.tile .box{aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:var(--tile);position:relative;border-radius:2px}
+.tile canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}
+.tile .nm{display:block;margin-top:6px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+.tile .sub{font-size:11px;color:var(--muted);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:15px}
+.ph{color:var(--muted);font-size:11px;letter-spacing:.05em;text-transform:uppercase}
+
+/* foldery w siatce */
+.tile.dir .box{overflow:hidden}
+.tile.dir .box canvas{object-fit:cover;opacity:.92}
+.tile.dir .box::after{content:'';position:absolute;inset:0;border:1px solid var(--line);border-radius:2px;pointer-events:none}
+.tile.dir .nm{font-weight:600}
+.tile.dir .ph{font-size:18px}
+.sk{position:absolute;left:4px;right:4px;bottom:4px;display:flex;gap:2px;height:3px;opacity:0;transition:opacity .15s;z-index:1}
+.sk i{flex:1;background:rgba(255,255,255,.45);border-radius:1px}
+.sk i.on{background:#fff}
+.cnt{position:absolute;right:5px;top:5px;font-size:10px;padding:1px 5px;border-radius:2px;background:rgba(0,0,0,.55);color:#fff;font-variant-numeric:tabular-nums;pointer-events:none;z-index:1;opacity:0}
+.tile.dir .box:hover .sk,.tile.dir .box:hover .cnt{opacity:1}
+
+/* lista */
+.list{width:100%;border-collapse:collapse}
+.list th{font-weight:400;color:var(--muted);text-align:left;padding:4px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+.list th button{border:0;background:none;height:auto;padding:0;color:inherit}
+.list th.on button{color:var(--text)}
+.list td{padding:4px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+.list td.num,.list th.num{text-align:right;font-variant-numeric:tabular-nums}
+.list td.m{color:var(--muted)}
+.list tr:hover td{background:var(--selh)}
+.list tr.sel td{background:var(--sel)}
+.list .cell{display:flex;align-items:center;min-width:0}
+.list .ic{flex:none;width:calc(var(--lic)*4/3);height:var(--lic);margin-right:10px;background:var(--tile);display:flex;overflow:hidden;border-radius:2px}
+.list .ic canvas{width:100%;height:100%;object-fit:cover;display:block}
+.list .nm{overflow:hidden;text-overflow:ellipsis}
+.list .nm i{font-style:normal;color:var(--muted)}
+
+#empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--muted);text-align:center;padding:20px}
+footer{grid-column:2;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:0 16px;height:30px;border-top:1px solid var(--line);background:var(--panel);color:var(--muted);font-size:12px;white-space:nowrap;min-width:0}
+#status{overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+#status b{color:var(--text);font-weight:500}
+.toggle{display:inline-flex;flex:none}
+.toggle button{height:20px;font-size:11px;padding:0 7px;border-radius:0;margin-left:-1px;color:var(--muted)}
+.toggle button:first-child{border-radius:3px 0 0 3px;margin-left:0}
+.toggle button:last-child{border-radius:0 3px 3px 0}
+.toggle button[aria-pressed=true]{background:var(--on);color:var(--text)}
+
+/* podgląd */
+#viewer{position:fixed;inset:0;background:var(--stage);display:none;flex-direction:column;z-index:10}
+#viewer.open{display:flex}
+#viewer .top{order:2;display:flex;align-items:center;gap:12px;padding:8px 16px;background:var(--panel);border-top:1px solid var(--line);white-space:nowrap}
+#vname{font-weight:500;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto}
+#vinfo{color:var(--muted);overflow:hidden;text-overflow:ellipsis;flex:1}
+#vcount{color:var(--muted);font-variant-numeric:tabular-nums}
+#stage{flex:1;overflow:auto;position:relative;display:flex}
+#stage.fit>*{position:absolute;inset:24px 60px;width:calc(100% - 120px);height:calc(100% - 48px);object-fit:scale-down;cursor:zoom-in}
+#stage.actual>*{margin:auto;flex:none;cursor:zoom-out}
+#stage .msg{margin:auto;color:var(--muted);position:static!important;width:auto!important;height:auto!important}
+#viewer .navb{position:absolute;top:calc(50% - 40px);width:40px;height:56px;border:0;background:none;color:var(--muted);font-size:20px;z-index:2}
+#viewer .navb:hover{background:none;color:var(--text)}
+#vprev{left:8px} #vnext{right:8px}
+
+/* menu, podpowiedź, upuszczanie */
+.ctx{position:fixed;z-index:60;min-width:200px;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:4px;box-shadow:0 8px 28px rgba(0,0,0,.18)}
+.ctx[hidden]{display:none}
+.ctx button{display:block;width:100%;text-align:left;border:0;background:none;height:auto;padding:5px 10px;border-radius:3px}
+.ctx button:hover,.ctx button:focus{background:var(--sel);outline:0}
+.ctx hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
+.ctx .ch{padding:4px 10px 6px;color:var(--muted);font-size:12px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zoomtip{position:fixed;left:calc(50% + 105px);bottom:50px;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:4px 10px;border-radius:3px;font-size:12px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:70}
+.zoomtip.on{opacity:1}
+.dropzone{display:none;position:fixed;inset:0;z-index:50;background:color-mix(in srgb,var(--bg) 85%,transparent);pointer-events:none}
+.dropzone span{position:absolute;inset:16px;border:2px dashed var(--muted);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+body[data-drop] .dropzone{display:block}
+
+/* program */
+#crumbs i{font-style:normal;color:var(--muted);margin:0 6px;flex:none}
+#crumbs a{min-width:24px}
+.tree li.drive span:last-child{color:var(--muted)}
+.cachebox{margin:18px 0 0;padding:0 16px;display:block;color:var(--muted);font-size:12px}
+.cachebox h2{margin:0 0 6px}
+.cachebox .cinfo{margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cachebox .crow{display:flex;gap:4px;margin-bottom:6px;align-items:center;flex-wrap:wrap}
+.cachebox .crow label{display:flex;align-items:center;gap:6px}
+.cachebox select{height:22px;font-size:12px;border-radius:3px;padding:0 4px}
+.cachebox button{height:22px;font-size:12px;padding:0 8px}
+#prog{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ctx kbd{float:right;margin-left:24px;font:inherit;font-size:11px;color:var(--muted)}
+.ctx button:hover kbd{color:inherit}
+aside{display:flex;flex-direction:column}
+aside .tree{flex:1 1 auto;overflow:auto;min-height:80px}
+#side-open{flex:none}
+</style>
+</head>
+<body>
+
+
+<aside>
+  <h2>Ulubione</h2>
+  <ul class="nav" id="favs"></ul>
+  <h2>Foldery</h2>
+  <ul class="nav tree" id="tree"></ul>
+  <button id="side-open">Otwórz folder…</button>
+  <div class="cachebox">
+    <h2>Pamięć miniatur</h2>
+    <div id="cache" class="cinfo"></div>
+    <div class="crow">
+      <label>Limit <select id="cacheLimit">
+        <option value="500">500 MB</option><option value="1024">1 GB</option><option value="2048">2 GB</option>
+        <option value="5120">5 GB</option><option value="10240">10 GB</option><option value="20480">20 GB</option></select></label>
+    </div>
+    <div class="crow"><button id="cacheDir" title="Przenieś pamięć miniatur do innego folderu">Folder…</button><button id="cacheShow" title="Pokaż folder z miniaturami">Pokaż</button><button id="cacheClear">Wyczyść</button></div>
+  </div>
+</aside>
+
+<header>
+  <button id="up" class="ico" title="Folder wyżej (Backspace)" disabled>↑</button>
+  <h1 id="crumbs"></h1>
+  <button id="fav" class="ico" title="Dodaj ten folder do ulubionych" disabled>☆</button>
+  <span class="gap"></span>
+  <label class="search"><input id="q" type="search" placeholder="Szukaj" autocomplete="off" spellcheck="false"><button type="button" id="qClear" hidden title="Wyczyść">×</button></label>
+  <button id="typesBtn" title="Pokaż lub ukryj typy plików">Typy ▾</button>
+  <span class="sortw"><select id="sortSel" title="Sortowanie">
+    <option value="name">Nazwa</option><option value="date">Data</option><option value="size">Rozmiar pliku</option><option value="dims">Wymiary</option><option value="type">Rodzaj</option>
+  </select><button id="sortDir" class="ico" title="Odwróć kolejność">↑</button></span>
+  <span class="zoom"><button id="zminus" title="Mniejsze miniatury (−)">−</button><input type="range" id="size" min="90" max="420" step="10" aria-label="rozmiar miniatur"><button id="zplus" title="Większe miniatury (+)">+</button></span>
+  <span class="seg" id="mode"><button data-v="icons" title="Ikony (L)">▦</button><button data-v="list" title="Lista (L)">☰</button></span>
+  <button id="refresh" class="ico" title="Odśwież (R)" disabled>⟳</button>
+</header>
+
+<main id="main" tabindex="0">
+  <div id="grid"></div>
+  <div id="empty">
+    <div>Wybierz folder z lewej, otwórz go albo przeciągnij tutaj.<br><br>JPG · PNG · PSD · TIFF · TGA · EXR · HDR · RAW · WebP · AVIF · GIF · BMP · SVG</div>
+    <button id="empty-open">Otwórz folder…</button>
+  </div>
+</main>
+
+<footer>
+  <span id="status"></span>
+  <span id="prog"></span>
+  <label class="chk" title="Pokazuj nazwy plików pod miniaturami (N)"><input type="checkbox" id="names"> Nazwy</label>
+  <span class="toggle" id="themeT"><button data-th="auto">Auto</button><button data-th="light">Jasny</button><button data-th="dark">Ciemny</button></span>
+</footer>
+
+<div class="ctx" id="ctx" hidden role="menu"></div>
+<div class="dropzone" aria-hidden="true"><span>Upuść folder, żeby go otworzyć</span></div>
+
+<div id="viewer" role="dialog" aria-modal="true">
+  <div class="top">
+    <span id="vname"></span><span id="vinfo"></span><span id="vcount"></span>
+    <button id="vedit" title="Otwórz w programie do edycji (⌘/Ctrl+E)">Otwórz w Photoshopie</button>
+    <button id="vzoom" title="Dopasuj / 100% (Z)"></button>
+    <button id="vclose" title="Zamknij (Esc / spacja)">Zamknij</button>
+  </div>
+  <div id="stage" class="fit"></div>
+  <button class="navb" id="vprev" title="Poprzedni (←)">←</button>
+  <button class="navb" id="vnext" title="Następny (→)">→</button>
+</div>
+
+<script src="decoders.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1126,10 +1126,9 @@ function viewerMenu(){
     {label:'Pokaż w '+FINDER,key:'R',run:()=>api.showInFolder(it.path)},
     {label:'Otwórz w '+(editorName||'Photoshopie'),key:'E',run:()=>openInEditor([it.path])},
     {label:zm?'Dopasuj do okna':'Rozmiar oryginalny (100%)',key:'Z',run:()=>{zm?zoomFit(true):zoomTo(1,null,null,true);}},
-    {label:'Tryb minimalny',box:viewer.classList.contains('min'),key:'Tab',run:toggleVMin},
     {label:'Kopiuj obraz',key:'C',run:()=>copyImage(it)},
     {label:'Kopiuj ścieżkę',key:'P',run:()=>copyText(it.path)},
-    '-',{label:'Ukryj interfejs',key:'Tab',run:toggleBare}]);
+    '-',{label:'Tryb minimalny',box:viewer.classList.contains('min'),key:'Tab',run:toggleVMin}]);
 }
 $('#vmore').onclick=e=>{e.stopPropagation();ctx.hidden?viewerMenu():hideMenu();};
 function toggleVMin(){ const on=!viewer.classList.contains('min'); viewer.classList.toggle('min',on); S.vmin=on; save(); applyZoom(); zoomTip(on?'Tryb minimalny — Tab przywraca':'Pasek widoczny'); }

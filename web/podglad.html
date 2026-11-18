@@ -1167,24 +1167,40 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme)
 function setTheme(t){S.theme=t==='auto'?null:t;save();applyTheme();}
 function cycleTheme(){S.theme=document.documentElement.dataset.theme==='dark'?'light':'dark';save();applyTheme();}
 
-/* rozmiar miniatur: suwak, + i −, Ctrl/⌘ + kółko lub gest szczypania na gładziku */
-// największy rozmiar: dwie miniatury na szerokość okna (kolumna + odstęp 15% szerokości kafelka)
-function maxTile(){ const m=document.getElementById('main'); const w=(m&&m.clientWidth?m.clientWidth:1200)-48; const mx=Math.max(420,Math.floor(w/2.15)); const s=document.getElementById('size'); if(s&&+s.max!==mx) s.max=mx; return mx; }
-addEventListener('resize',()=>{ const mx=maxTile(); if(S.mode!=='list'&&S.size>mx) setSize(mx); else sliderFill&&sliderFill(); });
-function setSize(v,tip){
-  if(S.mode==='list'){S.lic=Math.round(Math.max(16,Math.min(96,v)));document.documentElement.style.setProperty('--lic',S.lic+'px');if(tip)zoomTip(S.lic+' px');}
-  else{S.size=Math.round(Math.max(90,Math.min(maxTile(),v)));$('#size').value=S.size;document.documentElement.style.setProperty('--tile-w',S.size+'px');sliderFill();if(typeof hdAll==='function')hdAll();
-    if(tip){const n=cols();zoomTip(n+' '+plural(n,'kolumna','kolumny','kolumn'));}}
+/* rozmiar miniatur: liczony od liczby kolumn — każdy krok to jedna miniatura więcej albo mniej w rzędzie,
+   a kafelki zawsze dokładnie wypełniają szerokość. Suwak, 1 i 2, Ctrl/⌘ + − +, kółko i szczypnięcie */
+const gapK=()=>document.body.classList.contains('gridlines')?0:.15;     // odstęp między kolumnami = 15% kafelka
+function gridW(){ const g=document.getElementById('grid'); return g&&g.clientWidth?g.clientWidth:((main&&main.clientWidth)||1200)-48; }
+const tileFor=n=>Math.floor(gridW()/(n+gapK()*(n-1))-0.5);
+const colsFor=px=>Math.max(1,Math.round((gridW()+gapK()*px)/(px*(1+gapK()))));
+const nMax=()=>Math.max(2,Math.floor((gridW()+gapK()*90)/(90*(1+gapK()))));
+function maxTile(){ return tileFor(2); }
+let zAcc=null;                       // płynna wartość dla szczypnięcia i kółka; wyświetlamy najbliższą liczbę kolumn
+function applyCols(n,tip){
+  n=Math.max(2,Math.min(nMax(),n||2));
+  const t=Math.max(60,tileFor(n)), ch=S.cols!==n||S.size!==t;
+  S.cols=n; S.size=t;
+  const sl=$('#size'), nm=nMax(); sl.min=0; sl.max=nm-2; sl.step=1; sl.value=nm-n;   // suwak: równy odcinek na każdą kolumnę, w prawo = większe
+  document.documentElement.style.setProperty('--tile-w',t+'px'); sliderFill();
+  if(ch&&typeof hdAll==='function') hdAll();
+  if(tip&&ch) zoomTip(n+' '+plural(n,'kolumna','kolumny','kolumn'));
   save();
 }
-const zcur=()=>S.mode==='list'?S.lic:S.size;
-const zstep=d=>setSize(zcur()*(d>0?1.15:1/1.15),true);
+function setSize(v,tip){
+  if(S.mode==='list'){S.lic=Math.round(Math.max(16,Math.min(96,v)));document.documentElement.style.setProperty('--lic',S.lic+'px');const sl=$('#size');sl.min=96;sl.max=576;sl.value=S.lic*6;sliderFill();if(tip)zoomTip(S.lic+' px');save();return;}
+  zAcc=Math.max(70,Math.min(tileFor(2)*1.1,v));
+  applyCols(colsFor(zAcc),tip);
+}
+// zmiana szerokości okna, panelu bocznego albo panelu informacji: ta sama liczba kolumn, nowa wielkość
+new ResizeObserver(()=>{ if(S.mode!=='list'&&S.cols) requestAnimationFrame(()=>applyCols(S.cols)); }).observe(main);
+const zcur=()=>S.mode==='list'?S.lic:(zAcc||S.size);
+const zstep=d=>{ if(S.mode==='list') return setSize(S.lic*(d>0?1.15:1/1.15),true); applyCols((S.cols||colsFor(S.size))+(d>0?-1:1),true); zAcc=S.size; };
 let tipEl=null,tipT=0;
 function zoomTip(t){if(!tipEl){tipEl=document.createElement('div');tipEl.className='zoomtip';document.body.appendChild(tipEl);}
   tipEl.textContent=t;tipEl.classList.add('on');clearTimeout(tipT);tipT=setTimeout(()=>tipEl.classList.remove('on'),800);}
 document.documentElement.style.setProperty('--lic',S.lic+'px');
 setSize(S.size);
-$('#size').oninput=e=>{S.mode==='list'?setSize(+e.target.value/6):setSize(+e.target.value);};
+$('#size').oninput=e=>{ if(S.mode==='list') setSize(+e.target.value/6); else { applyCols(nMax()-(+e.target.value),true); zAcc=S.size; } };
 $('#size').addEventListener('change',()=>{ if(!S.hints||S.hints.zoom) return; hint('zoom',$('#size'),KL.wheel+' nad miniaturami zmienia ich wielkość płynnie, bez sięgania po suwak. Klawisze <kbd>1</kbd> <kbd>2</kbd> robią to samo.'); });
 function sliderFill(){const s=$('#size');s.style.setProperty('--p',((s.value-s.min)/(s.max-s.min)*100)+'%');}
 $('#size').addEventListener('input',sliderFill);
@@ -1193,7 +1209,9 @@ $('#size').addEventListener('input',sliderFill);
 // ząbek kółka myszy (duży, całkowity krok) zmienia rozmiar o kilka procent
 const pinchLike=e=>e.deltaMode===0&&(!Number.isInteger(e.deltaY)||Math.abs(e.deltaY)<50);
 main.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();hintDone('zoom');
-  const d=e.deltaMode===1?e.deltaY*33:e.deltaY; setSize(zcur()*Math.exp(-Math.max(-120,Math.min(120,d))/(pinchLike(e)?100:1600)),true);},{passive:false});
+  if(S.mode!=='list'&&!pinchLike(e)){ const now=performance.now(); if(now-(wheelT||0)>90){ wheelT=now; zstep(e.deltaY<0?1:-1); } return; }
+  const d=e.deltaMode===1?e.deltaY*33:e.deltaY; setSize(zcur()*Math.exp(-Math.max(-120,Math.min(120,d))/100),true);},{passive:false});
+let wheelT=0;
 
 /* filtry, sortowanie, widoki */
 function typeCounts(){const n={}; for(const it of items) n[it.type]=(n[it.type]||0)+1; return n;}
@@ -1240,14 +1258,14 @@ function markModes(){
   $('#size').min=S.mode==='list'?96:90; $('#size').max=S.mode==='list'?576:420;
   $('#size').value=S.mode==='list'?S.lic*6:S.size; sliderFill();
 }
-function setMode(m){if(S.mode===m)return;S.mode=m;save();markModes();render();}
+function setMode(m){if(S.mode===m)return;S.mode=m;save();markModes();render();if(m!=='list')requestAnimationFrame(()=>applyCols(S.cols||colsFor(S.size)));else setSize(S.lic);}
 document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>setMode(b.dataset.v));
 function setNames(v){S.names=v;save();document.body.classList.toggle('nonames',!v);}
-function setGridLines(v){S.gridlines=v;save();document.body.classList.toggle('gridlines',!!v);}
+function setGridLines(v){S.gridlines=v;save();document.body.classList.toggle('gridlines',!!v);if(S.mode!=='list'&&S.cols)applyCols(S.cols);}
 function setDirNames(v){S.dirNames=v;save();document.body.classList.toggle('nodirnames',!v);}
 function setSide(v){S.side=v;save();document.body.classList.toggle('noside',!v);press($('#sideBtn'),v);}
 $('#sideBtn').onclick=()=>setSide(S.side===false);
-function setInsp(v){S.insp=v;save();document.body.classList.toggle('insp',v);press($('#inspBtn'),v);if(v)renderInsp();requestAnimationFrame(()=>{if(S.mode!=='list'&&curPath)setSize(S.size);});}
+function setInsp(v){S.insp=v;save();document.body.classList.toggle('insp',v);press($('#inspBtn'),v);if(v)renderInsp();requestAnimationFrame(()=>{if(S.mode!=='list'&&S.cols)applyCols(S.cols);});}
 $('#inspBtn').onclick=()=>setInsp(!S.insp);
 // zwijane sekcje paska bocznego
 S.shut=S.shut||{};

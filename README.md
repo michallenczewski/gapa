@@ -64,7 +64,7 @@ Po wejściu do folderu najpierw liczą się widoczne miniatury, potem w tle resz
 | ⌘V / Ctrl+V | wklejona ścieżka przenosi od razu do folderu |
 | [ | panel folderów (też \\ albo ⌘⌥S / Ctrl+Alt+S) |
 | ] | panel informacji (też I albo ⌘⌥I / Ctrl+Alt+I) |
-| Tab (w podglądzie) | tryb minimalny — bez paska z nazwą i strzałek |
+| Tab | chowa interfejs — w siatce i w podglądzie (bez paska z nazwą i strzałek) |
 | klik / Z (w podglądzie) | dopasuj ↔ powiększ; potem przeciągaj, przewijaj kółkiem lub gładzikiem |
 | Ctrl/⌘ + kółko, szczypnięcie | przybliżanie wokół kursora; + i − co 25%, 0 dopasowuje |
 | ↑ ↓ (PDF) | poprzednia / następna strona |

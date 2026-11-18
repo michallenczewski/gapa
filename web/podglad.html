@@ -74,14 +74,14 @@ aside ::-webkit-scrollbar-thumb:hover{background:var(--scroll2);background-clip:
 /* interfejs schowany (Tab) albo podgląd minimalny: cienki pasek u góry na przyciski okna i do przeciągania */
 .frame-win body.bare main{padding-top:46px}
 .frame-mac body.bare main{padding-top:50px}
-.frame-win body.bare::before,.frame-mac body.bare::before,.frame-win #viewer.min::before,.frame-mac #viewer.min::before{content:"";position:fixed;left:0;right:0;top:0;height:36px;-webkit-app-region:drag;z-index:20;background:var(--bg)}
-.frame-win #viewer.min::before,.frame-mac #viewer.min::before{background:var(--stage)}
-.frame-mac body.bare::before,.frame-mac #viewer.min::before{height:40px}
-.frame-win #viewer.min #stage{margin-top:36px}
-.frame-mac #viewer.min #stage{margin-top:40px}
+.frame-win body.bare::before,.frame-mac body.bare::before,.frame-win body.bare #viewer::before,.frame-mac body.bare #viewer::before{content:"";position:fixed;left:0;right:0;top:0;height:36px;-webkit-app-region:drag;z-index:20;background:var(--bg)}
+.frame-win body.bare #viewer::before,.frame-mac body.bare #viewer::before{background:var(--stage)}
+.frame-mac body.bare::before,.frame-mac body.bare #viewer::before{height:40px}
+.frame-win body.bare #viewer #stage{margin-top:36px}
+.frame-mac body.bare #viewer #stage{margin-top:40px}
 .fs.frame-win body.bare main,.fs.frame-mac body.bare main{padding-top:10px}
-.fs body.bare::before,.fs #viewer.min::before{display:none}
-.fs.frame-win #viewer.min #stage,.fs.frame-mac #viewer.min #stage{margin-top:0}
+.fs body.bare::before,.fs body.bare #viewer::before{display:none}
+.fs.frame-win body.bare #viewer #stage,.fs.frame-mac body.bare #viewer #stage{margin-top:0}
 .fs.frame-mac header,.fs.frame-mac #viewer .top{padding-left:12px}
 .fs.frame-mac #hspace{width:calc(220px - 40px)}
 .frame-win header,.frame-mac header,.frame-win #viewer .top,.frame-mac #viewer .top{-webkit-app-region:drag}
@@ -321,9 +321,9 @@ body[data-drop] .dropzone{display:block}
 #stage.zoomed>*{position:absolute;left:0;top:0;max-width:none;max-height:none;margin:0;transform-origin:0 0;cursor:grab;will-change:transform}
 #stage.zoomed.pan>*{cursor:grabbing}
 /* tryb minimalny podglądu: bez paska z nazwą i bez strzałek, obraz na całą powierzchnię */
-#viewer.min .top,#viewer.min .navb{display:none}
-#viewer.min #stage.fit>*:not(.pdfwrap):not(.vwrap){inset:10px;width:calc(100% - 20px);height:calc(100% - 20px)}
-#viewer.min #stage>.vwrap{inset:10px}
+body.bare #viewer .top,body.bare #viewer .navb{display:none}
+body.bare #viewer #stage.fit>*:not(.pdfwrap):not(.vwrap){inset:10px;width:calc(100% - 20px);height:calc(100% - 20px)}
+body.bare #viewer #stage>.vwrap{inset:10px}
 /* PDF: strony jak arkusze na tle podglądu, przewijane w pionie */
 #stage>.pdfwrap{position:absolute;inset:0;width:100%;height:100%;margin:0;cursor:auto}
 .pdfwrap>.pgnav{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;align-items:center;gap:2px;padding:4px;border-radius:12px;background:var(--panel,rgba(255,255,255,.86));-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:0 0 0 1px var(--line),0 8px 24px rgba(0,0,0,.12);font-size:12px;font-variant-numeric:tabular-nums;color:var(--text2)}
@@ -1048,7 +1048,7 @@ function chromeSync(){
   const cs=getComputedStyle(document.documentElement), v=document.getElementById('viewer');
   const bg=(v&&v.classList.contains('open')?cs.getPropertyValue('--stage'):cs.getPropertyValue('--bg')).trim();
   // bez paska programu (Tab) przyciski okna stoją w cienkim pasku 36 px, żeby nie wchodzić na miniatury
-  const slim=v&&v.classList.contains('open')?v.classList.contains('min'):document.body.classList.contains('bare');
+  const slim=document.body.classList.contains('bare');
   api.chromeColors(bg,cs.getPropertyValue('--text2').trim(),slim?36:52);
 }
 applyTheme();
@@ -2089,7 +2089,7 @@ function stepV(d){if(!vList.length)return;SFX('tick');vi=(vi+d+vList.length)%vLi
 function applyZoom(){ if(zm) renderZoom(); else { stage.className='fit'; if(vEl&&!vEl.video&&!vEl.isDoc){vEl.style.width=vEl.style.height='';vEl.style.transform='';if(vEl.tagName!=='IFRAME')vEl.draggable=true;} } }
 const isImg=()=>vEl&&!vEl.video&&!vEl.isDoc&&vEl.tagName!=='IFRAME';
 const natW=()=>(vEl.naturalWidth||vEl.width)/devicePixelRatio, natH=()=>(vEl.naturalHeight||vEl.height)/devicePixelRatio;
-function fitScale(){ const r=stage.getBoundingClientRect(), m=viewer.classList.contains('min'); return Math.min((r.width-(m?20:128))/natW(),(r.height-(m?20:38))/natH(),1); }
+function fitScale(){ const r=stage.getBoundingClientRect(), m=document.body.classList.contains('bare'); return Math.min((r.width-(m?20:128))/natW(),(r.height-(m?20:38))/natH(),1); }
 function zoomFit(tip){ zm=null; applyZoom(); if(tip){ zoomTip('Dopasuj'); SFX('tick'); } }
 // przybliż do skali z (1 = 100%), trzymając pod kursorem ten sam punkt obrazu
 function zoomTo(z,cx,cy,tip){
@@ -2195,12 +2195,12 @@ function viewerMenu(){
     {label:'Kopiuj ścieżkę',key:'P',run:()=>copyText(it.path)},
     ...(api.writeNew&&canJpg(it)?[{label:'Zapisz jako JPG',run:()=>toJpg([it])}]:[]),
     ...(api.trash?['-',{label:'Przenieś do Kosza',key:isMac?'⌘⌫':'Delete',run:()=>trashItems([it])}]:[]),
-    '-',{label:'Tryb minimalny',box:viewer.classList.contains('min'),key:'Tab',run:toggleVMin},
+    '-',{label:'Ukryj interfejs',box:document.body.classList.contains('bare'),key:'Tab',run:toggleBare},
     {label:document.documentElement.dataset.theme==='dark'?'Tryb jasny':'Tryb ciemny',key:'T',run:cycleTheme}]);
 }
 $('#vmore').onclick=e=>{e.stopPropagation();ctx.hidden?viewerMenu():hideMenu();};
-function toggleVMin(){ const on=!viewer.classList.contains('min'); viewer.classList.toggle('min',on); S.vmin=on; save(); applyZoom(); chromeSync(); zoomTip(on?'Tryb minimalny — Tab przywraca':'Pasek widoczny'); }
-function toggleBare(){document.body.classList.toggle('bare');chromeSync();zoomTip(document.body.classList.contains('bare')?'Tab — pokaż interfejs':'Interfejs widoczny');}
+function toggleVMin(){ toggleBare(); }
+function toggleBare(){document.body.classList.toggle('bare');chromeSync();if(viewer.classList.contains('open'))applyZoom();zoomTip(document.body.classList.contains('bare')?'Tab — pokaż interfejs':'Interfejs widoczny');}
 
 /* --- programy zewnętrzne --- */
 let editorName=null;
@@ -2399,7 +2399,7 @@ addEventListener('mousedown',hideTip,true); addEventListener('keydown',hideTip,t
 
 /* --- start --- */
 $('#empty-open').onclick=pickFolder;
-markSort(); markModes(); setNames(S.names!==false); setDirNames(S.dirNames!==false); setGridLines(!!S.gridlines); if(S.vmin) viewer.classList.add('min'); setSide(S.side!==false); setInsp(!!S.insp);
+markSort(); markModes(); setNames(S.names!==false); setDirNames(S.dirNames!==false); setGridLines(!!S.gridlines); setSide(S.side!==false); setInsp(!!S.insp);
 renderSide(); renderCrumbs(); renderTypes(); cacheInfo();
 loadRoots().then(async()=>{ if(S.last&&await api.exists(S.last)) go(S.last); else { render(); syncTree(); } });
 

@@ -42,7 +42,7 @@ function chromeSync(){
   const cs=getComputedStyle(document.documentElement), v=document.getElementById('viewer');
   const bg=(v&&v.classList.contains('open')?cs.getPropertyValue('--stage'):cs.getPropertyValue('--bg')).trim();
   // bez paska programu (Tab) przyciski okna stoją w cienkim pasku 36 px, żeby nie wchodzić na miniatury
-  const slim=v&&v.classList.contains('open')?v.classList.contains('min'):document.body.classList.contains('bare');
+  const slim=document.body.classList.contains('bare');
   api.chromeColors(bg,cs.getPropertyValue('--text2').trim(),slim?36:52);
 }
 applyTheme();
@@ -1083,7 +1083,7 @@ function stepV(d){if(!vList.length)return;SFX('tick');vi=(vi+d+vList.length)%vLi
 function applyZoom(){ if(zm) renderZoom(); else { stage.className='fit'; if(vEl&&!vEl.video&&!vEl.isDoc){vEl.style.width=vEl.style.height='';vEl.style.transform='';if(vEl.tagName!=='IFRAME')vEl.draggable=true;} } }
 const isImg=()=>vEl&&!vEl.video&&!vEl.isDoc&&vEl.tagName!=='IFRAME';
 const natW=()=>(vEl.naturalWidth||vEl.width)/devicePixelRatio, natH=()=>(vEl.naturalHeight||vEl.height)/devicePixelRatio;
-function fitScale(){ const r=stage.getBoundingClientRect(), m=viewer.classList.contains('min'); return Math.min((r.width-(m?20:128))/natW(),(r.height-(m?20:38))/natH(),1); }
+function fitScale(){ const r=stage.getBoundingClientRect(), m=document.body.classList.contains('bare'); return Math.min((r.width-(m?20:128))/natW(),(r.height-(m?20:38))/natH(),1); }
 function zoomFit(tip){ zm=null; applyZoom(); if(tip){ zoomTip('Dopasuj'); SFX('tick'); } }
 // przybliż do skali z (1 = 100%), trzymając pod kursorem ten sam punkt obrazu
 function zoomTo(z,cx,cy,tip){
@@ -1189,12 +1189,12 @@ function viewerMenu(){
     {label:'Kopiuj ścieżkę',key:'P',run:()=>copyText(it.path)},
     ...(api.writeNew&&canJpg(it)?[{label:'Zapisz jako JPG',run:()=>toJpg([it])}]:[]),
     ...(api.trash?['-',{label:'Przenieś do Kosza',key:isMac?'⌘⌫':'Delete',run:()=>trashItems([it])}]:[]),
-    '-',{label:'Tryb minimalny',box:viewer.classList.contains('min'),key:'Tab',run:toggleVMin},
+    '-',{label:'Ukryj interfejs',box:document.body.classList.contains('bare'),key:'Tab',run:toggleBare},
     {label:document.documentElement.dataset.theme==='dark'?'Tryb jasny':'Tryb ciemny',key:'T',run:cycleTheme}]);
 }
 $('#vmore').onclick=e=>{e.stopPropagation();ctx.hidden?viewerMenu():hideMenu();};
-function toggleVMin(){ const on=!viewer.classList.contains('min'); viewer.classList.toggle('min',on); S.vmin=on; save(); applyZoom(); chromeSync(); zoomTip(on?'Tryb minimalny — Tab przywraca':'Pasek widoczny'); }
-function toggleBare(){document.body.classList.toggle('bare');chromeSync();zoomTip(document.body.classList.contains('bare')?'Tab — pokaż interfejs':'Interfejs widoczny');}
+function toggleVMin(){ toggleBare(); }
+function toggleBare(){document.body.classList.toggle('bare');chromeSync();if(viewer.classList.contains('open'))applyZoom();zoomTip(document.body.classList.contains('bare')?'Tab — pokaż interfejs':'Interfejs widoczny');}
 
 /* --- programy zewnętrzne --- */
 let editorName=null;
@@ -1393,6 +1393,6 @@ addEventListener('mousedown',hideTip,true); addEventListener('keydown',hideTip,t
 
 /* --- start --- */
 $('#empty-open').onclick=pickFolder;
-markSort(); markModes(); setNames(S.names!==false); setDirNames(S.dirNames!==false); setGridLines(!!S.gridlines); if(S.vmin) viewer.classList.add('min'); setSide(S.side!==false); setInsp(!!S.insp);
+markSort(); markModes(); setNames(S.names!==false); setDirNames(S.dirNames!==false); setGridLines(!!S.gridlines); setSide(S.side!==false); setInsp(!!S.insp);
 renderSide(); renderCrumbs(); renderTypes(); cacheInfo();
 loadRoots().then(async()=>{ if(S.last&&await api.exists(S.last)) go(S.last); else { render(); syncTree(); } });

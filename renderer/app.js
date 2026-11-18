@@ -219,30 +219,23 @@ const SFX=(()=>{
   let ctx=null, last={};
   const ac=()=>{ if(!ctx){ try{ctx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} } if(ctx&&ctx.state==='suspended') ctx.resume(); return ctx; };
   // jeden dźwięk: krótki ton z szybkim wygaszeniem albo trzask szumu przez filtr
-  function blip({f=1200,to=null,d=.035,g=.05,type='sine',noise=false,bp=3000,at=0}){
+  function blip({f=1200,to=null,d=.035,g=.05,type='sine',noise=false,bp=3000,at=0,ft='bandpass',q=1.2,att=.003}){
     const c=ac(); if(!c) return; const t=c.currentTime+at;
-    const out=c.createGain(); out.gain.setValueAtTime(0,t); out.gain.linearRampToValueAtTime(g,t+.003); out.gain.exponentialRampToValueAtTime(.0001,t+d); out.connect(c.destination);
+    const out=c.createGain(); out.gain.setValueAtTime(0,t); out.gain.linearRampToValueAtTime(g,t+att); out.gain.exponentialRampToValueAtTime(.0001,t+d); out.connect(c.destination);
     if(noise){
       const n=Math.ceil(c.sampleRate*d), buf=c.createBuffer(1,n,c.sampleRate), ch=buf.getChannelData(0);
       for(let i=0;i<n;i++) ch[i]=Math.random()*2-1;
-      const src=c.createBufferSource(); src.buffer=buf; const fl=c.createBiquadFilter(); fl.type='bandpass'; fl.frequency.value=bp; fl.Q.value=1.2;
+      const src=c.createBufferSource(); src.buffer=buf; const fl=c.createBiquadFilter(); fl.type=ft; fl.frequency.value=bp; fl.Q.value=q;
       src.connect(fl); fl.connect(out); src.start(t); src.stop(t+d);
     }else{
       const o=c.createOscillator(); o.type=type; o.frequency.setValueAtTime(f,t); if(to) o.frequency.exponentialRampToValueAtTime(to,t+d);
       o.connect(out); o.start(t); o.stop(t+d+.01);
     }
   }
-  // wszystkie dźwięki z jednej rodziny: suche tyknięcia szumu (jak przy przełączaniu strzałkami), różnią się wysokością i rytmem
-  const tk=(bp,g=.06,at=0,d=.008)=>blip({noise:true,d,g,bp,at});
-  const SOUNDS={
-    tick:()=>tk(5200),
-    click:()=>tk(4400,.03),
-    tok:()=>{tk(4600,.055); tk(3600,.045,.032);},
-    open:()=>{tk(3800,.04); tk(4800,.045,.022); tk(6000,.05,.044);},
-    close:()=>{tk(6000,.045); tk(4800,.04,.022); tk(3800,.035,.044);},
-    on:()=>{tk(6400,.055); tk(7200,.06,.05);},
-    off:()=>{tk(5200,.05); tk(4000,.045,.05);},
-  };
+  // T2 z próbnika (wysokie tyknięcie) wszędzie; podgląd (spacja) ma miękkie tapnięcie opuszką (P1). Zawsze pojedyncze uderzenie.
+  const t2=()=>blip({noise:true,d:.007,g:.055,bp:7000});
+  const tap=()=>{ blip({noise:true,d:.022,g:.07,bp:1800,ft:'lowpass',q:.7,att:.004}); blip({f:170,d:.03,g:.05}); };
+  const SOUNDS={tick:t2,click:t2,tok:t2,on:t2,off:t2,open:tap,close:tap};
   return name=>{ if(S.sound===false) return; const now=performance.now(); if(now-(last[name]||0)<28) return; last[name]=now; try{SOUNDS[name]&&SOUNDS[name]();}catch(e){} };
 })();
 // klik każdego przycisku interfejsu (poza tymi, które mają własny dźwięk)

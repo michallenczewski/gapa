@@ -377,6 +377,8 @@ tr.inb .nm::after{content:"";display:inline-block;width:11px;height:11px;margin-
 .vbar .drag:active{cursor:grabbing}
 #grid.icons>.vbar+div.grp{padding-top:12px}
 #grid.list>.vbar{padding:2px 8px 10px}
+#navh{display:flex;gap:2px;flex:none;margin-right:6px}
+#navh .ib:disabled{opacity:.3;cursor:default}
 </style>
 </head>
 <body>
@@ -386,6 +388,10 @@ tr.inb .nm::after{content:"";display:inline-block;width:11px;height:11px;margin-
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="M6 3v10"/></svg>
   </button>
   <span id="hspace" aria-hidden="true"></span>
+  <span id="navh">
+    <button id="backBtn" class="ib" aria-label="Wstecz" title="Wstecz — poprzednie miejsce" disabled><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg></button>
+    <button id="fwdBtn" class="ib" aria-label="Dalej" title="Dalej — następne miejsce" disabled><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 3.5 4.5 4.5L6 12.5"/></svg></button>
+  </span>
   <div id="pathbox" title="Kliknij, żeby wpisać albo wkleić ścieżkę (⌘L / Ctrl+L)">
     <nav id="crumbs" aria-label="Ścieżka"></nav>
     <input id="pathIn" type="text" spellcheck="false" autocomplete="off" aria-label="Ścieżka folderu" hidden>

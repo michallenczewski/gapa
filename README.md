@@ -67,6 +67,7 @@ Po wejściu do folderu najpierw liczą się widoczne miniatury, potem w tle resz
 | ⌘⌫ (Mac) / Delete (Windows) | przenieś zaznaczone do Kosza (też w podglądzie) |
 | B | dodaj zaznaczone do koszyka albo je z niego wyjmij (też w podglądzie) |
 | ⇧B | otwórz koszyk |
+| ⌘[ ⌘] (Mac) / Alt+← Alt+→ (Windows) | wstecz / dalej po odwiedzonych folderach (też strzałki < > w górnym pasku i boczne przyciski myszy) |
 | ⌘⇧F / Ctrl+Shift+F | szukaj w całej bibliotece (wszystkie ulubione foldery) |
 | ⌘L / Ctrl+L (też ⌘⇧G) | wpisz lub wklej ścieżkę; Enter przechodzi, ścieżka do pliku otwiera jego folder i zaznacza plik |
 | ⌥⌘C / Ctrl+Alt+C | kopiuj ścieżkę zaznaczonych plików, a bez zaznaczenia — bieżącego folderu |

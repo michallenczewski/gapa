@@ -289,7 +289,7 @@ function renderBasketNav(){
 }
 async function openBasket(){
   if(virt==='basket') return;
-  SFX('tok'); virt='basket'; deep=false; markDeep(); $('#q').value=''; $('#qClear').hidden=true;
+  record({basket:true}); SFX('tok'); virt='basket'; deep=false; markDeep(); $('#q').value=''; $('#qClear').hidden=true;
   gen++; renderBasketNav(); renderSide(); renderTree(); renderCrumbs(); applyView(null); main.scrollTop=0; prefetch();
   // pliki mogły się zmienić albo zniknąć od czasu dodania — sprawdź raz przy wejściu
   if(api.statFiles&&S.basket.length){
@@ -301,7 +301,7 @@ async function openBasket(){
     if(ch){ save(); applyView(keep()); prefetch(); }
   }
 }
-function closeVirt(){ virt=null; renderBasketNav(); renderSide(); renderTree(); renderCrumbs(); applyView(null); main.scrollTop=0; if(curPath) prefetch(); }
+function closeVirt(){ virt=null; if(curPath) record({path:curPath}); renderBasketNav(); renderSide(); renderTree(); renderCrumbs(); applyView(null); main.scrollTop=0; if(curPath) prefetch(); }
 async function copyBasketTo(list){
   if(!api.copyTo){ zoomTip('Kopiowanie działa w programie, nie w przeglądarce'); return; }
   const dir=await api.pickFolder(); if(!dir) return;
@@ -348,7 +348,30 @@ const SFX=(()=>{
 })();
 // klik każdego przycisku interfejsu (poza tymi, które mają własny dźwięk)
 document.addEventListener('pointerdown',e=>{ const b=e.target.closest('button,.seg button,.sec,#tree li,#favs li,#places li,#bRow'); if(b&&!b.closest('.rf,.tf')) SFX('click'); },true);
-function go(p,selectPath,inside){ SFX('tok'); if(virt){ virt=null; renderBasketNav(); } curPath=p; S.last=p; save(); deep=!!inside; deepItems=null; deepFor=null; $('#q').value='';$('#qClear').hidden=true; markDeep(); scan(false,selectPath); }
+/* --- historia miejsc: strzałki < > jak w Finderze (folder albo Koszyk) --- */
+let hist=[], hi=-1, histNav=false;
+const locKey=l=>l.basket?'#koszyk':bKey(l.path);
+function record(loc){
+  if(histNav) return;
+  if(hi>=0&&locKey(hist[hi])===locKey(loc)) return;
+  hist=hist.slice(0,hi+1); hist.push(loc); if(hist.length>100) hist.shift(); hi=hist.length-1; markHist();
+}
+function markHist(){ $('#backBtn').disabled=hi<=0; $('#fwdBtn').disabled=hi>=hist.length-1;
+  const nm=l=>l?(l.basket?'Koszyk':(api.basename(l.path)||l.path)):'';
+  $('#backBtn').title=hi>0?'Wstecz — '+nm(hist[hi-1])+' ('+(isMac?'⌘[':'Alt+←')+')':'Wstecz';
+  $('#fwdBtn').title=hi<hist.length-1?'Dalej — '+nm(hist[hi+1])+' ('+(isMac?'⌘]':'Alt+→')+')':'Dalej'; }
+async function histGo(d){
+  const k=hi+d; if(k<0||k>=hist.length) return;
+  const loc=hist[k], from=virt?null:curPath;
+  if(!loc.basket&&!(await api.exists(loc.path))){ zoomTip('Tego folderu już nie ma: '+(api.basename(loc.path)||loc.path)); hist.splice(k,1); if(k<=hi) hi--; markHist(); return; }
+  hi=k; histNav=true;
+  try{ if(loc.basket) openBasket(); else go(loc.path,from); } finally { histNav=false; }
+  markHist();
+}
+$('#backBtn').onclick=()=>histGo(-1); $('#fwdBtn').onclick=()=>histGo(1);
+// boczne przyciski myszy (wstecz / dalej)
+addEventListener('mouseup',e=>{ if(e.button===3||e.button===4){ e.preventDefault(); if(!viewer.classList.contains('open')) histGo(e.button===3?-1:1); } });
+function go(p,selectPath,inside){ record({path:p}); SFX('tok'); if(virt){ virt=null; renderBasketNav(); } curPath=p; S.last=p; save(); deep=!!inside; deepItems=null; deepFor=null; $('#q').value='';$('#qClear').hidden=true; markDeep(); scan(false,selectPath); }
 function setDeep(v){ if(virt){ virt=null; renderBasketNav(); renderSide(); renderCrumbs(); } deep=v; markDeep(); applyView(keep()); main.scrollTop=0; prefetch(); }
 function markDeep(){ const c=$('#deepChip'); c.hidden=true; for(const b of $('#scope').children) b.setAttribute('aria-pressed',String(b.dataset.v==='1'===!!deep)); }
 for(const b of $('#scope').children) b.onclick=()=>{ if((b.dataset.v==='1')!==!!deep) setDeep(b.dataset.v==='1'); };
@@ -386,7 +409,7 @@ function goUp(){
   if(!curPath) return;
   if(deep&&!$('#q').value){ setDeep(false); return; }
   const p=api.dirname(curPath); if(!p||p===curPath) return;
-  const from=curPath; curPath=p; S.last=p; save(); deep=false; deepItems=null; deepFor=null; markDeep(); scan(false,from);
+  const from=curPath; record({path:p}); curPath=p; S.last=p; save(); deep=false; deepItems=null; deepFor=null; markDeep(); scan(false,from);
 }
 // wczytanie całego drzewa pod bieżącym folderem
 async function loadDeep(){
@@ -1532,6 +1555,8 @@ document.addEventListener('keydown',e=>{
   if((mod&&!e.shiftKey&&e.code==='KeyL')||(mod&&e.shiftKey&&e.code==='KeyG')){e.preventDefault();editPath();return;}
   if(mod&&e.altKey&&e.code==='KeyC'){e.preventDefault();const s=[...picked];copyText(s.length?s.map(x=>x.path).join('\n'):curPath);return;}
   if(mod&&k.toLowerCase()==='d'){e.preventDefault();if(curPath){const had=!!findFav(curPath);toggleFav();zoomTip(had?'Usunięto z ulubionych':'Dodano do ulubionych');}return;}
+  if((isMac&&e.metaKey&&(e.code==='BracketLeft'||e.code==='BracketRight'))||(!isMac&&e.altKey&&(k==='ArrowLeft'||k==='ArrowRight'))){
+    e.preventDefault(); histGo(e.code==='BracketLeft'||k==='ArrowLeft'?-1:1); return; }
   // usuwanie: w koszyku tylko wyjmuje z koszyka, gdzie indziej przenosi do Kosza systemu
   if((isMac&&mod&&!e.shiftKey&&k==='Backspace')||k==='Delete'){
     e.preventDefault(); const s=[...picked].filter(x=>x.kind==='file'); if(!s.length) return;

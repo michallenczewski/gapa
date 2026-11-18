@@ -203,7 +203,10 @@ body.bare .vbox video{max-height:calc(100vh - 60px)}
 .tile:not(.dir) canvas{max-width:100%;max-height:100%;width:auto;height:auto;display:block;border-radius:3px;transition:transform .18s cubic-bezier(.2,.7,.3,1),box-shadow .18s}
 .tile:not(.dir):hover canvas{transform:scale(1.04);box-shadow:0 8px 24px rgba(0,0,0,.14)}
 /* zaznaczenie (S2): tło pod całym kafelkiem, jak w Finderze */
-.tile.sel{background:var(--selbg);border-radius:12px;box-shadow:0 0 0 8px var(--selbg)}
+/* promień tła = promień okładki (10) + odstęp (8), więc rogi biegną równolegle; zaznaczony kafelek nie powiększa się po najechaniu */
+.tile.sel{background:var(--selbg);border-radius:10px;box-shadow:0 0 0 8px var(--selbg)}
+.tile.sel:not(.dir):hover canvas,.tile.dir.sel:hover .box canvas{transform:none}
+.tile.sel:not(.dir) canvas{border-radius:4px}
 body.gridlines #grid.icons>.tile.sel{border-radius:0;box-shadow:none}
 .tile.sel:not(.dir):hover canvas{box-shadow:0 8px 24px rgba(0,0,0,.14)}
 .tile .nm{display:block;font-size:12px;color:var(--muted);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

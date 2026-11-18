@@ -367,17 +367,17 @@ body.bare #grid .nm{display:none}
 @media (max-width:760px){#insp{display:none!important}#count{display:none}}
 
 /* koszyk: wiersz w panelu bocznym, znacznik na kafelku, pasek nad zawartością */
-#tray{flex:none;margin-top:auto;margin-top:auto;padding:10px 10px 10px;border-radius:12px;background:var(--soft);cursor:pointer;transition:background .15s,box-shadow .15s}
-#tray:hover{background:var(--hover)}
-#tray.on{box-shadow:inset 0 0 0 1px var(--line);background:var(--hover)}
-#tray.drop,body.dragout #tray{box-shadow:inset 0 0 0 1.5px var(--text)}
+#tray{flex:none;margin-top:auto;padding:8px 10px 6px;border-radius:10px;cursor:pointer;transition:background .15s}
+#tray:hover,#tray.on{background:var(--hover)}
+#tray.drop,body.dragout #tray{outline:1px dashed var(--muted);outline-offset:-1px;background:var(--hover)}
 body[data-drop] #tray{position:relative;z-index:55}
-#bRow{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);font-weight:500}
-#bRow svg{flex:none}
-#bRow .n{margin-left:auto;color:var(--muted);font-size:12px;font-weight:400;font-variant-numeric:tabular-nums}
-#bThumbs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin-top:9px}
-#bThumbs canvas{display:block;width:100%;aspect-ratio:1;border-radius:5px;background:var(--bg)}
-#bThumbs .empty{grid-column:1/-1;padding:9px 8px;border:1px dashed var(--muted2);border-radius:8px;font-size:11.5px;line-height:1.4;color:var(--muted);text-align:center}
+#bRow{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted)}
+#bRow svg{flex:none;color:var(--muted2)}
+#tray.on #bRow{color:var(--text)}
+#bRow .n{margin-left:auto;color:var(--muted2);font-variant-numeric:tabular-nums}
+#bThumbs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px;margin-top:7px}
+#bThumbs canvas{display:block;width:100%;aspect-ratio:1;border-radius:4px;background:var(--soft)}
+#bThumbs .empty{grid-column:1/-1;font-size:11.5px;line-height:1.4;color:var(--muted2)}
 .bempty{grid-column:1/-1;min-height:calc(100vh - 180px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;color:var(--muted)}
 .bempty svg{color:var(--muted2)}
 .bempty b{font-weight:500;font-size:15px;color:var(--text)}
@@ -506,7 +506,7 @@ tr input.ren{text-align:left;margin:0}
   <button class="sec" data-sec="places"><svg class="gi" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><rect x="2" y="4" width="12" height="8" rx="1.6"/><path d="M4.8 9.5h.01M11.5 9.5H8"/></svg><span>Miejsca</span><svg class="ch" width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="m1.5 3 2.5 2.5L6.5 3"/></svg></button>
   <ul class="nav" id="places"></ul>
   <div id="tray" title="Koszyk — pliki zebrane z różnych folderów (⇧B). Przeciągnij tu zdjęcia albo naciśnij B.">
-    <div id="bRow"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M2.3 6.5h11.4l-1.25 6.2a1.3 1.3 0 0 1-1.27 1H4.82a1.3 1.3 0 0 1-1.27-1z"/><path d="M5.6 6.5 7.6 2.6M10.4 6.5 8.4 2.6"/></svg><span class="nm">Koszyk</span><span class="n" id="bCount"></span></div>
+    <div id="bRow"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M2.3 6.5h11.4l-1.25 6.2a1.3 1.3 0 0 1-1.27 1H4.82a1.3 1.3 0 0 1-1.27-1z"/><path d="M5.6 6.5 7.6 2.6M10.4 6.5 8.4 2.6"/></svg><span class="nm">Koszyk</span><span class="n" id="bCount"></span></div>
     <div id="bThumbs"></div>
   </div>
   <div class="foot">

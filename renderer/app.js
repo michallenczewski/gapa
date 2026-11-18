@@ -232,10 +232,14 @@ const SFX=(()=>{
       o.connect(out); o.start(t); o.stop(t+d+.01);
     }
   }
-  // T2 z próbnika (wysokie tyknięcie) wszędzie; podgląd (spacja) ma miękkie tapnięcie opuszką (P1). Zawsze pojedyncze uderzenie.
-  const t2=()=>blip({noise:true,d:.007,g:.055,bp:7000});
-  const tap=()=>{ blip({noise:true,d:.022,g:.07,bp:1800,ft:'lowpass',q:.7,att:.004}); blip({f:170,d:.03,g:.05}); };
-  const SOUNDS={tick:t2,click:t2,tok:t2,on:t2,off:t2,open:tap,close:tap};
+  // z próbnika: S2 (impuls z tonem, wysoki) wszędzie; S8 (pik prostokątny) przy otwieraniu i zamykaniu podglądu
+  function impulse(f,q,g){ const c=ac(); if(!c) return; const n=Math.ceil(c.sampleRate*.06), buf=c.createBuffer(1,n,c.sampleRate), ch=buf.getChannelData(0); ch[0]=1; ch[1]=-.6;
+    const src=c.createBufferSource(); src.buffer=buf; const fl=c.createBiquadFilter(); fl.type='bandpass'; fl.frequency.value=f; fl.Q.value=q; const out=c.createGain(); out.gain.value=g;
+    src.connect(fl); fl.connect(out); out.connect(c.destination); src.start(); }
+  function pip(f,d,g,type){ const c=ac(); if(!c) return; const t=c.currentTime, o=c.createOscillator(); o.type=type; o.frequency.value=f;
+    const out=c.createGain(); out.gain.setValueAtTime(g,t); out.gain.exponentialRampToValueAtTime(.0001,t+d); o.connect(out); out.connect(c.destination); o.start(t); o.stop(t+d+.005); }
+  const s2=()=>impulse(5200,10,.5), s8=()=>pip(3000,.003,.025,'square');
+  const SOUNDS={tick:s2,click:s2,tok:s2,on:s2,off:s2,open:s8,close:s8};
   return name=>{ if(S.sound===false) return; const now=performance.now(); if(now-(last[name]||0)<28) return; last[name]=now; try{SOUNDS[name]&&SOUNDS[name]();}catch(e){} };
 })();
 // klik każdego przycisku interfejsu (poza tymi, które mają własny dźwięk)

@@ -390,6 +390,77 @@ ipcMain.handle('editor-name', () => {
   return ed ? path.basename(ed).replace(/\.(app|exe)$/i, '') : null;
 });
 
+/* ---------- przenoszenie i kopiowanie przeciąganiem (jak w Finderze) ---------- */
+// ten sam dysk → przeniesienie, inny dysk albo z Alt / ⌥ → kopia; nic nie jest nadpisywane („nazwa (2).jpg”)
+const transfers = [];                       // historia do cofania (⌘Z / Ctrl+Z), ostatnie 20 operacji
+let lastDrag = null;                        // pliki przeciągane właśnie z któregoś okna Gapy
+const lc = p => isMac ? p : p.toLowerCase();
+const inside = (p, dir) => { const a = lc(p), b = lc(dir).replace(/[\\/]+$/, '') + path.sep; return a.startsWith(b); };
+async function freePath(dir, name) {
+  const ext = path.extname(name), base = name.slice(0, name.length - ext.length);
+  let p = path.join(dir, name), n = 2;
+  for (;;) { try { await fsp.access(p); p = path.join(dir, `${base} (${n++})${ext}`); } catch (err) { return p; } }
+}
+async function moveTo(src, to) {
+  try { await fsp.rename(src, to); }
+  catch (err) {
+    if (err.code !== 'EXDEV') throw err;
+    // inny wolumin mimo wszystko: kopia, a oryginał do Kosza (nie kasujemy na stałe)
+    await fsp.cp(src, to, { recursive: true, errorOnExist: true, force: false, preserveTimestamps: true });
+    await shell.trashItem(src);
+  }
+}
+function tellDirs(dirs) { for (const w of BrowserWindow.getAllWindows()) for (const d of dirs) if (!w.isDestroyed()) w.webContents.send('dir-changed', d); }
+ipcMain.handle('dev-of', (e, paths) => Promise.all((paths || []).map(p => fsp.stat(p).then(s => s.dev).catch(() => null))));
+ipcMain.handle('current-drag', () => lastDrag && Date.now() - lastDrag.t < 120000 ? lastDrag.files : null);
+ipcMain.handle('transfer', async (e, paths, dest, mode) => {
+  const done = [], failed = [], dirs = new Set([dest]);
+  let dst; try { dst = await fsp.stat(dest); if (!dst.isDirectory()) throw new Error(); } catch (err) { return { done, failed: paths.map(p => ({ path: p, error: 'nie ma folderu docelowego' })) }; }
+  for (const src of paths || []) {
+    try {
+      const here = lc(path.dirname(src)) === lc(dest);
+      if (here && mode !== 'copy') continue;                                   // już tam jest (kopia w tym samym folderze dostaje „(2)”)
+      if (lc(src) === lc(dest) || inside(dest, src)) { failed.push({ path: src, error: 'folderu nie da się włożyć do niego samego' }); continue; }
+      const st = await fsp.stat(src);
+      const op = mode === 'copy' ? 'copy' : mode === 'move' || st.dev === dst.dev ? 'move' : 'copy';
+      const to = await freePath(dest, path.basename(src));
+      if (op === 'move') await moveTo(src, to);
+      else await fsp.cp(src, to, { recursive: true, errorOnExist: true, force: false, preserveTimestamps: true });
+      done.push({ from: src, to, op }); dirs.add(path.dirname(src));
+    } catch (err) { failed.push({ path: src, error: err.message }); }
+  }
+  if (done.length) { transfers.push(done); if (transfers.length > 20) transfers.shift(); }
+  tellDirs(dirs);
+  return { done, failed };
+});
+// zmiana nazwy: bez nadpisywania; ⌘Z / Ctrl+Z cofa jak przeniesienie
+ipcMain.handle('rename', async (e, src, name) => {
+  name = String(name || '').trim();
+  if (!name || name === '.' || name === '..' || /[\\/:*?"<>|\x00-\x1f]/.test(name)) return { error: 'Nazwa nie może zawierać znaków \\ / : * ? " < > |' };
+  const to = path.join(path.dirname(src), name);
+  if (to === src) return { to };
+  try {
+    if (lc(to) !== lc(src)) { try { await fsp.access(to); return { error: 'Plik o tej nazwie już tu jest' }; } catch (err) {} }
+    await fsp.rename(src, to);
+    transfers.push([{ from: src, to, op: 'move' }]); if (transfers.length > 20) transfers.shift();
+    tellDirs([path.dirname(src)]);
+    return { to };
+  } catch (err) { return { error: err.message }; }
+});
+ipcMain.handle('undo-transfer', async () => {
+  const last = transfers.pop(); if (!last) return null;
+  const back = [], failed = [], dirs = new Set();
+  for (const r of [...last].reverse()) {
+    try {
+      if (r.op === 'move') { const to = await freePath(path.dirname(r.from), path.basename(r.from)); await moveTo(r.to, to); back.push({ from: r.to, to, op: 'move' }); }
+      else { await shell.trashItem(r.to); back.push({ from: r.to, to: null, op: 'trash' }); }   // cofnięta kopia trafia do Kosza
+      dirs.add(path.dirname(r.from)); dirs.add(path.dirname(r.to));
+    } catch (err) { failed.push({ path: r.to, error: err.message }); }
+  }
+  tellDirs(dirs);
+  return { op: last[0].op, back, failed };
+});
+
 let dragIcon = null;
 ipcMain.on('drag-out', (e, files, icon) => {
   if (!files || !files.length) return;
@@ -399,6 +470,7 @@ ipcMain.on('drag-out', (e, files, icon) => {
     try { img = nativeImage.createFromBuffer(Buffer.from(icon.slice(22), 'base64'), { scaleFactor: 2 }); if (img.isEmpty()) img = null; } catch (err) { img = null; }
   }
   if (!img) { if (!dragIcon) dragIcon = nativeImage.createFromPath(path.join(__dirname, 'renderer', 'icon.png')).resize({ width: 48, height: 48 }); img = dragIcon; }
+  lastDrag = { files, t: Date.now() };
   e.sender.startDrag({ file: files[0], files, icon: img });
 });
 

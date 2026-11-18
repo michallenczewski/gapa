@@ -446,6 +446,12 @@ body.dragout.noside #bdrop{opacity:1;transform:translate(-50%,0);pointer-events:
   .tile.dir .sk{left:6px;right:6px;bottom:5px}
   .tile.dir .cnt{left:5px;top:5px}
 }
+#droplab{position:fixed;z-index:90;padding:5px 9px;border-radius:7px;background:var(--tip);color:var(--tiptext);font-size:12px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .1s}
+#droplab.on{opacity:1}
+.tile.dir.dropon .box{box-shadow:0 0 0 2px var(--text);transform:scale(1.02);transition:transform .12s}
+.nav li.dropon{background:var(--selbg);color:var(--text)}
+.tile input.ren,tr input.ren{width:100%;height:24px;margin-top:-4px;padding:0 6px;border:0;border-radius:6px;outline:0;font:inherit;font-size:12px;text-align:center;background:var(--card);color:var(--text);box-shadow:0 0 0 1.5px var(--text)}
+tr input.ren{text-align:left;margin:0}
 </style>
 </head>
 <body>
@@ -1530,7 +1536,12 @@ async function scan(keepScroll,selectPath){
   api.watch(here);
   prefetch();
 }
-api.onDirChanged(d=>{ if(samePath(d,curPath)&&!viewer.classList.contains('open')) scan(true); });
+api.onDirChanged(d=>{
+  if(viewer.classList.contains('open')) return;
+  if(samePath(d,curPath)) scan(true);
+  else if(curPath&&samePath(api.dirname(d),curPath)){ const dd=dirs.find(x=>samePath(x.path,d)); if(dd){ resetDir(dd); if(dd.tile&&dd.tile.isConnected) loadDir(dd,true); } }
+  else if(virt==='basket') applyView(keep());
+});
 function goUp(){
   if(virt){ closeVirt(); return; }
   if(!curPath) return;
@@ -1591,9 +1602,18 @@ pathIn.addEventListener('keydown',async e=>{
 pathIn.addEventListener('blur',()=>setTimeout(()=>{ if(document.activeElement!==pathIn) endEditPath(); },120));
 $('#pathCopy').onclick=e=>{ e.stopPropagation(); copyText(curPath); };
 // wklejenie ścieżki gdziekolwiek w oknie (poza polami tekstowymi) przenosi do niej
-document.addEventListener('paste',e=>{
+let fileClip=null;
+document.addEventListener('paste',async e=>{
   if(e.target.closest&&e.target.closest('input,textarea')) return;
   const t=(e.clipboardData&&e.clipboardData.getData('text')||'').trim();
+  // pliki skopiowane albo wycięte w Gapie (⌘C / ⌘X) wklejamy do bieżącego folderu
+  if(fileClip&&t===fileClip.text){
+    e.preventDefault();
+    if(!curPath||virt||deep){ zoomTip('Otwórz folder, do którego mają trafić pliki'); return; }
+    const c=fileClip, r=await doTransfer(c.paths,{path:curPath,name:api.basename(curPath)||curPath},c.cut?'move':'copy');
+    if(c.cut&&r&&r.done.length){ fileClip=null; navigator.clipboard.writeText('').catch(()=>{}); }
+    return;
+  }
   if(t&&!t.includes('\n')&&/^(["']?)(\/|~|[A-Za-z]:[\\/]|\\\\|file:\/\/)/.test(t)){ e.preventDefault(); goPath(t); }
 });
 function renderCrumbs(){
@@ -2577,6 +2597,35 @@ async function toJpg(list){
   if(!viewer.classList.contains('open')) scan(true);
 }
 /* --- usuwanie: do Kosza, bez pytania (można przywrócić z Kosza) --- */
+/* --- zmiana nazwy w miejscu (F2): Enter zapisuje, Esc anuluje --- */
+function renameItem(it){
+  if(!api.rename||!it||!it.tile||virt==='basket') return;
+  const nm=it.tile.querySelector('.nm'); if(!nm) return;
+  const inp=document.createElement('input'); inp.className='ren'; inp.value=it.name; inp.spellcheck=false;
+  nm.after(inp); nm.hidden=true;
+  const dot=it.kind==='file'?it.name.lastIndexOf('.'):-1; inp.focus(); inp.setSelectionRange(0,dot>0?dot:it.name.length);
+  let done=false;
+  const end=async ok=>{
+    if(done) return; done=true;
+    const v=inp.value.trim();
+    if(ok&&v&&v!==it.name){
+      const r=await api.rename(it.path,v);
+      if(r.error){ zoomTip(r.error); done=false; inp.focus(); return; }
+      applyMoves([{from:it.path,to:r.to,op:'move'}]); zoomTip('Zmieniono nazwę  ·  '+(isMac?'⌘Z':'Ctrl+Z')+' cofa');
+      inp.remove(); nm.hidden=false; scan(true,r.to); return;
+    }
+    inp.remove(); nm.hidden=false; main.focus();
+  };
+  inp.addEventListener('keydown',e=>{ e.stopPropagation(); if(e.key==='Enter'){e.preventDefault();end(true);} else if(e.key==='Escape'){e.preventDefault();end(false);} });
+  inp.addEventListener('blur',()=>end(true));
+  inp.addEventListener('click',e=>e.stopPropagation()); inp.addEventListener('dblclick',e=>e.stopPropagation());
+}
+// foldery do Kosza tylko po potwierdzeniu — w środku może być dużo więcej, niż widać
+async function trashSel(list){
+  const ds=list.filter(x=>x.kind==='dir');
+  if(ds.length&&!(await askConfirm(ds.length===1?'Przenieść folder „'+ds[0].name+'” do Kosza?':'Przenieść '+ds.length+' foldery do Kosza?','Razem z całą zawartością. Można je przywrócić z Kosza.','Przenieś do Kosza'))) return;
+  trashItems(list);
+}
 async function trashItems(list){
   if(!api.trash||!list.length) return;
   const r=await api.trash(list.map(x=>x.path));
@@ -2671,6 +2720,7 @@ document.addEventListener('contextmenu',e=>{
     if(!curPath) return;
     showMenu(e.clientX,e.clientY,api.basename(curPath)||curPath,[
       {label:'Odśwież',key:'R',run:()=>scan(true)},
+      ...(fileClip&&api.transfer?[{label:(fileClip.cut?'Wklej (przenieś) ':'Wklej ')+fileClip.paths.length,key:MOD+'V',run:async()=>{ const c=fileClip, r=await doTransfer(c.paths,{path:curPath,name:api.basename(curPath)||curPath},c.cut?'move':'copy'); if(c.cut&&r&&r.done.length) fileClip=null; }},'-']:[]),
       {label:'Kopiuj ścieżkę folderu',run:()=>copyText(curPath)},
       {label:'Przejdź do ścieżki…',key:MOD+'L',run:editPath},
       {label:'Pokaż folder w '+FINDER,run:()=>api.openDefault(curPath)},
@@ -2689,18 +2739,21 @@ document.addEventListener('contextmenu',e=>{
       {label:'Pokaż wszystko w środku',key:'⇧Enter',run:()=>go(it.path,null,true)},
       {label:f?'Usuń z ulubionych':'Dodaj do ulubionych',run:()=>toggleFav(it.path)},
       {label:'Pokaż w '+FINDER,run:()=>api.showInFolder(it.path)},
-      '-',{label:'Kopiuj ścieżkę',run:()=>copyText(it.path)}]);
+      '-',{label:'Kopiuj ścieżkę',run:()=>copyText(it.path)},
+      ...(api.rename?[{label:'Zmień nazwę…',key:'F2',run:()=>renameItem(it)}]:[]),
+      ...(api.trash?['-',{label:'Przenieś do Kosza',key:isMac?'⌘⌫':'Delete',run:()=>trashSel([it])}]:[])]);
     return;
   }
   const many=pickedFiles(it), n=many.length, en=[];
   if(n>1) en.push({label:'Pokaż zaznaczone ('+n+')',key:'Enter',run:()=>openViewer(it)});
   else en.push({label:'Otwórz podgląd',key:'Enter',run:()=>openViewer(it)});
   en.push({label:'Otwórz w '+(editorName||'Photoshopie')+(n>1?' ('+n+')':''),key:MOD+'E',run:()=>openInEditor(many.map(x=>x.path))});
-  if(n===1) en.push({label:'Otwórz w domyślnym programie',run:()=>api.openDefault(it.path)});
+  if(n===1) en.push({label:'Otwórz w domyślnym programie',key:MOD+'Enter',run:()=>api.openDefault(it.path)});
   if(n===1&&(heads||virt)) en.push({label:'Przejdź do folderu „'+(api.basename(api.dirname(it.path))||api.dirname(it.path))+'”',run:()=>go(api.dirname(it.path),it.path)});
   en.push({label:'Pokaż w '+FINDER,run:()=>api.showInFolder(it.path)});
   en.push('-');
   en.push({label:bLabel(many)+(n>1?' ('+n+')':''),key:'B',run:()=>basketToggle(many)});
+  if(n===1&&api.rename&&virt!=='basket') en.push({label:'Zmień nazwę…',key:'F2',run:()=>renameItem(it)});
   if(virt==='basket'&&api.copyTo) en.push({label:'Kopiuj do folderu…'+(n>1?' ('+n+')':''),run:()=>copyBasketTo(many)});
   en.push('-');
   en.push({label:n>1?'Kopiuj nazwy ('+n+')':'Kopiuj nazwę',run:()=>copyText(many.map(x=>x.name).join('\n'))});
@@ -2773,12 +2826,22 @@ document.addEventListener('keydown',e=>{
   if(mod&&k.toLowerCase()==='d'){e.preventDefault();if(curPath){const had=!!findFav(curPath);toggleFav();zoomTip(had?'Usunięto z ulubionych':'Dodano do ulubionych');}return;}
   if((isMac&&e.metaKey&&(e.code==='BracketLeft'||e.code==='BracketRight'))||(!isMac&&e.altKey&&(k==='ArrowLeft'||k==='ArrowRight'))){
     e.preventDefault(); histGo(e.code==='BracketLeft'||k==='ArrowLeft'?-1:1); return; }
+  if(mod&&!e.shiftKey&&e.code==='KeyZ'){e.preventDefault();undoTransfer();return;}
   if(mod&&!e.altKey&&(k==='='||k==='+'||k==='-'||k==='0')){e.preventDefault();if(k==='0')setSize(180,true);else zstep(k==='-'?-1:1);return;}
+  if(mod&&!e.shiftKey&&!e.altKey&&(e.code==='KeyC'||e.code==='KeyX')&&api.transfer){
+    const s=[...picked]; if(!s.length) return;
+    if(e.code==='KeyX'&&virt==='basket'){ zoomTip('W koszyku pliki można skopiować, nie wyciąć'); return; }
+    e.preventDefault(); fileClip={paths:s.map(x=>x.path),cut:e.code==='KeyX',text:s.map(x=>x.path).join('\n')};
+    navigator.clipboard.writeText(fileClip.text).catch(()=>{});
+    zoomTip((fileClip.cut?'Wycięto ':'Skopiowano ')+s.length+' — wklej ('+(isMac?'⌘V':'Ctrl+V')+') w docelowym folderze'); return;
+  }
+  if(mod&&k==='Enter'){ e.preventDefault(); const s=[...picked].slice(0,12); for(const x of s) api.openDefault(x.path); return; }
+  if(k==='F2'){ e.preventDefault(); const it=view[sel]; if(it) renameItem(it); return; }
   // usuwanie: w koszyku tylko wyjmuje z koszyka, gdzie indziej przenosi do Kosza systemu
   if((isMac&&mod&&!e.shiftKey&&k==='Backspace')||k==='Delete'){
-    e.preventDefault(); const s=[...picked].filter(x=>x.kind==='file'); if(!s.length) return;
-    if(virt==='basket'){ basketRemove(s); SFX('tick'); zoomTip('Wyjęto z koszyka: '+s.length); }
-    else if(api.trash&&(!isMac||k==='Backspace')) trashItems(s);
+    e.preventDefault(); const s=[...picked]; if(!s.length) return;
+    if(virt==='basket'){ basketRemove(s.filter(x=>x.kind==='file')); SFX('tick'); zoomTip('Wyjęto z koszyka: '+s.length); }
+    else if(api.trash&&(!isMac||k==='Backspace')) trashSel(s);
     return;
   }
   if(mod||e.altKey) return;
@@ -2841,29 +2904,87 @@ addEventListener('storage',e=>{
   const z=$('#bdrop');
   z.addEventListener('dragover',e=>{ if(draggingOut){ e.preventDefault(); z.classList.add('over'); } });
   z.addEventListener('dragleave',()=>z.classList.remove('over')); }
-/* --- upuszczenie folderu lub pliku na okno --- */
-let dragN=0;
+/* --- upuszczanie: na folder (kafelek, drzewo, ulubione) albo na siatkę bieżącego folderu przenosi lub kopiuje pliki,
+       jak w Finderze: ten sam dysk — przenosi, inny dysk albo z Alt / ⌥ — kopiuje; ⌘Z / Ctrl+Z cofa --- */
+let dragN=0, dropOn=null, dragSrc=null, dragSrcDev=null;
+const devCache=new Map();
 const hasFiles=e=>e.dataTransfer&&[...e.dataTransfer.types].includes('Files');
-document.addEventListener('dragenter',e=>{if(!hasFiles(e)||draggingOut)return;dragN++;document.body.dataset.drop='1';});
-document.addEventListener('dragleave',e=>{if(!hasFiles(e))return;if(--dragN<=0){dragN=0;delete document.body.dataset.drop;}});
-document.addEventListener('dragover',e=>e.preventDefault());
+const dropLab=document.createElement('div'); dropLab.id='droplab'; document.body.appendChild(dropLab);
+function dropTarget(e){
+  const el=e.target&&e.target.closest?e.target:null; if(!el) return null;
+  if(el.closest('#tray,#bdrop')) return {kind:'basket'};
+  if(!api.transfer) return null;
+  const t=el.closest('.tile.dir'); if(t&&t._it) return {kind:'dir',path:t._it.path,el:t,name:t._it.name};
+  const li=el.closest('#tree li,#favs li,#places li'); if(li&&li.title&&!li.classList.contains('none')) return {kind:'dir',path:li.title,el:li,name:(li.querySelector('.nm')||li).textContent};
+  if(el.closest('#main')&&curPath&&!virt&&!deep&&!libActive()) return {kind:'here',path:curPath,el:null,name:api.basename(curPath)||curPath};
+  return null;
+}
+async function learnDrag(){            // co jest przeciągane: z tego okna wiemy od razu, z innego okna Gapy pytamy proces główny
+  dragSrc=draggingOut?lastOut:(api.currentDrag?await api.currentDrag():null);
+  dragSrcDev=null; if(dragSrc&&dragSrc.length&&api.devOf) dragSrcDev=(await api.devOf([dragSrc[0]]))[0];
+}
+function devOfDest(p){ if(devCache.has(p)) return devCache.get(p); devCache.set(p,undefined); if(api.devOf) api.devOf([p]).then(r=>devCache.set(p,r[0])); return undefined; }
+function clearDrop(){ if(dropOn&&dropOn.el) dropOn.el.classList.remove('dropon'); dropOn=null; dropLab.classList.remove('on'); $('#tray').classList.remove('drop'); }
+function showDrop(t,e){
+  if(!dropOn||!t||dropOn.el!==t.el||dropOn.path!==t.path){ if(dropOn&&dropOn.el) dropOn.el.classList.remove('dropon'); dropOn=t; if(t&&t.el) t.el.classList.add('dropon'); }
+  if(!t||t.kind==='basket'){ dropLab.classList.remove('on'); return; }
+  const same=dragSrc&&dragSrc.length&&dragSrc.every(p=>samePath(api.dirname(p),t.path));
+  if(same){ dropLab.classList.remove('on'); e.dataTransfer.dropEffect='none'; return; }
+  let verb;
+  if(e.altKey) verb='Kopiuj';
+  else { const d=devOfDest(t.path); verb=dragSrcDev==null||d==null?'Przenieś':(d===dragSrcDev?'Przenieś':'Kopiuj'); }
+  e.dataTransfer.dropEffect=verb==='Kopiuj'?'copy':'move';
+  dropLab.textContent=verb+' do „'+t.name+'”'+(verb==='Przenieś'?'  ·  '+(isMac?'⌥':'Alt')+' kopiuje':'');
+  dropLab.style.left=(e.clientX+16)+'px'; dropLab.style.top=(e.clientY+18)+'px'; dropLab.classList.add('on');
+}
+document.addEventListener('dragenter',e=>{ if(!hasFiles(e)) return; if(dragN++===0) learnDrag(); if(!curPath&&!draggingOut) document.body.dataset.drop='1'; });
+document.addEventListener('dragleave',e=>{ if(!hasFiles(e)) return; if(--dragN<=0){ dragN=0; delete document.body.dataset.drop; clearDrop(); } });
+document.addEventListener('dragover',e=>{ e.preventDefault(); if(hasFiles(e)) showDrop(dropTarget(e),e); });
+function applyMoves(list){        // przeniesione pliki w koszyku dostają nowe ścieżki
+  let ch=false;
+  for(const r of list){ if(r.op!=='move'||!inBasket(r.from)) continue; const b=S.basket.find(x=>samePath(x.path,r.from)); if(b){ bItems.delete(b.path); b.path=r.to; b.name=api.basename(r.to); ch=true; } }
+  if(ch){ bSet=new Set(S.basket.map(b=>bKey(b.path))); save(); basketChanged(); }
+}
+async function doTransfer(paths,t,mode){
+  if(mode!=='copy') paths=paths.filter(p=>!samePath(api.dirname(p),t.path));
+  if(!paths.length) return null;
+  const r=await api.transfer(paths,t.path,mode||'auto');
+  applyMoves(r.done);
+  const mv=r.done.filter(x=>x.op==='move').length, cp=r.done.length-mv, a=[];
+  if(mv) a.push('Przeniesiono '+mv); if(cp) a.push((mv?'skopiowano ':'Skopiowano ')+cp);
+  SFX('tick');
+  zoomTip(r.done.length?a.join(', ')+' do „'+t.name+'”'+(r.failed.length?' · nie udało się '+r.failed.length:'')+'  ·  '+(isMac?'⌘Z':'Ctrl+Z')+' cofa':'Nie udało się: '+(r.failed[0]&&r.failed[0].error||''));
+  return r;
+}
+async function undoTransfer(){
+  if(!api.undoTransfer) return;
+  const r=await api.undoTransfer(); if(!r){ zoomTip('Nie ma czego cofnąć'); return; }
+  applyMoves(r.back.filter(x=>x.op==='move'));
+  SFX('tick'); zoomTip((r.op==='move'?'Cofnięto przeniesienie: ':'Cofnięto kopiowanie (kopie w Koszu): ')+r.back.length+(r.failed.length?' · nie udało się '+r.failed.length:''));
+}
 document.addEventListener('drop',async e=>{
   e.preventDefault(); dragN=0; delete document.body.dataset.drop;
-  $('#tray').classList.remove('drop');
-  // pliki przeciągnięte z siatki na koszyk w panelu bocznym albo na duże pole na dole okna
-  if(draggingOut&&e.target.closest&&e.target.closest('#tray,#bdrop')){ dragDone(); const n=basketAdd(lastOutItems); SFX('tick'); zoomTip(n?(n===1?'W koszyku':'Dodano do koszyka: '+n)+' · razem '+S.basket.length:'Już są w koszyku'); return; }
-  if(draggingOut){dragDone();return;}
-  // pliki z Findera, Eksploratora albo z innego okna Gapy upuszczone na koszyk
-  if(e.target.closest&&e.target.closest('#tray,#bdrop')&&api.statFiles){
+  const t=dropTarget(e); clearDrop();
+  const wasOut=draggingOut, outItems=lastOutItems, outPaths=lastOut; if(draggingOut) dragDone();
+  // na koszyk: z tego okna, z innego okna Gapy, z Findera albo Eksploratora
+  if(t&&t.kind==='basket'){
+    if(wasOut){ const n=basketAdd(outItems); SFX('tick'); zoomTip(n?(n===1?'W koszyku':'Dodano do koszyka: '+n)+' · razem '+S.basket.length:'Już są w koszyku'); return; }
+    if(!api.statFiles) return;
     const ps=[...e.dataTransfer.files].map(f=>api.pathForFile(f)).filter(p=>p&&EXT[extOf(p)]);
     if(!ps.length){ zoomTip('Do koszyka trafiają tylko obrazy i pliki, które Gapa pokazuje'); return; }
     const st=await api.statFiles(ps);
     const n=basketAdd(ps.map((p,k)=>st[k]&&{kind:'file',name:api.basename(p),path:p,size:st[k].size,mtime:st[k].mtime,type:EXT[extOf(p)],state:null}).filter(Boolean));
     SFX('tick'); zoomTip(n?(n===1?'W koszyku':'Dodano do koszyka: '+n)+' · razem '+S.basket.length:'Już są w koszyku'); return;
   }
+  const dropped=wasOut?outPaths:[...e.dataTransfer.files].map(f=>api.pathForFile(f)).filter(Boolean);
+  if(t&&(t.kind==='dir'||t.kind==='here')&&dropped.length){
+    // pojedynczy folder z zewnątrz upuszczony na siatkę — otwieramy go, jak dotąd
+    if(!wasOut&&t.kind==='here'&&dropped.length===1&&await api.exists(dropped[0])){ go(dropped[0]); return; }
+    await doTransfer(dropped,t,e.altKey?'copy':'auto'); return;
+  }
+  if(wasOut) return;
   if(api.addDropped){ const it=[...e.dataTransfer.items].find(i=>i.kind==='file'); if(it){ const p=await api.addDropped(it); if(p){ await loadRoots(); go(p); } } return; }
-  const f=e.dataTransfer.files[0]; if(!f) return;
-  const p=api.pathForFile(f); if(!p) return;
+  const p=dropped[0]; if(!p) return;
   if(await api.exists(p)) go(p); else go(api.dirname(p),p);
 });
 

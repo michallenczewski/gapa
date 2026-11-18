@@ -25,6 +25,10 @@ Program nie jest podpisany płatnym certyfikatem, więc system za pierwszym raze
 - **macOS:** przeciągnij Gapę do *Programów* i spróbuj go otworzyć. Gdy pojawi się komunikat, wejdź w *Ustawienia systemowe → Prywatność i ochrona*, przewiń w dół i kliknij *Otwórz mimo to*. Jeśli macOS twierdzi, że program jest „uszkodzony”, wpisz w Terminalu:
   `sudo xattr -cr /Applications/Gapa.app`
 
+## Pliki: przenoszenie, kopiowanie, zmiana nazwy
+
+Przeciągnięcie plików na folder (kafelek, folder w drzewie albo w Ulubionych) albo na siatkę innego okna przenosi je, jeśli są na tym samym dysku, a kopiuje, jeśli na innym; z Alt (⌥ na Macu) zawsze kopiuje. Pod kursorem widać, co się stanie. Nic nie jest nadpisywane — powtórzona nazwa dostaje dopisek „(2)”. ⌘Z / Ctrl+Z cofa ostatnią operację (cofnięta kopia trafia do Kosza). To samo działa przez ⌘C / ⌘X i ⌘V.
+
 ## Koszyk i wyszukiwanie w bibliotece
 
 **Koszyk** zbiera pliki z różnych folderów podczas przeglądania: zaznacz i naciśnij B, wybierz „Dodaj do koszyka” z menu albo przeciągnij miniatury na „Koszyk” w panelu bocznym. Pliki zostają na swoich miejscach. W koszyku przycisk „Przeciągnij wszystkie” przenosi całość naraz do Photoshopa, 3ds Maxa albo Findera, a „Kopiuj do folderu…” kopiuje pliki do folderu projektu (bez nadpisywania). Delete / ⌘⌫ w koszyku tylko wyjmuje plik z koszyka. Koszyk pamięta się między uruchomieniami.
@@ -69,7 +73,11 @@ Najczęstsze skróty leżą pod lewą ręką, żeby prawa mogła zostać na mysz
 | ⌘/Ctrl + N | nowe okno w tym samym folderze (Koszyk i Ulubione są wspólne) |
 | ⌘[ ⌘] (Mac) / Alt+← Alt+→ (Windows) | wstecz / dalej po odwiedzonych miejscach (też strzałki < > i boczne przyciski myszy) |
 | ⌘/Ctrl + kółko, szczypnięcie | płynna zmiana wielkości miniatur; w podglądzie przybliżanie wokół kursora |
-| ⌘⌫ (Mac) / Delete (Windows) | przenieś do Kosza; w koszyku tylko wyjmuje z koszyka |
+| ⌘⌫ (Mac) / Delete (Windows) | przenieś do Kosza (foldery po potwierdzeniu); w koszyku tylko wyjmuje z koszyka |
+| ⌘C / ⌘X, potem ⌘V (Ctrl na Windows) | kopiuj albo wytnij zaznaczone pliki i foldery, wklej w bieżącym folderze |
+| F2 | zmień nazwę (Enter zapisuje, Esc anuluje) |
+| ⌘Enter / Ctrl+Enter | otwórz w domyślnym programie |
+| ⌘Z / Ctrl+Z | cofnij ostatnie przeniesienie, kopiowanie albo zmianę nazwy |
 | ⌘/Ctrl + A | zaznacz wszystkie |
 | ⌘L / Ctrl+L | wpisz lub wklej ścieżkę (wklejenie ścieżki gdziekolwiek też przenosi) |
 | ⌘/Ctrl + D | dodaj folder do ulubionych |

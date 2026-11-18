@@ -803,7 +803,8 @@ function paint(it){
   box.textContent='';
   if(it.thumb){const c=(it.hd&&it.hd.c)||it.thumb; c.className=c.width/c.height>=4/3?'w':'h'; box.appendChild(c); wantHD(it);if(it.type==='vid'){const d=document.createElement('span');d.className='dur';d.innerHTML='<svg width="7" height="8" viewBox="0 0 7 8" aria-hidden="true"><path d="M0 0v8l7-4z" fill="currentColor"/></svg>';d.append(it.meta&&it.meta.mode||'');box.appendChild(d);}return;}
   const s=document.createElement('span'); s.className='ph';
-  s.textContent=(it.state==='error'?extOf(it.name)+' · brak podglądu':extOf(it.name));
+  s.textContent=extOf(it.name);
+  if(it.state==='error'){const w=document.createElement('span');w.className='why';w.textContent=' · brak podglądu';s.appendChild(w);}
   if(it.err) el.title=it.name+'\n'+it.err;
   box.appendChild(s);
 }
@@ -840,6 +841,7 @@ function loadDir(d,hi){
   })();
 }
 const FOLDER_ICO='<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width=".9" aria-hidden="true"><path d="M1.5 3.5a1 1 0 0 1 1-1h2.2l1 1.2h3.8a1 1 0 0 1 1 1v4.3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1z"/></svg>';
+const FOLDERS_ICO_S='<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.1" aria-hidden="true"><path d="M3 4.6a.9.9 0 0 1 .9-.9h1.8l.8 1h3a.9.9 0 0 1 .9.9v3.6a.9.9 0 0 1-.9.9H3.9a.9.9 0 0 1-.9-.9z"/><path d="M1.4 7.6V3.3a.9.9 0 0 1 .9-.9h1.6"/></svg>';
 const FOLDER_ICO_S='<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M1.5 3.5a1 1 0 0 1 1-1h2.2l1 1.2h3.8a1 1 0 0 1 1 1v4.3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1z"/></svg>';
 function coverFrom(d,i,hi){ // okładka: pierwszy plik, który da się pokazać (najwyżej 6 prób)
   const f=d.files&&d.files[i]; if(!f||i>5){ paint(d); return; }
@@ -852,8 +854,10 @@ function paintDir(d){
   const f=d.files&&d.files[d.si||0];
   if(f&&f.thumb) box.appendChild(f.thumb);
   else if(d.state==='done'&&!(d.files&&d.files.length)){const s=document.createElement('span');s.className='ph';s.innerHTML=FOLDER_ICO;box.appendChild(s);}
-  if(d.count||(d.deep&&d.sub)){const c=document.createElement('span');c.className='chip';c.innerHTML=FOLDER_ICO_S;
-    c.appendChild(document.createTextNode(d.count?d.count:d.sub+' '+plural(d.sub,'folder','foldery','folderów')));box.appendChild(c);}
+  if(d.count||(d.deep&&d.sub)){const c=document.createElement('span');c.className='chip';
+    if(d.count){c.innerHTML=FOLDER_ICO_S;c.appendChild(document.createTextNode(d.count));}
+    else{c.innerHTML=FOLDERS_ICO_S;c.appendChild(document.createTextNode(d.sub));const l=document.createElement('span');l.className='lbl';l.textContent=' '+plural(d.sub,'folder','foldery','folderów');c.appendChild(l);c.title=d.sub+' '+plural(d.sub,'podfolder','podfoldery','podfolderów');}
+    box.appendChild(c);}
   if(d.files&&d.files.length>1){
     const sk=document.createElement('div');sk.className='sk';
     for(let k=0;k<d.files.length;k++){const i=document.createElement('i');if(k===(d.si||0))i.className='on';sk.appendChild(i);}

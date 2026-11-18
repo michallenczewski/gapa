@@ -226,7 +226,7 @@ body.nodirnames .tile.dir .nm{display:none}
 .tile.dir .nm{color:var(--text);font-weight:500}
 .tile.dir .ph{font-size:0}
 .tile.dir .ph svg{width:24px;height:24px;color:var(--muted2)}
-.chip{position:absolute;left:8px;bottom:8px;height:22px;padding:0 8px;border-radius:6px;background:rgba(255,255,255,.88);color:#4a4945;font-size:11px;display:flex;align-items:center;gap:5px;z-index:2;font-variant-numeric:tabular-nums}
+.chip{position:absolute;left:8px;bottom:8px;height:22px;padding:0 8px;white-space:nowrap;max-width:calc(100% - 16px);overflow:hidden;border-radius:6px;background:rgba(255,255,255,.88);color:#4a4945;font-size:11px;display:flex;align-items:center;gap:5px;z-index:2;font-variant-numeric:tabular-nums}
 [data-theme=dark] .chip{background:rgba(22,22,22,.78);color:#d0d0cd}
 .sk{position:absolute;left:10px;right:10px;bottom:8px;display:flex;gap:3px;height:2px;opacity:0;transition:opacity .15s;z-index:2}
 .sk i{flex:1;background:rgba(255,255,255,.4);border-radius:1px}
@@ -412,6 +412,16 @@ body.dragout #bRow{background:var(--hover)}
 .hint button{position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:5px;color:inherit;opacity:.6;font-size:14px;line-height:1}
 .hint button:hover{opacity:1;background:rgba(127,127,127,.25)}
 .hint kbd{font:inherit;font-weight:500}
+/* małe kafelki folderów: krótszy znacznik (sama liczba), mniejsza gwiazdka i mniejsze marginesy */
+.tile{container-type:inline-size}
+@container (max-width:170px){
+  .tile.dir .chip{left:5px;bottom:5px;height:19px;padding:0 6px;gap:4px;font-size:10.5px;border-radius:5px}
+  .tile.dir .chip .lbl,.tile .ph .why{display:none}
+  .tile .tf{top:5px;right:5px;width:21px;height:21px;border-radius:5px}
+  .tile .tf svg{width:10px;height:10px}
+  .tile.dir .sk{left:6px;right:6px;bottom:5px}
+  .tile.dir .cnt{left:5px;top:5px}
+}
 </style>
 </head>
 <body>

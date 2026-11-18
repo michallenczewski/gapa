@@ -197,6 +197,9 @@ body.gridlines #grid.icons>.grp{border-right:1px solid var(--line);border-bottom
 .avk-s.vv{flex:none;width:64px}
 .vmsg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;color:#d0d0cc;font-size:13px;line-height:1.5;background:#000}
 body.bare .vbox video{max-height:calc(100vh - 60px)}
+/* plik: wyśrodkowany w równej komórce 4:3; wysoki obraz nie rozpycha rzędu */
+.tile:not(.dir) .box{min-height:0;overflow:visible}
+.tile:not(.dir) .box>canvas{position:absolute;inset:0;margin:auto}
 .tile:not(.dir) canvas{max-width:100%;max-height:100%;width:auto;height:auto;display:block;border-radius:3px;transition:transform .18s cubic-bezier(.2,.7,.3,1),box-shadow .18s}
 .tile:not(.dir):hover canvas{transform:scale(1.04);box-shadow:0 8px 24px rgba(0,0,0,.14)}
 /* zaznaczenie (S2): tło pod całym kafelkiem, jak w Finderze */

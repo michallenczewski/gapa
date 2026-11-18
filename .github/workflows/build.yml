@@ -1,11 +1,9 @@
 name: Buduj instalatory
 
-# Instalatory budują się tylko przy nowej wersji: gdy w package.json pojawi się
-# numer, dla którego nie ma jeszcze wydania. Ręcznie: Actions → Buduj instalatory → Run workflow.
+# Instalatory budują się TYLKO na wyraźne polecenie (Actions → Buduj instalatory → Run workflow),
+# a nie przy każdym wypchnięciu. W prywatnym repo minuty na macOS liczą się ok. 10×, na Windows 2×,
+# więc jedno wydanie zużywa ok. 50 minut z miesięcznej puli 2000.
 on:
-  push:
-    branches: [main]
-    paths-ignore: ['README.md', 'web/**', 'scripts/**']
   workflow_dispatch:
 
 permissions:

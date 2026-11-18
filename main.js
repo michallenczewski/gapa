@@ -171,6 +171,122 @@ ipcMain.handle('write-new', async (e, dir, name, buf) => {
   await fsp.writeFile(p, Buffer.from(buf));
   return p;
 });
+// świeże dane plików (koszyk, wyniki z indeksu): null, gdy pliku już nie ma
+async function statMany(paths) {
+  const out = new Array(paths.length).fill(null); let i = 0;
+  await Promise.all(Array.from({ length: 24 }, async () => {
+    while (i < paths.length) { const k = i++; try { const s = await fsp.stat(paths[k]); if (s.isFile()) out[k] = { size: s.size, mtime: Math.round(s.mtimeMs) }; } catch (err) {} }
+  }));
+  return out;
+}
+ipcMain.handle('stat-files', (e, paths) => statMany(paths || []));
+// kopiowanie zebranych plików do folderu projektu; zajęta nazwa → „nazwa (2).jpg”, nic nie jest nadpisywane
+ipcMain.handle('copy-to', async (e, paths, dir) => {
+  const done = [], failed = [];
+  for (const src of paths) {
+    const ext = path.extname(src), base = path.basename(src, ext);
+    let p = path.join(dir, base + ext), n = 2;
+    try {
+      for (;;) {
+        try { await fsp.copyFile(src, p, fs.constants.COPYFILE_EXCL); break; }
+        catch (err) { if (err.code !== 'EEXIST') throw err; p = path.join(dir, `${base} (${n++})${ext}`); }
+      }
+      done.push(p);
+    } catch (err) { failed.push({ path: src, error: err.message }); }
+  }
+  return { done, failed };
+});
+
+/* ---------- indeks biblioteki: nazwy plików we wszystkich ulubionych folderach ---------- */
+// Zapamiętujemy tylko nazwy (bez odczytu dat i rozmiarów), więc przejście nawet przez setki tysięcy plików trwa krótko.
+// Rozmiar i datę sprawdzamy dopiero dla znalezionych wyników.
+const libFile = () => path.join(app.getPath('userData'), 'biblioteka.json');
+let lib = { exts: [], roots: {} };        // root → { t, dirs:[ścieżki względne], files:[[nr folderu, nazwa]] }
+let libLc = new Map();                     // root → { dirs:[małe litery], names:[małe litery] } — do szukania
+let libWant = [];                          // foldery, które interfejs chce mieć w indeksie
+const libBusy = new Map();                 // root → liczba plików znalezionych do tej pory
+const lcn = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l');
+const LIB_STALE = 10 * 60 * 1000;
+function libLoad() {
+  try { const j = JSON.parse(fs.readFileSync(libFile(), 'utf8')); if (j && j.roots) lib = j; } catch (e) {}
+  for (const r of Object.keys(lib.roots)) libPrep(r);
+}
+function libPrep(r) { const x = lib.roots[r]; libLc.set(r, { dirs: x.dirs.map(lcn), names: x.files.map(f => lcn(f[1])) }); }
+let libSaveT = 0;
+function libSave() { clearTimeout(libSaveT); libSaveT = setTimeout(() => fsp.writeFile(libFile(), JSON.stringify(lib)).catch(() => {}), 1500); }
+function libStatus() {
+  let files = 0; for (const r of libWant) if (lib.roots[r]) files += lib.roots[r].files.length;
+  let found = 0; for (const n of libBusy.values()) found += n;
+  return { roots: libWant.length, files, busy: libBusy.size > 0, found };
+}
+let libSendT = 0;
+function libTell(now) {
+  if (libSendT && !now) return;
+  const go = () => { libSendT = 0; if (win && !win.isDestroyed()) win.webContents.send('lib-status', libStatus()); };
+  if (now) { clearTimeout(libSendT); go(); } else libSendT = setTimeout(go, 700);
+}
+async function libWalk(root) {
+  if (libBusy.has(root)) return;
+  libBusy.set(root, 0); libTell(true);
+  const ok = new Set(lib.exts), skip = new Set(['$RECYCLE.BIN', 'System Volume Information', '$Recycle.Bin', 'node_modules']);
+  const dirs = [''], files = [], queue = [0];
+  const visit = async di => {
+    const rel = dirs[di], abs = rel ? path.join(root, rel) : root;
+    let ents; try { ents = await fsp.readdir(abs, { withFileTypes: true }); } catch (err) { return; }
+    for (const d of ents) {
+      if (d.name.startsWith('.') || skip.has(d.name) || d.isSymbolicLink()) continue;  // bez dowiązań — żadnych pętli
+      let isDir = d.isDirectory(), isFile = d.isFile();
+      if (!isDir && !isFile) { try { const s = await fsp.stat(path.join(abs, d.name)); isDir = s.isDirectory(); isFile = s.isFile(); } catch (err) { continue; } }
+      if (isDir) { dirs.push(rel ? rel + path.sep + d.name : d.name); queue.push(dirs.length - 1); }
+      else if (isFile) { const i = d.name.lastIndexOf('.'); if (i > 0 && ok.has(d.name.slice(i + 1).toLowerCase())) files.push([di, d.name]); }
+    }
+  };
+  try {
+    while (queue.length) {
+      await Promise.all(queue.splice(0, 16).map(visit));
+      libBusy.set(root, files.length); libTell();
+      if (!libWant.includes(root)) return;             // folder usunięty z ulubionych w trakcie
+    }
+    lib.roots[root] = { t: Date.now(), dirs, files }; libPrep(root); libSave();
+  } finally { libBusy.delete(root); libTell(true); }
+}
+const under = (p, r) => { const a = isMac ? p : p.toLowerCase(), b = isMac ? r : r.toLowerCase(); return a.startsWith(b.endsWith(path.sep) ? b : b + path.sep); };
+ipcMain.handle('lib-roots', async (e, roots, exts, force) => {
+  roots = [...new Set((roots || []).filter(Boolean))];
+  libWant = roots.filter(r => !roots.some(o => o !== r && under(r, o)));   // folder w środku innego ulubionego nie liczy się dwa razy
+  const ex = [...new Set(exts || [])].sort();
+  if (ex.join() !== (lib.exts || []).join()) { lib.exts = ex; for (const r of Object.keys(lib.roots)) lib.roots[r].t = 0; }
+  for (const r of Object.keys(lib.roots)) if (!libWant.includes(r)) { delete lib.roots[r]; libLc.delete(r); libSave(); }
+  for (const r of libWant) {
+    const x = lib.roots[r];
+    if (force || !x || Date.now() - x.t > LIB_STALE) fsp.stat(r).then(s => { if (s.isDirectory()) libWalk(r); }).catch(() => {});
+  }
+  return libStatus();
+});
+ipcMain.handle('lib-search', async (e, q, exts, names) => {
+  const toks = lcn(String(q || '')).split(/\s+/).filter(Boolean);
+  const ok = exts && exts.length ? new Set(exts) : null;
+  const LIMIT = 2000, hits = [];
+  let total = 0;
+  if (toks.length) for (const r of libWant) {
+    const x = lib.roots[r], lc = libLc.get(r); if (!x || !lc) continue;
+    // słowa pasujące do nazwy folderu liczą się dla wszystkich plików w środku („cegły czerwone”)
+    const dm = lc.dirs.map(d => toks.map(t => d.includes(t)));
+    for (let i = 0; i < x.files.length; i++) {
+      const [di, name] = x.files[i], nm = lc.names[i], m = dm[di];
+      let all = true; for (let k = 0; k < toks.length; k++) if (!m[k] && !nm.includes(toks[k])) { all = false; break; }
+      if (!all) continue;
+      if (ok) { const j = name.lastIndexOf('.'); if (!ok.has(name.slice(j + 1).toLowerCase())) continue; }
+      total++;
+      if (hits.length < LIMIT) { const rel = x.dirs[di]; hits.push({ name, dir: rel ? path.join(r, rel) : r, root: r, rel, name0: (names && names[r]) || path.basename(r) || r }); }
+    }
+  }
+  const st = await statMany(hits.map(h => path.join(h.dir, h.name)));
+  const files = [];
+  hits.forEach((h, k) => { if (st[k]) files.push({ name: h.name, path: path.join(h.dir, h.name), size: st[k].size, mtime: st[k].mtime, dir: h.dir, label: [h.name0, ...(h.rel ? h.rel.split(path.sep) : [])].join(' / ') }); });
+  return { files, total, st: libStatus() };
+});
+
 ipcMain.handle('exists', async (e, p) => { try { return (await fsp.stat(p)).isDirectory(); } catch (err) { return false; } });
 ipcMain.handle('roots', async () => {
   const r = [];
@@ -328,7 +444,7 @@ if (!app.requestSingleInstanceLock()) app.quit();
 else {
   app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
   app.whenReady().then(() => {
-    loadSettings();
+    loadSettings(); libLoad();
     openCache(settings.cacheDir);
     protocol.handle('pgf', async req => {
       if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });

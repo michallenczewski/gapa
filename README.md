@@ -25,6 +25,12 @@ Program nie jest podpisany płatnym certyfikatem, więc system za pierwszym raze
 - **macOS:** przeciągnij Gapę do *Programów* i spróbuj go otworzyć. Gdy pojawi się komunikat, wejdź w *Ustawienia systemowe → Prywatność i ochrona*, przewiń w dół i kliknij *Otwórz mimo to*. Jeśli macOS twierdzi, że program jest „uszkodzony”, wpisz w Terminalu:
   `sudo xattr -cr /Applications/Gapa.app`
 
+## Koszyk i wyszukiwanie w bibliotece
+
+**Koszyk** zbiera pliki z różnych folderów podczas przeglądania: zaznacz i naciśnij B, wybierz „Dodaj do koszyka” z menu albo przeciągnij miniatury na „Koszyk” w panelu bocznym. Pliki zostają na swoich miejscach. W koszyku przycisk „Przeciągnij wszystkie” przenosi całość naraz do Photoshopa, 3ds Maxa albo Findera, a „Kopiuj do folderu…” kopiuje pliki do folderu projektu (bez nadpisywania). Delete / ⌘⌫ w koszyku tylko wyjmuje plik z koszyka. Koszyk pamięta się między uruchomieniami.
+
+**Biblioteka** to wszystkie foldery z Ulubionych razem z podfolderami. Gapa zapamiętuje nazwy plików w nich (indeks w pliku `biblioteka.json` obok ustawień) i odświeża go w tle po zmianie ulubionych, przy powrocie do okna, jeśli minęło 10 minut, albo na żądanie („Odśwież indeks”). Zakres wyszukiwania wybiera się przyciskiem w polu szukania: tu, podfoldery albo biblioteka. Słowa w zapytaniu muszą wystąpić wszystkie — w nazwie pliku albo folderu, więc „cegły czerwone” znajdzie pliki z folderu „Cegły/czerwone”.
+
 ## Jak działa pamięć miniatur
 
 Miniatury (480 px, WebP) zapisują się w folderze programu na dysku:
@@ -59,6 +65,9 @@ Po wejściu do folderu najpierw liczą się widoczne miniatury, potem w tle resz
 | S | dźwięki interfejsu: włącz / wycisz |
 | G | siatka linii między miniaturami |
 | ⌘⌫ (Mac) / Delete (Windows) | przenieś zaznaczone do Kosza (też w podglądzie) |
+| B | dodaj zaznaczone do koszyka albo je z niego wyjmij (też w podglądzie) |
+| ⇧B | otwórz koszyk |
+| ⌘⇧F / Ctrl+Shift+F | szukaj w całej bibliotece (wszystkie ulubione foldery) |
 | ⌘L / Ctrl+L (też ⌘⇧G) | wpisz lub wklej ścieżkę; Enter przechodzi, ścieżka do pliku otwiera jego folder i zaznacza plik |
 | ⌥⌘C / Ctrl+Alt+C | kopiuj ścieżkę zaznaczonych plików, a bez zaznaczenia — bieżącego folderu |
 | ⌘V / Ctrl+V | wklejona ścieżka przenosi od razu do folderu |

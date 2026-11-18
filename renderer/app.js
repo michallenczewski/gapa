@@ -1488,7 +1488,9 @@ stage.addEventListener('pointerdown',e=>{
 });
 addEventListener('resize',()=>{ if(zm) renderZoom(); hdAll(); });
 function closeViewer(){if(hintId==='viewer')hideHint();if(viewer.classList.contains('open'))SFX('close');stopMedia();viewer.classList.remove('open');chromeSync();vTok++;stage.textContent='';vEl=null;main.focus();}
-stage.addEventListener('click',e=>{if(e.target===stage)closeViewer();});
+// trzy poziomy: siatka → podgląd → przybliżenie. Klik w obraz schodzi poziom niżej (przybliża, a przybliżony wraca do dopasowania),
+// klik obok obrazu wraca o jeden poziom: z przybliżenia do dopasowania, z dopasowania do siatki
+stage.addEventListener('click',e=>{ if(e.target!==stage||panMoved) return; if(zm) zoomFit(true); else closeViewer(); });
 // kółko myszy i gładzik przewijają obrazy (w trybie 100% przewijają sam obraz)
 let wAcc=0, wT=0;
 stage.addEventListener('wheel',e=>{

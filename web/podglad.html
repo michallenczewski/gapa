@@ -2133,6 +2133,45 @@ stage.addEventListener('wheel',e=>{
   while(Math.abs(wAcc)>=70){ const s=Math.sign(wAcc); wAcc-=s*70; stepV(s); }
 },{passive:false});
 $('#vprev').onclick=()=>stepV(-1); $('#vnext').onclick=()=>stepV(1); $('#vclose').onclick=closeViewer;
+/* --- przerób na JPG: pełna rozdzielczość, przezroczystość na białym tle, plik obok oryginału --- */
+const canJpg=it=>it&&it.kind==='file'&&!DOCS.has(it.type)&&it.type!=='vid'&&it.type!=='jpg';
+async function cleanBitmap(it){
+  if(it.type==='svg'){ const im=await loadImg(api.fileUrl(it.path)); const w=im.naturalWidth||1024,h=im.naturalHeight||1024; return {src:im,w,h}; }
+  if(NATIVE.has(it.type)){ const b=await createImageBitmap(await blobOf(it)); return {src:b,w:b.width,h:b.height,close:()=>b.close()}; }
+  const r=await decode(ref(it),it.type,0); const b=await toBitmap(r); return {src:b,w:b.width,h:b.height,close:()=>b.close(),note:r.note};
+}
+async function toJpg(list){
+  list=list.filter(canJpg);
+  if(!list.length){ zoomTip('Nic do przerobienia — JPG, filmy i pliki projektowe są pomijane'); return; }
+  if(!api.writeNew){ zoomTip('Zapis plików działa w programie, nie w przeglądarce'); return; }
+  let ok=0, fail=0;
+  for(let i=0;i<list.length;i++){
+    const it=list[i]; zoomTip('Zapisuję JPG '+(i+1)+' / '+list.length+'…');
+    try{
+      const b=await cleanBitmap(it), c=document.createElement('canvas'); c.width=b.w; c.height=b.h;
+      const g=c.getContext('2d'); g.fillStyle='#ffffff'; g.fillRect(0,0,b.w,b.h); g.drawImage(b.src,0,0,b.w,b.h); b.close&&b.close();
+      const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',.92));
+      const name=it.name.replace(/\.[^.]+$/,'')+'.jpg';
+      await api.writeNew(api.dirname(it.path),name,await blob.arrayBuffer()); ok++;
+    }catch(e){ fail++; }
+  }
+  SFX('tick'); zoomTip(fail?('Zapisano '+ok+', nie udało się '+fail):(ok===1?'Zapisano JPG obok oryginału':'Zapisano '+ok+' plików JPG'));
+  if(!viewer.classList.contains('open')) scan(true);
+}
+/* --- usuwanie: do Kosza, bez pytania (można przywrócić z Kosza) --- */
+async function trashItems(list){
+  if(!api.trash||!list.length) return;
+  const r=await api.trash(list.map(x=>x.path));
+  if(r.failed.length) zoomTip('Nie udało się przenieść '+r.failed.length+' do Kosza');
+  else { SFX('tick'); zoomTip(list.length===1?'Przeniesiono do Kosza':'Przeniesiono do Kosza: '+list.length); }
+  const gone=new Set(r.done);
+  if(viewer.classList.contains('open')){
+    const cur=vList[vi]; vList=vList.filter(x=>!gone.has(x.path));
+    if(!vList.length) closeViewer(); else { vi=Math.min(vi,vList.length-1); if(cur&&gone.has(cur.path)) showV(); }
+  }
+  picked=new Set([...picked].filter(x=>!gone.has(x.path)));
+  scan(true);
+}
 async function copyImage(it){
   try{
     const v=await fullOf(it); let c=v.el;
@@ -2151,6 +2190,8 @@ function viewerMenu(){
     {label:zm?'Dopasuj do okna':'Rozmiar oryginalny (100%)',key:'Z',run:()=>{zm?zoomFit(true):zoomTo(1,null,null,true);}},
     {label:'Kopiuj obraz',key:'C',run:()=>copyImage(it)},
     {label:'Kopiuj ścieżkę',key:'P',run:()=>copyText(it.path)},
+    ...(api.writeNew&&canJpg(it)?[{label:'Zapisz jako JPG',run:()=>toJpg([it])}]:[]),
+    ...(api.trash?['-',{label:'Przenieś do Kosza',key:isMac?'⌘⌫':'Delete',run:()=>trashItems([it])}]:[]),
     '-',{label:'Tryb minimalny',box:viewer.classList.contains('min'),key:'Tab',run:toggleVMin}]);
 }
 $('#vmore').onclick=e=>{e.stopPropagation();ctx.hidden?viewerMenu():hideMenu();};
@@ -2232,6 +2273,8 @@ document.addEventListener('contextmenu',e=>{
   en.push('-');
   en.push({label:n>1?'Kopiuj nazwy ('+n+')':'Kopiuj nazwę',run:()=>copyText(many.map(x=>x.name).join('\n'))});
   en.push({label:n>1?'Kopiuj ścieżki ('+n+')':'Kopiuj ścieżkę',run:()=>copyText(many.map(x=>x.path).join('\n'))});
+  if(api.writeNew&&many.some(canJpg)) en.push('-',{label:n>1?'Zapisz jako JPG ('+many.filter(canJpg).length+')':'Zapisz jako JPG',run:()=>toJpg(many)});
+  if(api.trash) en.push('-',{label:n>1?'Przenieś do Kosza ('+n+')':'Przenieś do Kosza',key:isMac?'⌘⌫':'Delete',run:()=>trashItems(many)});
   en.push('-',{label:'Zmień program do edycji…',run:()=>openInEditor(many.map(x=>x.path),true)});
   showMenu(e.clientX,e.clientY,n>1?'Zaznaczone: '+n:it.name,en);
 });
@@ -2262,6 +2305,7 @@ document.addEventListener('keydown',e=>{
     else if((k==='k'||k==='m')&&vEl&&vEl.video){const m=vEl.video; if(k==='k') m.paused?m.play().catch(()=>{}):m.pause(); else {m.muted=!m.muted;if(!m.muted&&!m.volume)m.volume=.5;S.mute=m.muted;S.vol=m.volume;save();}}
     else if(k==='z'||k==='1'){zm?zoomFit(true):zoomTo(1,null,null,true);}
     else if(k==='r'){api.showInFolder(vList[vi].path);}
+    else if(((isMac&&(e.metaKey||e.ctrlKey)&&k==='Backspace')||(!isMac&&k==='Delete'))&&api.trash){e.preventDefault();trashItems([vList[vi]]);}
     else if(k==='e'){const c=vList[vi]; if(c.type==='vid') api.openDefault(c.path); else openInEditor([c.path]);}
     else if(k==='c'&&!mod){copyImage(vList[vi]);}
     else if(k==='p'){copyText(vList[vi].path);}
@@ -2292,6 +2336,7 @@ document.addEventListener('keydown',e=>{
   else if(k==='w'){setDeep(!deep);}
   else if(k==='i'||k===']'||(mod&&e.altKey&&e.code==='KeyI')){e.preventDefault();setInsp(!S.insp);}
   else if(k==='\\'||k==='['||(mod&&e.altKey&&e.code==='KeyS')){e.preventDefault();setSide(S.side===false);}
+  else if(((isMac&&mod&&k==='Backspace')||(!isMac&&k==='Delete'))&&api.trash){e.preventDefault();const s=[...picked].filter(x=>x.kind==='file');if(s.length)trashItems(s);}
   else if(k==='Backspace'){e.preventDefault();goUp();}
   else if(k==='+'||k==='='){zstep(1);}
   else if(k==='-'){zstep(-1);}

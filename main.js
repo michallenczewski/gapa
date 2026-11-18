@@ -157,6 +157,20 @@ ipcMain.handle('resolve-path', async (e, raw) => {
   p = path.resolve(p);
   try { const st = await fsp.stat(p); return st.isDirectory() ? { dir: p } : { dir: path.dirname(p), file: p }; } catch (err) { return null; }
 });
+// usuwanie: zawsze do Kosza, nigdy na stałe
+ipcMain.handle('trash', async (e, paths) => {
+  const done = [], failed = [];
+  for (const p of paths) { try { await shell.trashItem(p); done.push(p); } catch (err) { failed.push({ path: p, error: err.message }); } }
+  return { done, failed };
+});
+// zapis nowego pliku obok oryginału; gdy nazwa zajęta — „nazwa (2).jpg”
+ipcMain.handle('write-new', async (e, dir, name, buf) => {
+  const ext = path.extname(name), base = name.slice(0, name.length - ext.length);
+  let p = path.join(dir, name), i = 2;
+  while (fs.existsSync(p)) p = path.join(dir, `${base} (${i++})${ext}`);
+  await fsp.writeFile(p, Buffer.from(buf));
+  return p;
+});
 ipcMain.handle('exists', async (e, p) => { try { return (await fsp.stat(p)).isDirectory(); } catch (err) { return false; } });
 ipcMain.handle('roots', async () => {
   const r = [];

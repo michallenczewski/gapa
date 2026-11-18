@@ -135,9 +135,14 @@ document.querySelectorAll('.sec').forEach(b=>{const k=b.dataset.sec;
   const apply=()=>{b.classList.toggle('shut',!!S.shut[k]);$('#'+k).classList.toggle('shut',!!S.shut[k]);};
   b.onclick=()=>{S.shut[k]=!S.shut[k];save();apply();}; apply();});
 
-/* wyszukiwanie */
+/* wyszukiwanie: zwinięte do lupy, gdy puste i nieużywane */
+function syncSearch(){ const q=$('#q'); $('.search').classList.toggle('min',!q.value&&document.activeElement!==q&&!(ctx&&!ctx.hidden&&ctx.dataset.of==='scope')); }
+$('#q').addEventListener('focus',()=>$('.search').classList.remove('min'));
+$('#q').addEventListener('blur',()=>setTimeout(syncSearch,160));
+$('#qScope').addEventListener('mousedown',e=>e.preventDefault());
 let qt=0;
 $('#q').oninput=()=>{ if(api.libSearch&&S.qIn!=='lib'&&S.favs.length&&!S.hints.lib) hint('lib',$('#q'),'<kbd>⇧F</kbd> szuka od razu we wszystkich ulubionych folderach i ich podfolderach.');$('#qClear').hidden=!$('#q').value;clearTimeout(qt);qt=setTimeout(()=>applyView(keep()),120);};
+$('#qClear').addEventListener('mousedown',e=>e.preventDefault());
 $('#qClear').onclick=()=>{$('#q').value='';$('#qClear').hidden=true;applyView(keep());$('#q').focus();};
 // zakres wyszukiwania: ten folder, z podfolderami albo cała biblioteka (wszystkie ulubione foldery, z indeksu)
 if(!S.qIn) S.qIn=S.qAll?'deep':'here';
@@ -376,7 +381,7 @@ async function histGo(d){
 $('#backBtn').onclick=()=>histGo(-1); $('#fwdBtn').onclick=()=>histGo(1);
 // boczne przyciski myszy (wstecz / dalej)
 addEventListener('mouseup',e=>{ if(e.button===3||e.button===4){ e.preventDefault(); if(!viewer.classList.contains('open')) histGo(e.button===3?-1:1); } });
-function go(p,selectPath,inside){ record({path:p}); if(!S.favs.length&&!S.hints.fav&&curPath&&p!==curPath) setTimeout(()=>{ const f=$('#favs'); if(S.side!==false&&f.getBoundingClientRect().width) hint('fav',f,'Gwiazdka przy folderze dodaje go do Ulubionych ('+KL.mod+'D). Ulubione tworzą też bibliotekę do wyszukiwania.','right'); },900); SFX('tok'); if(virt){ virt=null; renderBasketNav(); } curPath=p; S.last=p; save(); deep=!!inside; deepItems=null; deepFor=null; $('#q').value='';$('#qClear').hidden=true; markDeep(); scan(false,selectPath); }
+function go(p,selectPath,inside){ record({path:p}); if(!S.favs.length&&!S.hints.fav&&curPath&&p!==curPath) setTimeout(()=>{ const f=$('#favs'); if(S.side!==false&&f.getBoundingClientRect().width) hint('fav',f,'Gwiazdka przy folderze dodaje go do Ulubionych ('+KL.mod+'D). Ulubione tworzą też bibliotekę do wyszukiwania.','right'); },900); SFX('tok'); if(virt){ virt=null; renderBasketNav(); } curPath=p; S.last=p; save(); deep=!!inside; deepItems=null; deepFor=null; $('#q').value='';$('#qClear').hidden=true; syncSearch(); markDeep(); scan(false,selectPath); }
 function setDeep(v){ if(virt){ virt=null; renderBasketNav(); renderSide(); renderCrumbs(); } deep=v; markDeep(); applyView(keep()); main.scrollTop=0; prefetch(); }
 function markDeep(){ const c=$('#deepChip'); c.hidden=true; for(const b of $('#scope').children) b.setAttribute('aria-pressed',String(b.dataset.v==='1'===!!deep)); }
 for(const b of $('#scope').children) b.onclick=()=>{ if((b.dataset.v==='1')!==!!deep) setDeep(b.dataset.v==='1'); };
@@ -1489,7 +1494,7 @@ async function openInEditor(paths,choose){
 
 /* --- menu pod prawym przyciskiem --- */
 const ctx=$('#ctx');
-function hideMenu(){ctx.hidden=true;ctx.dataset.of='';document.querySelectorAll('.tb.open').forEach(b=>b.classList.remove('open'));}
+function hideMenu(){ctx.hidden=true;ctx.dataset.of='';setTimeout(syncSearch,0);document.querySelectorAll('.tb.open').forEach(b=>b.classList.remove('open'));}
 const CHECK='<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m2.5 6.2 2.3 2.3 4.7-5"/></svg>';
 function showMenu(x,y,title,entries,up){
   ctx.textContent=''; delete ctx.dataset.of;
@@ -1595,6 +1600,9 @@ document.addEventListener('keydown',e=>{
     else if(vEl&&vEl.pageBy&&(k==='ArrowUp'||k==='PageUp')){e.preventDefault();vEl.pageBy(-1);}
     else if(k==='ArrowRight'||k==='ArrowDown'||e.code==='KeyD'){e.preventDefault();stepV(1);}
     else if(k==='ArrowLeft'||k==='ArrowUp'||e.code==='KeyA'){e.preventDefault();stepV(-1);}
+    else if(mod&&(k==='='||k==='+')&&isImg()){e.preventDefault();zoomTo((zm||fitScale())*1.25,null,null,true);}
+    else if(mod&&k==='-'&&isImg()){e.preventDefault();zoomTo((zm||fitScale())/1.25,null,null,true);}
+    else if(mod&&k==='0'){e.preventDefault();zoomFit(true);}
     else if(e.code==='Digit2'&&isImg()){zoomTo((zm||fitScale())*1.25,null,null,true);}
     else if(e.code==='Digit1'&&isImg()){zoomTo((zm||fitScale())/1.25,null,null,true);}
     else if((k==='+'||k==='=')&&isImg()){zoomTo((zm||fitScale())*1.25,null,null,true);}
@@ -1630,6 +1638,7 @@ document.addEventListener('keydown',e=>{
   if(mod&&k.toLowerCase()==='d'){e.preventDefault();if(curPath){const had=!!findFav(curPath);toggleFav();zoomTip(had?'Usunięto z ulubionych':'Dodano do ulubionych');}return;}
   if((isMac&&e.metaKey&&(e.code==='BracketLeft'||e.code==='BracketRight'))||(!isMac&&e.altKey&&(k==='ArrowLeft'||k==='ArrowRight'))){
     e.preventDefault(); histGo(e.code==='BracketLeft'||k==='ArrowLeft'?-1:1); return; }
+  if(mod&&!e.altKey&&(k==='='||k==='+'||k==='-'||k==='0')){e.preventDefault();if(k==='0')setSize(180,true);else zstep(k==='-'?-1:1);return;}
   // usuwanie: w koszyku tylko wyjmuje z koszyka, gdzie indziej przenosi do Kosza systemu
   if((isMac&&mod&&!e.shiftKey&&k==='Backspace')||k==='Delete'){
     e.preventDefault(); const s=[...picked].filter(x=>x.kind==='file'); if(!s.length) return;

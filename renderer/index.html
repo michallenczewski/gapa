@@ -42,15 +42,15 @@ header{grid-column:1/4;display:flex;align-items:center;gap:6px;padding:0 12px;mi
 /* ścieżka: okruszki do klikania, a klik w wolne miejsce zamienia je w pole do wpisania lub wklejenia ścieżki */
 .ok-show{margin:6px 4px;height:28px;padding:0 12px;border-radius:8px;background:var(--soft);color:var(--text);font:inherit;font-size:12px}
 .ok-show:hover{background:var(--hover)}
-#pathbox{position:relative;display:flex;align-items:center;min-width:120px;flex:100 1 auto;max-width:640px;height:30px;border-radius:8px;cursor:text;padding-right:2px}
+#pathbox{position:relative;display:flex;align-items:center;min-width:120px;flex:0 1 auto;max-width:min(640px,45vw);height:30px;border-radius:8px;cursor:text;padding-right:2px}
 #pathbox:hover{background:var(--hover)}
-#pathbox.edit{flex:1 1 auto;max-width:720px;background:var(--field,var(--soft));box-shadow:0 0 0 1px var(--line) inset}
-#pathIn{flex:1;min-width:0;height:30px;border:0;outline:0;background:transparent;padding:0 10px;font:inherit;font-size:13px;color:var(--text)}
+#pathbox.edit{flex:0 1 auto;max-width:min(720px,55vw);background:var(--field,var(--soft));box-shadow:0 0 0 1px var(--line) inset}
+#pathIn{flex:1;field-sizing:content;min-width:260px;max-width:100%;padding-right:28px!important;height:30px;border:0;outline:0;background:transparent;padding:0 10px;font:inherit;font-size:13px;color:var(--text)}
 #pathCopy{width:24px;height:24px;flex:none;opacity:0;color:var(--muted)}
 #pathbox:hover #pathCopy{opacity:1}
 #pathbox #pathCopy{margin-left:auto}
 #pathbox.edit #pathCopy,#pathbox.edit #crumbs{display:none}
-#crumbs{display:flex;align-items:center;min-width:0;margin:0 0 0 4px;font-size:13px;font-weight:400;white-space:nowrap;overflow:hidden;flex:0 1 auto}
+#crumbs{display:flex;align-items:center;min-width:0;margin:0 18px 0 4px;font-size:13px;font-weight:400;white-space:nowrap;overflow:hidden;flex:0 1 auto}
 #crumbs a{color:var(--muted);padding:4px 6px;border-radius:6px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:28px}
 #crumbs a:hover{color:var(--text);background:var(--hover)}
 #crumbs i{font-style:normal;color:var(--muted2);opacity:.6;flex:none}
@@ -102,7 +102,12 @@ body.noside #hspace{display:none}
 #deepChip{height:26px;padding:0 10px;border-radius:7px;background:var(--soft);font-size:12px;flex:none;color:var(--text2)}
 #deepChip:hover{background:var(--hover);color:var(--text)}
 .gap{flex:1 1 0;min-width:8px}
-.search{display:flex;align-items:center;gap:8px;height:30px;width:220px;padding:0 4px 0 10px;border-radius:8px;background:var(--soft);color:var(--muted);flex:none}
+.search{display:flex;align-items:center;gap:8px;height:30px;width:220px;padding:0 4px 0 10px;border-radius:8px;background:var(--soft);color:var(--muted);flex:none;overflow:hidden;transition:width .18s cubic-bezier(.2,.7,.3,1),background .15s}
+/* puste i nieużywane szukanie zwija się do samej lupy — więcej miejsca na chwytanie okna */
+.search.min{width:30px;padding:0 0 0 8px;background:transparent;cursor:pointer}
+.search.min:hover{background:var(--hover);color:var(--text)}
+.search.min>:not(svg){opacity:0;pointer-events:none}
+.search.min svg{flex:none}
 .search:focus-within{box-shadow:0 0 0 1px var(--line)}
 .search input{flex:1;min-width:0;border:0;background:transparent;outline:0;font:inherit;color:var(--text);padding:0}
 .search input::placeholder{color:var(--muted)}
@@ -355,8 +360,8 @@ body.bare #grid .nm{display:none}
 .web .apponly{display:none}
 .web.oneroot [data-sec=places],.web.oneroot #places{display:none}
 /* węższe okno: najpierw znika suwak, potem nazwy przy sortowaniu, panel boczny i panel informacji chowają się same */
-@media (max-width:1100px){.zoom,.sep{display:none}.search{width:170px}}
-@media (max-width:860px){#hspace{display:none}#sortBtn span,#typesBtn span{display:none}#sortBtn,#typesBtn{padding:0 6px}.search{width:130px}#qScope{display:none}aside{display:none}}
+@media (max-width:1100px){.zoom,.sep{display:none}.search:not(.min){width:170px}}
+@media (max-width:860px){#hspace{display:none}#sortBtn span,#typesBtn span{display:none}#sortBtn,#typesBtn{padding:0 6px}.search:not(.min){width:130px}#qScope{display:none}aside{display:none}}
 @media (max-width:760px){#insp{display:none!important}#count{display:none}}
 
 /* koszyk: wiersz w panelu bocznym, znacznik na kafelku, pasek nad zawartością */
@@ -443,7 +448,7 @@ body.dragout #bRow{background:var(--hover)}
   <span id="count" hidden></span>
   <button id="deepChip" hidden title="Wróć do zwykłego widoku folderu (W)">Wszystko w środku ✕</button>
   <span class="gap"></span>
-  <label class="search">
+  <label class="search min" title="Szukaj (F)">
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
     <input id="q" type="search" placeholder="Szukaj" autocomplete="off" spellcheck="false" aria-label="Szukaj">
     <button type="button" id="qClear" hidden aria-label="Wyczyść">×</button>

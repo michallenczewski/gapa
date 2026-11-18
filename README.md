@@ -63,7 +63,7 @@ Najczęstsze skróty leżą pod lewą ręką, żeby prawa mogła zostać na mysz
 | C / ⇧C | kopiuj obraz / kopiuj ścieżki (także P, ⌥⌘C) |
 | V | ikony ↔ lista (także L) |
 | B / ⇧B | dodaj do koszyka lub wyjmij / otwórz koszyk |
-| 1 / 2 | mniejsze / większe miniatury; w podglądzie oddal / przybliż (także − +) |
+| 1 / 2 | mniejsze / większe miniatury; w podglądzie oddal / przybliż (także − + oraz ⌘/Ctrl + − +, ⌘/Ctrl+0 przywraca) |
 | Tab | ukryj / pokaż interfejs |
 | Esc | zamknij podgląd, wyczyść wyszukiwanie |
 | ⌘/Ctrl + N | nowe okno w tym samym folderze (Koszyk i Ulubione są wspólne) |

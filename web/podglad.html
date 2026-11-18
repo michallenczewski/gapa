@@ -197,8 +197,8 @@ body.nodirnames .tile.dir .nm{display:none}
 .tile.dir:hover .box::before,.tile.dir:hover .box::after{background:var(--folder2)}
 .tile.dir .box canvas{position:absolute;left:7px;top:17px;width:calc(100% - 14px);height:calc(100% - 24px);object-fit:cover;border-radius:6px;z-index:1}
 .tile.dir .box .ph{position:relative;z-index:1;margin-top:10px}
-.tile.dir.sel .box::after{box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--ring)}
-.tile.dir.sel .box::before{box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--ring);clip-path:inset(-4px -4px 6px -4px)}
+/* zaznaczony folder: cała teczka w kolorze zaznaczenia, bez obwódek, które ucinałyby się na krawędziach */
+.tile.dir.sel .box::before,.tile.dir.sel .box::after,.tile.dir.sel:hover .box::before,.tile.dir.sel:hover .box::after{background:var(--ring)}
 .tile.dir .nm{color:var(--text);font-weight:500}
 .tile.dir .nm::before{content:"";display:inline-block;width:13px;height:11px;margin-right:6px;vertical-align:-1px;background:currentColor;opacity:.55;
   -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 11'%3E%3Cpath d='M0 1.6C0 .7.7 0 1.6 0h3.1c.4 0 .8.2 1.1.5L7 1.7h4.4c.9 0 1.6.7 1.6 1.6v6.1c0 .9-.7 1.6-1.6 1.6H1.6C.7 11 0 10.3 0 9.4z'/%3E%3C/svg%3E") center/contain no-repeat;

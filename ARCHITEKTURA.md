@@ -16,6 +16,12 @@ Gapa to aplikacja Electron, czyli przeglądarka Chromium zamknięta w oknie prog
 - **Wersja w przeglądarce (`web/`)** służy tylko do testowania interfejsu. Most `web/web-api.js` zastępuje tam Electron.
 - **Wydania** buduje GitHub Actions, kiedy w `package.json` zmieni się numer wersji.
 
+## Pamięć
+
+Stały koszt Electrona to około 150–300 MB RAM, zanim cokolwiek się otworzy. Przy dużych plikach więcej zajmują zdekodowane piksele: obraz 8192 × 8192 to 256 MB. Od wersji 0.7.1 podgląd PSD, PSB, TIFF, EXR, HDR i TGA jest najpierw dekodowany w rozdzielczości ekranu, a pełna rozdzielczość wczytuje się dopiero po przybliżeniu i jest trzymana tylko dla bieżącego pliku. Rzeczywiste zużycie pokazuje „Pokaż zużycie pamięci” w ustawieniach.
+
+Wąskie gardło, które zostaje: dekodery w JavaScripcie wczytują cały plik do pamięci przed dekodowaniem. Jeśli przy wielogigabajtowych PSB albo dużych 16-bitowych TIFF-ach będzie to za wolne albo za ciężkie, to sygnał 3 poniżej.
+
 ## Decyzja: na razie zostajemy przy Electronie
 
 Obecny zakres (przeglądanie, podgląd, koszyk, wyszukiwanie w bibliotece, otwieranie, kopiowanie, przenoszenie, usuwanie i zmiana nazwy plików) Electron obsługuje w całości. Przepisanie programu na inną platformę kosztowałoby dużo pracy i niczego dziś nie poprawia.

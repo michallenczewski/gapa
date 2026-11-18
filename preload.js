@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld('api', {
   libRoots: (roots, exts, force) => ipcRenderer.invoke('lib-roots', roots, exts, force),
   libSearch: (q, exts, names) => ipcRenderer.invoke('lib-search', q, exts, names),
   onLibStatus: cb => ipcRenderer.on('lib-status', (e, s) => cb(s)),
+  mem: () => ipcRenderer.invoke('mem'),
   transfer: (paths, dest, mode) => ipcRenderer.invoke('transfer', paths, dest, mode),
   rename: (p, name) => ipcRenderer.invoke('rename', p, name),
   undoTransfer: () => ipcRenderer.invoke('undo-transfer'),

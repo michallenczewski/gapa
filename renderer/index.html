@@ -162,6 +162,7 @@ body.noside aside{display:none}
 .tw.open svg{transform:rotate(90deg)}
 .foot{flex:none;display:flex;align-items:center;gap:6px;padding:10px 4px 0 10px}
 #cache{flex:1;font-size:11px;color:var(--muted2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#mem{font-size:11px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
 #prog{font-size:11px;color:var(--muted);white-space:nowrap}
 
 /* --- siatka --- */
@@ -511,6 +512,7 @@ tr input.ren{text-align:left;margin:0}
   </div>
   <div class="foot">
     <span id="cache" class="num"></span>
+    <span id="mem" class="num" hidden></span>
     <span id="prog" class="num"></span>
     <button id="setBtn" class="ib" aria-label="Ustawienia" title="Ustawienia">
       <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v1.6M8 12.6v1.6M3.6 3.6l1.1 1.1M11.3 11.3l1.1 1.1M1.8 8h1.6M12.6 8h1.6M3.6 12.4l1.1-1.1M11.3 4.7l1.1-1.1"/></svg>

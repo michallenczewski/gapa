@@ -411,6 +411,12 @@ async function moveTo(src, to) {
   }
 }
 function tellDirs(dirs) { for (const w of BrowserWindow.getAllWindows()) for (const d of dirs) if (!w.isDestroyed()) w.webContents.send('dir-changed', d); }
+// pamięć RAM wszystkich procesów programu (w KB): główny, okna, karta graficzna, pomocnicze
+ipcMain.handle('mem', () => {
+  let total = 0, renderer = 0;
+  for (const m of app.getAppMetrics()) { const k = (m.memory && m.memory.workingSetSize) || 0; total += k; if (m.type === 'Tab' || m.type === 'Renderer') renderer += k; }
+  return { total, renderer };
+});
 ipcMain.handle('dev-of', (e, paths) => Promise.all((paths || []).map(p => fsp.stat(p).then(s => s.dev).catch(() => null))));
 ipcMain.handle('current-drag', () => lastDrag && Date.now() - lastDrag.t < 120000 ? lastDrag.files : null);
 ipcMain.handle('transfer', async (e, paths, dest, mode) => {

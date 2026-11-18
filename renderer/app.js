@@ -189,6 +189,10 @@ async function cacheClear(){
   render(); prefetch(); cacheInfo();
 }
 let curIcon='3d'; if(api.iconGet) api.iconGet().then(v=>curIcon=v);
+/* --- zużycie pamięci RAM przez wszystkie procesy Gapy (włączane w ustawieniach) --- */
+let memT=0;
+async function memTick(){ if(!S.showMem||!api.mem) return; const m=await api.mem(); $('#mem').textContent='RAM '+fmtSize(m.total*1024); $('#mem').title='Pamięć RAM wszystkich procesów Gapy: '+fmtSize(m.total*1024)+' (okna: '+fmtSize(m.renderer*1024)+')'; }
+function setShowMem(v){ S.showMem=v; save(); $('#mem').hidden=!v; clearInterval(memT); if(v){ memTick(); memT=setInterval(memTick,2000); } }
 function settingsMenu(){
   const r=$('#setBtn').getBoundingClientRect(), t=S.theme||'auto', lim=cacheC?cacheC.limitMB:2048;
   const LIM=[[1024,'1 GB'],[2048,'2 GB'],[5120,'5 GB'],[10240,'10 GB']];
@@ -202,6 +206,7 @@ function settingsMenu(){
     {label:'Nazwy folderów',box:S.dirNames!==false,keys:['⇧','N'],keep:true,run:()=>{setDirNames(!(S.dirNames!==false));settingsMenu();}},
     {label:'Ukryj interfejs',keys:['Tab'],run:toggleBare},
     {label:'Skróty klawiszowe',keys:['?'],run:()=>toggleKeys(true)},
+    ...(api.mem?[{label:'Pokaż zużycie pamięci',box:!!S.showMem,keep:true,run:()=>{setShowMem(!S.showMem);settingsMenu();}}]:[]),
     {label:'Pokaż podpowiedzi od nowa',run:resetHints},
     {label:'Dźwięki',box:S.sound!==false,keys:['S'],keep:true,run:()=>{S.sound=!(S.sound!==false);save();if(S.sound)SFX('on');settingsMenu();}},
     ...(api.iconSet?['-',{head:'Ikona programu'},
@@ -1289,12 +1294,12 @@ function fullOf(it){
       if(it.type==='svg'&&!el.naturalWidth){el.style.width='80%';}
       v={el,note:''};
     }else{
-      const r=await decode(ref(it),it.type,0);
+      // najpierw w rozdzielczości ekranu (PSD, TIFF, EXR, HDR, TGA) — pełna dopiero po przybliżeniu
+      const r=await decode(ref(it),it.type,screenPx());
       it.meta=r.meta; it.dims=[r.meta.width,r.meta.height];
-      const bmp=await toBitmap(r); let el;
-      if(OPAQUE.has(it.type)||r.jpeg){el=document.createElement('canvas');el.width=bmp.width;el.height=bmp.height;el.getContext('2d').drawImage(bmp,0,0);}
-      else el=paintOn(bmp,bmp.width,bmp.height,bigCell(bmp.width,bmp.height));
-      bmp.close(); v={el,note:r.note||''};
+      const el=await viewCanvas(it,r);
+      if(r.meta&&r.width&&r.meta.width>r.width*1.02){ el._fw=r.meta.width; el._fh=r.meta.height; el._reduced=true; }
+      v={el,note:r.note||''};
     }
     if(v.media) return v; // filmów nie trzymamy w pamięci
     vCache.set(it,v);
@@ -1303,6 +1308,26 @@ function fullOf(it){
     return v;
   })().finally(()=>vLoading.delete(it));
   vLoading.set(it,p); return p;
+}
+// dłuższy bok ekranu w pikselach urządzenia, z małym zapasem — tyle wystarcza do podglądu „dopasuj”
+const screenPx=()=>Math.round(Math.max(screen.width,screen.height)*devicePixelRatio*1.1);
+async function viewCanvas(it,r){
+  const bmp=await toBitmap(r); let el;
+  if(OPAQUE.has(it.type)||r.jpeg){el=document.createElement('canvas');el.width=bmp.width;el.height=bmp.height;el.getContext('2d').drawImage(bmp,0,0);}
+  else el=paintOn(bmp,bmp.width,bmp.height,bigCell(bmp.width,bmp.height));
+  bmp.close(); return el;
+}
+// po przybliżeniu podmieniamy obraz na pełną rozdzielczość; trzymamy ją tylko dla bieżącego pliku
+async function upgradeFull(){
+  const el=vEl, it=vList[vi]; if(!el||!el._reduced||el._upg||!it) return;
+  el._upg=true; const tok=vTok, t=setTimeout(()=>zoomTip('Wczytuję pełną rozdzielczość…'),250);
+  try{
+    const r=await decode(ref(it),it.type,0); if(tok!==vTok||vEl!==el) return;
+    const c=await viewCanvas(it,r); if(tok!==vTok||vEl!==el) return;
+    c.className=el.className; c.style.cssText=el.style.cssText; c.draggable=false; c.onclick=el.onclick; c.ondragstart=el.ondragstart;
+    el.replaceWith(c); vEl=c; if(zm) renderZoom();
+  }catch(e){ el._upg=false; }
+  finally{ clearTimeout(t); }
 }
 function openViewer(it){
   SFX('open');
@@ -1408,7 +1433,7 @@ function afterShow(it,v,tok){
 function stepV(d){if(!vList.length)return;SFX('tick');vi=(vi+d+vList.length)%vList.length;showV();}
 function applyZoom(){ if(zm) renderZoom(); else { stage.className='fit'; if(vEl&&!vEl.video&&!vEl.isDoc){vEl.style.width=vEl.style.height='';vEl.style.transform='';if(vEl.tagName!=='IFRAME')vEl.draggable=true;} } }
 const isImg=()=>vEl&&!vEl.video&&!vEl.isDoc&&vEl.tagName!=='IFRAME';
-const natW=()=>(vEl.naturalWidth||vEl.width)/devicePixelRatio, natH=()=>(vEl.naturalHeight||vEl.height)/devicePixelRatio;
+const natW=()=>(vEl._fw||vEl.naturalWidth||vEl.width)/devicePixelRatio, natH=()=>(vEl._fh||vEl.naturalHeight||vEl.height)/devicePixelRatio;
 function fitScale(){ const r=stage.getBoundingClientRect(), m=document.body.classList.contains('bare'); return Math.min((r.width-(m?20:128))/natW(),(r.height-(m?20:38))/natH(),1); }
 function zoomFit(tip){ zm=null; applyZoom(); if(tip){ zoomTip('Dopasuj'); SFX('tick'); } }
 // przybliż do skali z (1 = 100%), trzymając pod kursorem ten sam punkt obrazu
@@ -1421,6 +1446,7 @@ function zoomTo(z,cx,cy,tip){
   if(zm){s0=zm;ox=zx;oy=zy;} else { s0=f; const b=vEl.getBoundingClientRect(); const w=natW()*f,h=natH()*f; ox=b.left-r.left+(b.width-w)/2; oy=b.top-r.top+(b.height-h)/2; }
   const ix=(cx-r.left-ox)/s0, iy=(cy-r.top-oy)/s0;
   zm=z; zx=cx-r.left-ix*z; zy=cy-r.top-iy*z; renderZoom();
+  if(vEl._reduced&&!vEl._upg&&z>f*1.05) upgradeFull();
   if(tip){ zoomTip(Math.round(z*100)+'%'); SFX('tick'); }
 }
 function renderZoom(){
@@ -1949,6 +1975,6 @@ function resetHints(){ S.hints={}; S.seenKeys=false; save(); zoomTip('Podpowiedz
 /* --- start --- */
 $('#empty-open').onclick=pickFolder;
 markSort(); markModes(); setNames(S.names!==false); setDirNames(S.dirNames!==false); setGridLines(!!S.gridlines); setSide(S.side!==false); setInsp(!!S.insp);
-renderSide(); renderCrumbs(); renderTypes(); cacheInfo(); renderBasketNav(); libSync();
+renderSide(); renderCrumbs(); renderTypes(); cacheInfo(); renderBasketNav(); libSync(); setShowMem(!!S.showMem);
 if(!S.seenKeys&&!api.startPath) setTimeout(()=>{ if(!S.seenKeys) toggleKeys(true); },1400);
 loadRoots().then(async()=>{ const sp=api.startPath; if(sp&&await api.exists(sp)) go(sp); else if(S.last&&await api.exists(S.last)) go(S.last); else { render(); syncTree(); } });

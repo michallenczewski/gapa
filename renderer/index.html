@@ -111,6 +111,7 @@ body.noside #hspace{display:none}
 .seg{display:flex;gap:2px;padding:2px;border-radius:8px;background:var(--soft);flex:none;margin-left:6px}
 .seg button{width:28px;height:26px;border-radius:6px;color:var(--muted);display:flex;align-items:center;justify-content:center}
 .seg button:hover{color:var(--text)}
+#scope button{width:auto;padding:0 10px;font-size:12px}
 .seg button[aria-pressed=true]{background:var(--pill);box-shadow:var(--pillsh);color:var(--text)}
 
 /* --- pasek boczny --- */
@@ -365,6 +366,10 @@ body.bare #grid .nm{display:none}
   <button id="typesBtn" class="tb" title="Typy plików"></button>
   <span class="sep"></span>
   <span class="zoom" title="Wielkość miniatur (+ / −)"><input type="range" id="size" min="90" max="420" step="5" aria-label="Wielkość miniatur"></span>
+  <span class="seg" id="scope" role="group" aria-label="Zakres">
+    <button data-v="0" title="Tylko ten folder (W przełącza)">Folder</button>
+    <button data-v="1" title="Wszystkie obrazy z tego folderu i podfolderów, pogrupowane (W przełącza)">Wszystko</button>
+  </span>
   <span class="seg" id="mode">
     <button data-v="icons" aria-label="Ikony" title="Ikony (L)"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="1.5" y="1.5" width="4.5" height="4.5" rx="1"/><rect x="8" y="1.5" width="4.5" height="4.5" rx="1"/><rect x="1.5" y="8" width="4.5" height="4.5" rx="1"/><rect x="8" y="8" width="4.5" height="4.5" rx="1"/></svg></button>
     <button data-v="list" aria-label="Lista" title="Lista (L)"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M2 3.5h10M2 7h10M2 10.5h10"/></svg></button>

@@ -239,14 +239,16 @@ const SFX=(()=>{
   function pip(f,d,g,type){ const c=ac(); if(!c) return; const t=c.currentTime, o=c.createOscillator(); o.type=type; o.frequency.value=f;
     const out=c.createGain(); out.gain.setValueAtTime(g,t); out.gain.exponentialRampToValueAtTime(.0001,t+d); o.connect(out); out.connect(c.destination); o.start(t); o.stop(t+d+.005); }
   const s2=()=>impulse(5200,10,.5), s8=()=>pip(3000,.003,.025,'square');
-  const SOUNDS={tick:s2,click:s2,tok:s2,on:s2,off:s2,open:s8,close:s8};
-  return name=>{ if(S.sound===false) return; const now=performance.now(); if(now-(last[name]||0)<28) return; last[name]=now; try{SOUNDS[name]&&SOUNDS[name]();}catch(e){} };
+  const SOUNDS={tick:s2,click:s2,tok:s2,on:s2,off:s2,open:s2,close:s2};
+  // jedna akcja = jeden dźwięk: drugi dźwięk w ciągu 60 ms (np. otwarcie podglądu + zaznaczenie) jest pomijany
+  return name=>{ if(S.sound===false) return; const now=performance.now(); if(now-(last.any||0)<60) return; last.any=now; try{SOUNDS[name]&&SOUNDS[name]();}catch(e){} };
 })();
 // klik każdego przycisku interfejsu (poza tymi, które mają własny dźwięk)
 document.addEventListener('pointerdown',e=>{ const b=e.target.closest('button,.seg button,.sec,#tree li,#favs li,#places li'); if(b&&!b.closest('.rf,.tf')) SFX('click'); },true);
 function go(p,selectPath,inside){ SFX('tok'); curPath=p; S.last=p; save(); deep=!!inside; deepItems=null; deepFor=null; $('#q').value='';$('#qClear').hidden=true; markDeep(); scan(false,selectPath); }
 function setDeep(v){ deep=v; markDeep(); applyView(keep()); main.scrollTop=0; prefetch(); }
-function markDeep(){ const c=$('#deepChip'); c.hidden=!deep; }
+function markDeep(){ const c=$('#deepChip'); c.hidden=true; for(const b of $('#scope').children) b.setAttribute('aria-pressed',String(b.dataset.v==='1'===!!deep)); }
+for(const b of $('#scope').children) b.onclick=()=>{ if((b.dataset.v==='1')!==!!deep) setDeep(b.dataset.v==='1'); };
 async function scan(keepScroll,selectPath){
   if(!curPath) return;
   const tok=++scanTok, prevPath=selectPath||keep(), prevTop=main.scrollTop, here=curPath;

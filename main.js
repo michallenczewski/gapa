@@ -207,7 +207,7 @@ ipcMain.handle('os-thumb', async (e, p, size) => {
 });
 
 /* ---------- system: Finder/Eksplorator, programy, przeciąganie ---------- */
-ipcMain.on('chrome-colors', (e, c) => { try { if (win && process.platform !== 'darwin') win.setTitleBarOverlay({ color: c.bg, symbolColor: c.fg, height: 52 }); } catch (_) {} });
+ipcMain.on('chrome-colors', (e, c) => { try { if (win && process.platform !== 'darwin') win.setTitleBarOverlay({ color: c.bg, symbolColor: c.fg, height: c.h || 52 }); } catch (_) {} });
 ipcMain.handle('show-in-folder', (e, p) => shell.showItemInFolder(p));
 ipcMain.handle('open-default', (e, p) => shell.openPath(p));
 

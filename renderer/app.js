@@ -41,7 +41,9 @@ function chromeSync(){
   if(api.web||!api.chromeColors) return;
   const cs=getComputedStyle(document.documentElement), v=document.getElementById('viewer');
   const bg=(v&&v.classList.contains('open')?cs.getPropertyValue('--stage'):cs.getPropertyValue('--bg')).trim();
-  api.chromeColors(bg,cs.getPropertyValue('--text2').trim());
+  // bez paska programu (Tab) przyciski okna stoją w cienkim pasku 36 px, żeby nie wchodzić na miniatury
+  const slim=v&&v.classList.contains('open')?v.classList.contains('min'):document.body.classList.contains('bare');
+  api.chromeColors(bg,cs.getPropertyValue('--text2').trim(),slim?36:52);
 }
 applyTheme();
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);
@@ -1144,8 +1146,8 @@ function viewerMenu(){
     '-',{label:'Tryb minimalny',box:viewer.classList.contains('min'),key:'Tab',run:toggleVMin}]);
 }
 $('#vmore').onclick=e=>{e.stopPropagation();ctx.hidden?viewerMenu():hideMenu();};
-function toggleVMin(){ const on=!viewer.classList.contains('min'); viewer.classList.toggle('min',on); S.vmin=on; save(); applyZoom(); zoomTip(on?'Tryb minimalny — Tab przywraca':'Pasek widoczny'); }
-function toggleBare(){document.body.classList.toggle('bare');zoomTip(document.body.classList.contains('bare')?'Tab — pokaż interfejs':'Interfejs widoczny');}
+function toggleVMin(){ const on=!viewer.classList.contains('min'); viewer.classList.toggle('min',on); S.vmin=on; save(); applyZoom(); chromeSync(); zoomTip(on?'Tryb minimalny — Tab przywraca':'Pasek widoczny'); }
+function toggleBare(){document.body.classList.toggle('bare');chromeSync();zoomTip(document.body.classList.contains('bare')?'Tab — pokaż interfejs':'Interfejs widoczny');}
 
 /* --- programy zewnętrzne --- */
 let editorName=null;

@@ -71,6 +71,17 @@ aside ::-webkit-scrollbar-thumb:hover{background:var(--scroll2);background-clip:
 .frame-mac #viewer .top{padding-left:84px}
 .frame-mac #hspace{width:calc(220px - 112px)}
 .fs.frame-win header,.fs.frame-win #viewer .top{padding-right:12px}
+/* interfejs schowany (Tab) albo podgląd minimalny: cienki pasek u góry na przyciski okna i do przeciągania */
+.frame-win body.bare main{padding-top:46px}
+.frame-mac body.bare main{padding-top:50px}
+.frame-win body.bare::before,.frame-mac body.bare::before,.frame-win #viewer.min::before,.frame-mac #viewer.min::before{content:"";position:fixed;left:0;right:0;top:0;height:36px;-webkit-app-region:drag;z-index:20;background:var(--bg)}
+.frame-win #viewer.min::before,.frame-mac #viewer.min::before{background:var(--stage)}
+.frame-mac body.bare::before,.frame-mac #viewer.min::before{height:40px}
+.frame-win #viewer.min #stage{margin-top:36px}
+.frame-mac #viewer.min #stage{margin-top:40px}
+.fs.frame-win body.bare main,.fs.frame-mac body.bare main{padding-top:10px}
+.fs body.bare::before,.fs #viewer.min::before{display:none}
+.fs.frame-win #viewer.min #stage,.fs.frame-mac #viewer.min #stage{margin-top:0}
 .fs.frame-mac header,.fs.frame-mac #viewer .top{padding-left:12px}
 .fs.frame-mac #hspace{width:calc(220px - 40px)}
 .frame-win header,.frame-mac header,.frame-win #viewer .top,.frame-mac #viewer .top{-webkit-app-region:drag}
@@ -1032,7 +1043,9 @@ function chromeSync(){
   if(api.web||!api.chromeColors) return;
   const cs=getComputedStyle(document.documentElement), v=document.getElementById('viewer');
   const bg=(v&&v.classList.contains('open')?cs.getPropertyValue('--stage'):cs.getPropertyValue('--bg')).trim();
-  api.chromeColors(bg,cs.getPropertyValue('--text2').trim());
+  // bez paska programu (Tab) przyciski okna stoją w cienkim pasku 36 px, żeby nie wchodzić na miniatury
+  const slim=v&&v.classList.contains('open')?v.classList.contains('min'):document.body.classList.contains('bare');
+  api.chromeColors(bg,cs.getPropertyValue('--text2').trim(),slim?36:52);
 }
 applyTheme();
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);
@@ -2135,8 +2148,8 @@ function viewerMenu(){
     '-',{label:'Tryb minimalny',box:viewer.classList.contains('min'),key:'Tab',run:toggleVMin}]);
 }
 $('#vmore').onclick=e=>{e.stopPropagation();ctx.hidden?viewerMenu():hideMenu();};
-function toggleVMin(){ const on=!viewer.classList.contains('min'); viewer.classList.toggle('min',on); S.vmin=on; save(); applyZoom(); zoomTip(on?'Tryb minimalny — Tab przywraca':'Pasek widoczny'); }
-function toggleBare(){document.body.classList.toggle('bare');zoomTip(document.body.classList.contains('bare')?'Tab — pokaż interfejs':'Interfejs widoczny');}
+function toggleVMin(){ const on=!viewer.classList.contains('min'); viewer.classList.toggle('min',on); S.vmin=on; save(); applyZoom(); chromeSync(); zoomTip(on?'Tryb minimalny — Tab przywraca':'Pasek widoczny'); }
+function toggleBare(){document.body.classList.toggle('bare');chromeSync();zoomTip(document.body.classList.contains('bare')?'Tab — pokaż interfejs':'Interfejs widoczny');}
 
 /* --- programy zewnętrzne --- */
 let editorName=null;

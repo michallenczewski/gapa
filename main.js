@@ -145,6 +145,15 @@ ipcMain.handle('list', async (e, dir, exts) => {
     return { dirs, files };
   } catch (err) { return { error: err.code === 'EACCES' || err.code === 'EPERM' ? 'brak dostępu do folderu' : err.message, dirs: [], files: [] }; }
 });
+// wklejona ścieżka: zdejmij cudzysłowy, rozwiń ~ i file://, sprawdź, czy to folder czy plik
+ipcMain.handle('resolve-path', async (e, raw) => {
+  let p = String(raw || '').trim().replace(/^["']|["']$/g, '');
+  if (p.startsWith('file://')) { try { p = require('url').fileURLToPath(p); } catch (_) {} }
+  if (p === '~' || p.startsWith('~/')) p = path.join(require('os').homedir(), p.slice(1));
+  if (!p) return null;
+  p = path.resolve(p);
+  try { const st = await fsp.stat(p); return st.isDirectory() ? { dir: p } : { dir: path.dirname(p), file: p }; } catch (err) { return null; }
+});
 ipcMain.handle('exists', async (e, p) => { try { return (await fsp.stat(p)).isDirectory(); } catch (err) { return false; } });
 ipcMain.handle('roots', async () => {
   const r = [];

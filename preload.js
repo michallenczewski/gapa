@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('api', {
 
   list: (dir, exts) => ipcRenderer.invoke('list', dir, exts),
   exists: p => ipcRenderer.invoke('exists', p),
+  resolvePath: p => ipcRenderer.invoke('resolve-path', p),
   roots: () => ipcRenderer.invoke('roots'),
   pickFolder: () => ipcRenderer.invoke('pick-folder'),
   watch: dir => ipcRenderer.invoke('watch', dir),

@@ -67,6 +67,13 @@
       return {dirs:ds,files:fs};
     },
     async exists(p){ return !!(await resolve(p,false)); },
+    async resolvePath(raw){
+      const p=String(raw||'').trim().replace(/^["']|["']$/g,'').replace(/\/+$/,'');
+      if(!p) return null;
+      if(await resolve(p,false)) return {dir:p};
+      const i=p.lastIndexOf('/'); if(i>0&&await resolve(p.slice(0,i),false)) return {dir:p.slice(0,i),file:p};
+      return null;
+    },
     async roots(){ await loadRoots(); return roots.map(r=>({name:r.name,path:r.path,drive:false})); },
     async pickFolder(){
       if(!window.showDirectoryPicker){ say('Ta przeglądarka nie otwiera folderów — użyj Chrome albo Edge'); return null; }

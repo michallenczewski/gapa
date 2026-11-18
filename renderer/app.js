@@ -68,10 +68,11 @@ function zoomTip(t){if(!tipEl){tipEl=document.createElement('div');tipEl.classNa
 document.documentElement.style.setProperty('--lic',S.lic+'px');
 setSize(S.size);
 $('#size').oninput=e=>{S.mode==='list'?setSize(+e.target.value/6):setSize(+e.target.value);};
+$('#size').addEventListener('change',()=>{ if(!S.hints||S.hints.zoom) return; hint('zoom',$('#size'),KL.wheel+' nad miniaturami zmienia ich wielkość płynnie, bez sięgania po suwak. Klawisze <kbd>1</kbd> <kbd>2</kbd> robią to samo.'); });
 function sliderFill(){const s=$('#size');s.style.setProperty('--p',((s.value-s.min)/(s.max-s.min)*100)+'%');}
 $('#size').addEventListener('input',sliderFill);
 // Ctrl/⌘ + kółko albo szczypnięcie: płynna zmiana wielkości miniatur (ząbek kółka ≈ 6%, gładzik jeszcze drobniej)
-main.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();
+main.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();hintDone('zoom');
   const d=e.deltaMode===1?e.deltaY*33:e.deltaY; setSize(zcur()*Math.exp(-Math.max(-120,Math.min(120,d))/1600),true);},{passive:false});
 
 /* filtry, sortowanie, widoki */
@@ -136,7 +137,7 @@ document.querySelectorAll('.sec').forEach(b=>{const k=b.dataset.sec;
 
 /* wyszukiwanie */
 let qt=0;
-$('#q').oninput=()=>{$('#qClear').hidden=!$('#q').value;clearTimeout(qt);qt=setTimeout(()=>applyView(keep()),120);};
+$('#q').oninput=()=>{ if(api.libSearch&&S.qIn!=='lib'&&S.favs.length&&!S.hints.lib) hint('lib',$('#q'),'<kbd>⇧F</kbd> szuka od razu we wszystkich ulubionych folderach i ich podfolderach.');$('#qClear').hidden=!$('#q').value;clearTimeout(qt);qt=setTimeout(()=>applyView(keep()),120);};
 $('#qClear').onclick=()=>{$('#q').value='';$('#qClear').hidden=true;applyView(keep());$('#q').focus();};
 // zakres wyszukiwania: ten folder, z podfolderami albo cała biblioteka (wszystkie ulubione foldery, z indeksu)
 if(!S.qIn) S.qIn=S.qAll?'deep':'here';
@@ -144,7 +145,7 @@ if(S.qIn==='lib'&&!api.libSearch) S.qIn='here';
 const QIN={here:['tu','W tym folderze'],deep:['podfoldery','Z podfolderami'],lib:['biblioteka','W całej bibliotece (ulubione)']};
 function markScope(){const b=$('#qScope');press(b,S.qIn!=='here');b.textContent=QIN[S.qIn][0];b.title='Szukam: '+QIN[S.qIn][1].toLowerCase()+' — kliknij, żeby zmienić';
   $('#q').placeholder=S.qIn==='lib'?'Szukaj w bibliotece':'Szukaj';}
-function setQIn(v){if(S.qIn===v)return;S.qIn=v;save();markScope();if($('#q').value)applyView(keep());}
+function setQIn(v){if(v==='lib')hintDone('lib');if(S.qIn===v)return;S.qIn=v;save();markScope();if($('#q').value)applyView(keep());}
 function scopeMenu(){
   const r=$('#qScope').getBoundingClientRect();
   showMenu(r.left-8,r.bottom+6,'Szukaj',[
@@ -195,6 +196,8 @@ function settingsMenu(){
     {label:'Siatka między miniaturami',box:!!S.gridlines,keys:['G'],keep:true,run:()=>{setGridLines(!S.gridlines);settingsMenu();}},
     {label:'Nazwy folderów',box:S.dirNames!==false,keys:['⇧','N'],keep:true,run:()=>{setDirNames(!(S.dirNames!==false));settingsMenu();}},
     {label:'Ukryj interfejs',keys:['Tab'],run:toggleBare},
+    {label:'Skróty klawiszowe',keys:['?'],run:()=>toggleKeys(true)},
+    {label:'Pokaż podpowiedzi od nowa',run:resetHints},
     {label:'Dźwięki',box:S.sound!==false,keys:['S'],keep:true,run:()=>{S.sound=!(S.sound!==false);save();if(S.sound)SFX('on');settingsMenu();}},
     ...(api.iconSet?['-',{head:'Ikona programu'},
       {label:'Gałka 3D',check:curIcon!=='retro',run:async()=>{curIcon=await api.iconSet('3d');}},
@@ -229,7 +232,7 @@ function favBtn(cls,p){
   b.onclick=e=>{e.stopPropagation();toggleFav(p);sync();for(const t of document.querySelectorAll('.tile.dir'))t._sync&&t._sync();};
   b.ondblclick=e=>e.stopPropagation(); sync(); b._sync=sync; return b;
 }
-function toggleFav(p){
+function toggleFav(p){hintDone('fav');
   p=p||curPath; if(!p) return;
   const f=findFav(p);
   if(f) S.favs=S.favs.filter(x=>x!==f); else S.favs.push({name:api.basename(p)||p,path:p});
@@ -273,7 +276,7 @@ function basketToggle(list){
   const fs=list.filter(x=>x&&x.kind==='file'); if(!fs.length) return;
   SFX('tick');
   if(fs.every(x=>inBasket(x.path))){ const n=basketRemove(fs); zoomTip((n===1?'Wyjęto z koszyka':'Wyjęto z koszyka: '+n)+' · zostało '+S.basket.length); }
-  else { const n=basketAdd(fs); zoomTip((n===1?'W koszyku':'Dodano do koszyka: '+n)+' · razem '+S.basket.length); }
+  else { hintDone('basket'); const n=basketAdd(fs); zoomTip((n===1?'W koszyku':'Dodano do koszyka: '+n)+' · razem '+S.basket.length); }
 }
 function basketChanged(){
   renderBasketNav();
@@ -373,7 +376,7 @@ async function histGo(d){
 $('#backBtn').onclick=()=>histGo(-1); $('#fwdBtn').onclick=()=>histGo(1);
 // boczne przyciski myszy (wstecz / dalej)
 addEventListener('mouseup',e=>{ if(e.button===3||e.button===4){ e.preventDefault(); if(!viewer.classList.contains('open')) histGo(e.button===3?-1:1); } });
-function go(p,selectPath,inside){ record({path:p}); SFX('tok'); if(virt){ virt=null; renderBasketNav(); } curPath=p; S.last=p; save(); deep=!!inside; deepItems=null; deepFor=null; $('#q').value='';$('#qClear').hidden=true; markDeep(); scan(false,selectPath); }
+function go(p,selectPath,inside){ record({path:p}); if(!S.favs.length&&!S.hints.fav&&curPath&&p!==curPath) setTimeout(()=>{ const f=$('#favs'); if(S.side!==false&&f.getBoundingClientRect().width) hint('fav',f,'Gwiazdka przy folderze dodaje go do Ulubionych ('+KL.mod+'D). Ulubione tworzą też bibliotekę do wyszukiwania.','right'); },900); SFX('tok'); if(virt){ virt=null; renderBasketNav(); } curPath=p; S.last=p; save(); deep=!!inside; deepItems=null; deepFor=null; $('#q').value='';$('#qClear').hidden=true; markDeep(); scan(false,selectPath); }
 function setDeep(v){ if(virt){ virt=null; renderBasketNav(); renderSide(); renderCrumbs(); } deep=v; markDeep(); applyView(keep()); main.scrollTop=0; prefetch(); }
 function markDeep(){ const c=$('#deepChip'); c.hidden=true; for(const b of $('#scope').children) b.setAttribute('aria-pressed',String(b.dataset.v==='1'===!!deep)); }
 for(const b of $('#scope').children) b.onclick=()=>{ if((b.dataset.v==='1')!==!!deep) setDeep(b.dataset.v==='1'); };
@@ -861,6 +864,7 @@ function paintDir(d){
 grid.addEventListener('pointermove',e=>{
   const box=e.target.closest('.tile.dir .box'); if(!box) return;
   const d=box.parentNode._it; if(!d||!d.files||d.files.length<2) return;
+  if(!S.hints.skim) hint('skim',box,'Przesuń kursor w poziomie po folderze, żeby przejrzeć, co jest w środku.');
   const r=box.getBoundingClientRect(), x=Math.min(.999,Math.max(0,(e.clientX-r.left)/r.width));
   const i=Math.floor(x*d.files.length); if(i===d.si) return;
   d.si=i; const f=d.files[i];
@@ -881,6 +885,7 @@ function select(i,how){
   else if(how==='range'&&anchor>=0){picked=new Set(view.slice(Math.min(anchor,i),Math.max(anchor,i)+1));}
   else{picked=new Set([it]);anchor=i;}
   sel=i; markSel(); if(it.tile) it.tile.scrollIntoView({block:'nearest'}); status();
+  if(picked.size>1&&!S.hints.basket&&virt!=='basket'){ const r=$('#bRow'); hint('basket',S.side!==false&&r.getBoundingClientRect().width?r:it.tile,'<kbd>B</kbd> wrzuca zaznaczone do koszyka — zbiór plików z różnych folderów. <kbd>⇧B</kbd> go otwiera.',S.side!==false&&r.getBoundingClientRect().width?'right':undefined); }
 }
 function selectAll(){picked=new Set(view.filter(x=>x.kind==='file'));markSel();status();}
 const pickedFiles=it=>{const m=[...picked].filter(x=>x.kind==='file');return it&&!picked.has(it)?[it]:m;};
@@ -1256,6 +1261,7 @@ function openViewer(it){
   const files=view.filter(x=>x.kind==='file');
   vList=picked.size>1&&picked.has(it)?files.filter(x=>picked.has(x)):files;
   vi=Math.max(0,vList.indexOf(it)); viewer.classList.add('open'); chromeSync(); showV();
+  if(!S.hints.viewer) setTimeout(()=>{ if(viewer.classList.contains('open')){ const r=stage.getBoundingClientRect(); hint('viewer',{left:r.left,top:r.bottom-70,width:r.width,height:1,right:r.right,bottom:r.bottom-70},'<kbd>A</kbd> <kbd>D</kbd> albo strzałki — poprzedni i następny · <kbd>Z</kbd> — 100% · <kbd>1</kbd> <kbd>2</kbd> — oddal, przybliż · spacja wraca do siatki','above'); } },700);
 }
 // odtwarzacz w stylu macOS (AVKit): pływający, przydymiony panel na dole obrazu, chowa się podczas odtwarzania
 const IC_PLAY='<svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M6.5 4.2v13.6c0 .8.9 1.3 1.6.9l11-6.8c.6-.4.6-1.3 0-1.7l-11-6.8c-.7-.4-1.6.1-1.6.8z" fill="currentColor"/></svg>';
@@ -1386,7 +1392,7 @@ stage.addEventListener('pointerdown',e=>{
   stage.addEventListener('pointermove',mv); stage.addEventListener('pointerup',up);
 });
 addEventListener('resize',()=>{ if(zm) renderZoom(); hdAll(); });
-function closeViewer(){if(viewer.classList.contains('open'))SFX('close');stopMedia();viewer.classList.remove('open');chromeSync();vTok++;stage.textContent='';vEl=null;main.focus();}
+function closeViewer(){if(hintId==='viewer')hideHint();if(viewer.classList.contains('open'))SFX('close');stopMedia();viewer.classList.remove('open');chromeSync();vTok++;stage.textContent='';vEl=null;main.focus();}
 stage.addEventListener('click',e=>{if(e.target===stage)closeViewer();});
 // kółko myszy i gładzik przewijają obrazy (w trybie 100% przewijają sam obraz)
 let wAcc=0, wT=0;
@@ -1568,6 +1574,9 @@ addEventListener('blur',hideMenu); main.addEventListener('scroll',hideMenu);
 document.addEventListener('keydown',e=>{
   const k=e.key;
   if(!ctx.hidden&&k==='Escape'){hideMenu();return;}
+  if($('#keys').classList.contains('on')){ if(k==='Escape'||k==='?'){e.preventDefault();toggleKeys(false);} return; }
+  if(k==='?'&&!e.target.matches('input,textarea')){e.preventDefault();toggleKeys(true);return;}
+  if(hintEl&&k==='Escape'&&!viewer.classList.contains('open')){hideHint();}
   if(e.target.matches('input[type=search]')){
     if(k==='Escape'){if(e.target.value){$('#qClear').click();}else e.target.blur();}
     else if(k==='Enter'||k==='ArrowDown'){e.target.blur();main.focus();if(view.length&&sel<0)select(0);}
@@ -1726,8 +1735,46 @@ document.addEventListener('mouseover',e=>{
 document.addEventListener('mouseout',e=>{ if(tipFor&&!(e.relatedTarget&&tipFor.contains(e.relatedTarget))) hideTip(); });
 addEventListener('mousedown',hideTip,true); addEventListener('keydown',hideTip,true); addEventListener('blur',hideTip); main.addEventListener('scroll',hideTip,{passive:true});
 
+
+/* --- ściąga skrótów (?) i jednorazowe podpowiedzi; opisy zależą od systemu (Mac / Windows) --- */
+const KL={mod:isMac?'⌘':'Ctrl+',del:isMac?'⌘⌫':'Delete',back:isMac?'⌘[':'Alt+←',fwd:isMac?'⌘]':'Alt+→',wheel:isMac?'⌘ + kółko albo szczypnięcie':'Ctrl + kółko'};
+function renderKeys(){
+  const K=(k,t,c)=>'<div class="k'+(c?' '+c:'')+'"><i>'+k+'</i><small>'+t+'</small></div>';
+  const row=(m,ks)=>'<div class="kr" style="margin-left:'+m+'px">'+ks.join('')+'</div>';
+  $('#keys').innerHTML='<div class="kc"><div class="kh"><b>Skróty klawiszowe</b><span>? otwiera tę ściągę · Esc zamyka</span></div>'
+    +row(0,[K('1','mniejsze'),K('2','większe')])
+    +row(20,[K('Q','wyżej'),K('W','wszystko w środku'),K('E','Photoshop'),K('R',isMac?'Finder':'Eksplorator'),K('T','jasny / ciemny')])
+    +row(34,[K('A','poprzedni'),K('S','dźwięki'),K('D','następny'),K('F','szukaj<em>⇧ biblioteka</em>'),K('G','linie siatki')])
+    +row(54,[K('Z','100% / dopasuj'),K('X','panel<em>⇧ info</em>'),K('C','kopiuj obraz<em>⇧ ścieżki</em>'),K('V','ikony / lista'),K('B','koszyk<em>⇧ otwórz</em>')])
+    +row(0,[K('Tab','ukryj interfejs','w'),K('spacja','podgląd / wróć do siatki','sp')])
+    +'<div class="km">'+[[KL.mod+'N','nowe okno'],[KL.back+' '+KL.fwd,'wstecz / dalej'],[KL.wheel,'wielkość miniatur'],[KL.del,'przenieś do Kosza'],[KL.mod+'L','wpisz ścieżkę'],[KL.mod+'D','dodaj do ulubionych']]
+      .map(([k,t])=>'<div><kbd>'+k+'</kbd>'+t+'</div>').join('')+'</div></div>';
+}
+function toggleKeys(v){ const o=$('#keys'); v=v===undefined?!o.classList.contains('on'):v; if(v){ renderKeys(); hideHint(); } o.classList.toggle('on',v); if(v&&!S.seenKeys){ S.seenKeys=true; save(); } }
+$('#keys').addEventListener('click',e=>{ if(!e.target.closest('.kc')) toggleKeys(false); });
+// podpowiedź pokazuje się raz w życiu programu, przy elemencie, którego dotyczy
+S.hints=S.hints||{};
+let hintEl=null, hintT=0, hintId=null;
+function hideHint(){ clearTimeout(hintT); if(hintEl){ const h=hintEl; h.classList.remove('on'); setTimeout(()=>h.remove(),200); hintEl=null; hintId=null; } }
+function hintDone(id){ if(!S.hints[id]){ S.hints[id]=1; save(); } if(hintId===id) hideHint(); }
+function hint(id,anchor,html,where){
+  if(S.hints[id]||hintEl||$('#keys').classList.contains('on')) return;
+  const r=anchor&&anchor.getBoundingClientRect?anchor.getBoundingClientRect():anchor; if(!r||!r.width) return;
+  S.hints[id]=1; save();
+  const h=document.createElement('div'); h.className='hint'; h.innerHTML=html+'<button aria-label="Zamknij">×</button>';
+  h.lastChild.onclick=hideHint; document.body.appendChild(h);
+  const b=h.getBoundingClientRect();
+  let x=r.left+r.width/2-b.width/2, y=where==='above'?r.top-b.height-10:r.bottom+10;
+  if(where==='right'){ x=r.right+10; y=r.top+r.height/2-b.height/2; }
+  h.style.left=Math.max(10,Math.min(x,innerWidth-b.width-10))+'px'; h.style.top=Math.max(10,Math.min(y,innerHeight-b.height-10))+'px';
+  requestAnimationFrame(()=>h.classList.add('on'));
+  hintEl=h; hintId=id; hintT=setTimeout(hideHint,9000);
+}
+function resetHints(){ S.hints={}; S.seenKeys=false; save(); zoomTip('Podpowiedzi pokażą się od nowa'); }
+
 /* --- start --- */
 $('#empty-open').onclick=pickFolder;
 markSort(); markModes(); setNames(S.names!==false); setDirNames(S.dirNames!==false); setGridLines(!!S.gridlines); setSide(S.side!==false); setInsp(!!S.insp);
 renderSide(); renderCrumbs(); renderTypes(); cacheInfo(); renderBasketNav(); libSync();
+if(!S.seenKeys&&!api.startPath) setTimeout(()=>{ if(!S.seenKeys) toggleKeys(true); },1400);
 loadRoots().then(async()=>{ const sp=api.startPath; if(sp&&await api.exists(sp)) go(sp); else if(S.last&&await api.exists(S.last)) go(S.last); else { render(); syncTree(); } });

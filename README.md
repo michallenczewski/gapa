@@ -44,7 +44,7 @@ Po wejściu do folderu najpierw liczą się widoczne miniatury, potem w tle resz
 
 ## Skróty
 
-Najczęstsze skróty leżą pod lewą ręką, żeby prawa mogła zostać na myszce. Te same klawisze działają w siatce i w podglądzie.
+Najczęstsze skróty leżą pod lewą ręką, żeby prawa mogła zostać na myszce. Te same klawisze działają w siatce i w podglądzie. Klawisz ? pokazuje w programie ściągę z mapą klawiatury (przy pierwszym uruchomieniu pojawia się sama), a krótkie podpowiedzi pokazują się po razie, kiedy coś staje się przydatne; w ustawieniach można je włączyć od nowa.
 
 | Klawisz | Działanie |
 |---|---|

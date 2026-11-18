@@ -95,7 +95,7 @@ body.noside #hspace{display:none}
 .nav li:hover .rf,.rf:focus-visible{opacity:1}
 .rf:hover{color:var(--text);background:var(--hover2,rgba(0,0,0,.06))}
 .rf.on{opacity:1;color:#c99a2e}
-.tile .tf{position:absolute;top:12px;right:12px;width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.9);color:#4a4945;opacity:0;transition:opacity .12s;z-index:3}
+.tile .tf{position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.9);color:#4a4945;opacity:0;transition:opacity .12s;z-index:3}
 [data-theme=dark] .tile .tf{background:rgba(22,22,22,.8);color:#d0d0cd}
 .tile.dir:hover .tf,.tile .tf.on{opacity:1}
 .tile .tf.on{color:#c99a2e}
@@ -210,19 +210,19 @@ body.gridlines #grid.icons>.tile.sel{border-radius:0;box-shadow:none}
 .tile:not(.dir) .box:has(.ph){background:var(--soft);border-radius:6px}
 body.nonames .tile:not(.dir) .nm{display:none}
 body.nodirnames .tile.dir .nm{display:none}
-/* folder: okładka w miękkiej ramce w kolorze papieru (F) */
-.tile.dir .box{background:var(--folder);border-radius:12px;padding:5px;transition:background .15s}
-.tile.dir:hover .box{background:var(--folder2)}
-.tile.dir .box canvas{position:absolute;inset:5px;width:calc(100% - 10px);height:calc(100% - 10px);object-fit:cover;border-radius:8px}
+/* folder: zaokrąglona okładka jak w wersji 0.9; zaznaczenie — tło pod kafelkiem, bez obwódek */
+.tile.dir .box{border-radius:10px;background:var(--soft);overflow:hidden}
+.tile.dir .box canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform .25s cubic-bezier(.2,.7,.3,1)}
+.tile.dir:hover .box canvas{transform:scale(1.03)}
 .tile.dir .nm{color:var(--text);font-weight:500}
 .tile.dir .ph{font-size:0}
 .tile.dir .ph svg{width:24px;height:24px;color:var(--muted2)}
-.chip{position:absolute;left:12px;bottom:12px;height:22px;padding:0 8px;border-radius:6px;background:rgba(255,255,255,.88);color:#4a4945;font-size:11px;display:flex;align-items:center;gap:5px;z-index:2;font-variant-numeric:tabular-nums}
+.chip{position:absolute;left:8px;bottom:8px;height:22px;padding:0 8px;border-radius:6px;background:rgba(255,255,255,.88);color:#4a4945;font-size:11px;display:flex;align-items:center;gap:5px;z-index:2;font-variant-numeric:tabular-nums}
 [data-theme=dark] .chip{background:rgba(22,22,22,.78);color:#d0d0cd}
-.sk{position:absolute;left:14px;right:14px;bottom:12px;display:flex;gap:3px;height:2px;opacity:0;transition:opacity .15s;z-index:2}
+.sk{position:absolute;left:10px;right:10px;bottom:8px;display:flex;gap:3px;height:2px;opacity:0;transition:opacity .15s;z-index:2}
 .sk i{flex:1;background:rgba(255,255,255,.4);border-radius:1px}
 .sk i.on{background:#fff}
-.cnt{position:absolute;left:12px;top:12px;font-size:10px;padding:2px 6px;border-radius:5px;background:rgba(0,0,0,.5);color:#fff;font-variant-numeric:tabular-nums;opacity:0;z-index:2;pointer-events:none}
+.cnt{position:absolute;left:8px;top:8px;font-size:10px;padding:2px 6px;border-radius:5px;background:rgba(0,0,0,.5);color:#fff;font-variant-numeric:tabular-nums;opacity:0;z-index:2;pointer-events:none}
 .tile.dir .box:hover .sk,.tile.dir .box:hover .cnt{opacity:1}
 .tile.dir .box:hover .chip{opacity:0}
 /* nagłówki podfolderów w trybie „wszystko w środku” */

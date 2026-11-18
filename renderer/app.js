@@ -489,7 +489,7 @@ function renderIcons(){
     const t=document.createElement('div'); t.className='tile'+(it.kind==='dir'?' dir':'')+(picked.has(it)?' sel':''); t.dataset.i=i; t._it=it;
     if(it.kind==='file') t.draggable=true;
     t.innerHTML='<div class="box"></div><div><span class="nm"></span><div class="sub"></div></div>';
-    t.querySelector('.nm').textContent=it.name;
+    t.querySelector('.nm').textContent=it.kind==='dir'?it.name+'/':it.name;
     t.querySelector('.sub').textContent=it.kind==='dir'?dirSub(it):'';
     if(it.kind==='dir'){const fb=favBtn('tf',it.path);t.appendChild(fb);t._sync=fb._sync;}
     t.title=it.name; it.tile=t; paint(it); frag.appendChild(t); io.observe(t);

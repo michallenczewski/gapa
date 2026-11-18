@@ -391,10 +391,15 @@ ipcMain.handle('editor-name', () => {
 });
 
 let dragIcon = null;
-ipcMain.on('drag-out', (e, files) => {
+ipcMain.on('drag-out', (e, files, icon) => {
   if (!files || !files.length) return;
-  if (!dragIcon) dragIcon = nativeImage.createFromPath(path.join(__dirname, 'renderer', 'icon.png')).resize({ width: 48, height: 48 });
-  e.sender.startDrag({ file: files[0], files, icon: dragIcon });
+  // pod kursorem miniatury przeciąganych plików (przygotowane w oknie); ikona programu tylko awaryjnie
+  let img = null;
+  if (typeof icon === 'string' && icon.startsWith('data:image/png;base64,')) {
+    try { img = nativeImage.createFromBuffer(Buffer.from(icon.slice(22), 'base64'), { scaleFactor: 2 }); if (img.isEmpty()) img = null; } catch (err) { img = null; }
+  }
+  if (!img) { if (!dragIcon) dragIcon = nativeImage.createFromPath(path.join(__dirname, 'renderer', 'icon.png')).resize({ width: 48, height: 48 }); img = dragIcon; }
+  e.sender.startDrag({ file: files[0], files, icon: img });
 });
 
 /* ---------- okno ---------- */

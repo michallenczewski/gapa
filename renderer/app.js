@@ -82,8 +82,8 @@ const fmtDur=s=>{if(!isFinite(s))return '';s=Math.round(s);const h=Math.floor(s/
 const ICO_DOWN='<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="m2.5 4 2.5 2.5L7.5 4"/></svg>';
 function renderTypes(){
   const n=typeCounts(), present=TYPES.filter(t=>n[t]), shown=present.filter(t=>on(t));
-  const b=$('#typesBtn'); let l='Wszystkie typy';
-  if(shown.length<present.length) l=shown.length?shown.slice(0,2).map(TLABEL).join(', ')+(shown.length>2?' +'+(shown.length-2):''):'Żaden typ';
+  const b=$('#typesBtn'); let l='Filtr';
+  if(shown.length<present.length) l='Filtr: '+(shown.length?shown.slice(0,2).map(TLABEL).join(', ')+(shown.length>2?' +'+(shown.length-2):''):'nic');
   b.innerHTML='<span></span>'+ICO_DOWN; b.firstChild.textContent=l; b.classList.toggle('on',shown.length<present.length);
 }
 function refilter(){save();renderTypes();for(const d of dirs)resetDir(d);applyView(keep());}
@@ -182,7 +182,7 @@ async function cacheInfo(){
 }
 let newThumbs=0; setInterval(()=>{if(newThumbs){newThumbs=0;cacheInfo();}},4000);
 async function cacheClear(){
-  if(!confirm('Usunąć zapamiętane miniatury? Policzą się od nowa przy następnym otwarciu folderów.')) return;
+  if(!(await askConfirm('Wyczyścić miniatury?','Zapamiętane miniatury zostaną usunięte i policzą się od nowa przy następnym otwarciu folderów.','Wyczyść'))) return;
   await api.cacheClear();
   for(const it of items){it.thumb=null;it.state=null;it._tp=null;}
   for(const d of dirs) resetDir(d);
@@ -293,9 +293,17 @@ function basketChanged(){
   if(S.insp) renderInsp();
 }
 function renderBasketNav(){
-  const li=$('#bRow'); if(!li) return;
+  const t=$('#tray'); if(!t) return;
   $('#bCount').textContent=S.basket.length||'';
-  li.classList.toggle('on',virt==='basket');
+  t.classList.toggle('on',virt==='basket');
+  const box=$('#bThumbs'); box.textContent='';
+  if(!S.basket.length){ box.innerHTML='<div class="empty">Przeciągnij tu zdjęcia albo naciśnij B</div>'; return; }
+  // ostatnio dodane, najnowsze pierwsze
+  for(const b of S.basket.slice(-5).reverse()){
+    const it=fileObj(bItems,b), c=document.createElement('canvas'); c.width=c.height=72; c.title=b.name; box.appendChild(c);
+    const draw=()=>{ const src=it.thumb; if(!src) return; const g=c.getContext('2d'), k=Math.max(72/src.width,72/src.height), w=src.width*k, h=src.height*k; g.drawImage(src,(72-w)/2,(72-h)/2,w,h); };
+    if(it.thumb) draw(); else thumbOf(it).then(()=>{ it.state='done'; draw(); },()=>{});
+  }
 }
 async function openBasket(){
   if(virt==='basket') return;
@@ -320,9 +328,9 @@ async function copyBasketTo(list){
   SFX('tick');
   zoomTip(r.failed.length?('Skopiowano '+r.done.length+', nie udało się '+r.failed.length):('Skopiowano '+r.done.length+' do „'+(api.basename(dir)||dir)+'”'));
 }
-function basketClear(){
+async function basketClear(){
   if(!S.basket.length) return;
-  if(!confirm('Wyjąć wszystkie pliki z koszyka ('+S.basket.length+')? Pliki na dysku zostają tam, gdzie są.')) return;
+  if(!(await askConfirm('Wyczyścić koszyk?','Z koszyka zniknie '+S.basket.length+' '+plural(S.basket.length,'plik','pliki','plików')+'. Pliki na dysku zostają tam, gdzie są.','Wyczyść'))) return;
   S.basket=[]; bSet=new Set(); save(); basketChanged(); zoomTip('Koszyk jest pusty');
 }
 
@@ -357,7 +365,7 @@ const SFX=(()=>{
   return name=>{ if(S.sound===false) return; const now=performance.now(); if(now-(last.any||0)<60) return; last.any=now; try{SOUNDS[name]&&SOUNDS[name]();}catch(e){} };
 })();
 // klik każdego przycisku interfejsu (poza tymi, które mają własny dźwięk)
-document.addEventListener('pointerdown',e=>{ const b=e.target.closest('button,.seg button,.sec,#tree li,#favs li,#places li,#bRow'); if(b&&!b.closest('.rf,.tf')) SFX('click'); },true);
+document.addEventListener('pointerdown',e=>{ const b=e.target.closest('button,.seg button,.sec,#tree li,#favs li,#places li,#tray'); if(b&&!b.closest('.rf,.tf')) SFX('click'); },true);
 /* --- historia miejsc: strzałki < > jak w Finderze (folder albo Koszyk) --- */
 let hist=[], hi=-1, histNav=false;
 const locKey=l=>l.basket?'#koszyk':bKey(l.path);
@@ -711,7 +719,8 @@ function render(){
   const folderEmpty=!virt&&!lib&&(!view.length||(!q&&hiddenByType()));
   if(has&&(folderEmpty||((virt||lib)&&!view.length))){
     const p=document.createElement('p');p.className='ph';p.style.cssText='font-size:13px;margin:4px;text-transform:none;letter-spacing:0;grid-column:1/-1;max-width:640px;line-height:1.55';
-    p.textContent=virt==='basket'?(q?'Nic w koszyku nie pasuje do „'+q+'”.':'Koszyk jest pusty. Zaznacz pliki w dowolnym folderze i naciśnij B albo wybierz „Dodaj do koszyka” z menu. Pliki zostają na swoich miejscach, koszyk tylko je zbiera — potem przeciągasz całość do Photoshopa albo Maxa albo kopiujesz do folderu projektu.')
+    if(virt==='basket'&&!q&&!S.basket.length){ const d=document.createElement('div'); d.className='bempty'; d.innerHTML='<svg width="30" height="30" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M2.3 6.5h11.4l-1.25 6.2a1.3 1.3 0 0 1-1.27 1H4.82a1.3 1.3 0 0 1-1.27-1z"/><path d="M5.6 6.5 7.6 2.6M10.4 6.5 8.4 2.6"/></svg><b>Koszyk jest pusty</b><p>Zaznacz zdjęcia w dowolnym folderze i naciśnij B albo przeciągnij je na koszyk w panelu bocznym. Pliki zostają na swoich miejscach — koszyk tylko je zbiera, żeby potem przeciągnąć całość do Photoshopa albo Maxa albo skopiować do folderu projektu.</p>'; grid.appendChild(d); status(); return; }
+    p.textContent=virt==='basket'?'Nic w koszyku nie pasuje do „'+q+'”.'
       :lib?(!S.favs.length?'Biblioteka to foldery z Ulubionych. Dodaj gwiazdką foldery z obrazami, a Gapa zapamięta nazwy plików w nich i we wszystkich podfolderach.'
         :!libInfo?'Szukam…':libSt&&libSt.busy?'Nic jeszcze nie pasuje do „'+q+'” — indeksuję bibliotekę, wyniki dojdą same.':'Nic w bibliotece nie pasuje do „'+q+'”.')
       :q?'Nic nie pasuje do „'+q+'”.':emptyText();
@@ -746,7 +755,7 @@ function basketBar(){
     +'<button class="bb clear">Wyczyść</button>';
   bar.querySelector('.t').textContent=all.length+' '+plural(all.length,'plik','pliki','plików')+'  ·  '+fmtSize(size);
   const dr=bar.querySelector('.drag');
-  if(dr){ dr.ondragstart=e=>{e.preventDefault();draggingOut=true;lastOut=S.basket.map(b=>b.path);api.dragOut(lastOut);};
+  if(dr){ dr.ondragstart=e=>{e.preventDefault();draggingOut=true;lastOut=S.basket.map(b=>b.path);api.dragOut(lastOut,dragImage(S.basket.map(b=>bItems.get(b.path))));};
     dr.onclick=()=>zoomTip('Złap ten przycisk i przeciągnij do innego programu'); }
   const cp=bar.querySelector('.copy'); if(cp) cp.onclick=()=>copyBasketTo(S.basket);
   bar.querySelector('.clear').onclick=basketClear;
@@ -918,9 +927,25 @@ grid.addEventListener('dragstart',e=>{
   const it=view[+t.dataset.i]; if(!it||it.kind!=='file') return;
   e.preventDefault();
   if(!picked.has(it)) select(+t.dataset.i);
-  draggingOut=true; dragT=performance.now(); if(virt!=='basket') document.body.classList.add('dragout'); lastOutItems=pickedFiles(it); lastOut=lastOutItems.map(x=>x.path); api.dragOut(lastOut);
+  draggingOut=true; dragT=performance.now(); if(virt!=='basket') document.body.classList.add('dragout'); lastOutItems=pickedFiles(it); lastOut=lastOutItems.map(x=>x.path); api.dragOut(lastOut,dragImage(lastOutItems));
 });
 let dragT=0;
+// obraz pod kursorem przy przeciąganiu: miniatury (do trzech, ułożone w stos) i liczba plików
+function dragImage(list){
+  const th=list.filter(x=>x&&x.thumb).slice(0,3); if(!th.length) return null;
+  const W=150, R=2, c=document.createElement('canvas'); c.width=c.height=W*R; const g=c.getContext('2d'); g.scale(R,R);
+  const n=th.length;
+  for(let i=n-1;i>=0;i--){
+    const s=th[i].thumb, m=112, k=Math.min(m/s.width,m/s.height), w=s.width*k, h=s.height*k;
+    const x=(W-w)/2+i*7-(n-1)*3.5, y=(W-h)/2-i*7+(n-1)*3.5;
+    g.save(); g.shadowColor='rgba(0,0,0,.28)'; g.shadowBlur=10; g.shadowOffsetY=3;
+    g.beginPath(); g.roundRect(x,y,w,h,6); g.fillStyle='#fff'; g.fill(); g.restore();
+    g.save(); g.beginPath(); g.roundRect(x,y,w,h,6); g.clip(); g.drawImage(s,x,y,w,h); g.restore();
+  }
+  if(list.length>1){ const t=String(list.length); g.font='600 12px -apple-system,Segoe UI,sans-serif'; const bw=Math.max(22,g.measureText(t).width+12);
+    g.fillStyle='#1a1a19'; g.beginPath(); g.roundRect(W-bw-6,8,bw,22,11); g.fill(); g.fillStyle='#fff'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(t,W-6-bw/2,19.5); }
+  return c.toDataURL('image/png');
+}
 const dragDone=()=>{draggingOut=false;document.body.classList.remove('dragout');$('#bdrop').classList.remove('over');};
 addEventListener('pointermove',()=>{ if(draggingOut&&performance.now()-dragT>400) dragDone(); });
 addEventListener('keydown',e=>{ if(e.key==='Escape'&&draggingOut) dragDone(); });
@@ -1331,7 +1356,7 @@ function mount(el,low,it){
     const s=Math.min(aw/dw,ah/dh,1); el.style.width=Math.round(dw*s)+'px'; el.style.height=Math.round(dh*s)+'px';
   } else {
     if(el.tagName!=='IFRAME'&&!el.video&&!el.isDoc) el.onclick=ev=>{ev.stopPropagation(); if(panMoved) return; if(zm) zoomFit(true); else zoomTo(Math.max(1,fitScale()*2),ev.clientX,ev.clientY,true);};
-    if(!el.video) el.draggable=true; el.ondragstart=ev=>{ev.preventDefault();if(zm)return;draggingOut=true;lastOutItems=[it];api.dragOut([it.path]);};
+    if(!el.video) el.draggable=true; el.ondragstart=ev=>{ev.preventDefault();if(zm)return;draggingOut=true;lastOutItems=[it];api.dragOut([it.path],dragImage([it]));};
     applyZoom();
     if(el.video) el.video.play().catch(()=>{});
   }
@@ -1582,6 +1607,7 @@ addEventListener('blur',hideMenu); main.addEventListener('scroll',hideMenu);
 /* --- klawiatura --- */
 document.addEventListener('keydown',e=>{
   const k=e.key;
+  if(dlgDone){ if(k==='Escape'){e.preventDefault();dlgDone(false);} else if(k==='Enter'){e.preventDefault();dlgDone(true);} return; }
   if(!ctx.hidden&&k==='Escape'){hideMenu();return;}
   if($('#keys').classList.contains('on')){ if(k==='Escape'||k==='?'){e.preventDefault();toggleKeys(false);} return; }
   if(k==='?'&&!e.target.matches('input,textarea')){e.preventDefault();toggleKeys(true);return;}
@@ -1699,10 +1725,10 @@ addEventListener('storage',e=>{
 });
 
 /* --- Koszyk w panelu bocznym: klik otwiera, upuszczenie plików z siatki dodaje --- */
-{ const r=$('#bRow');
+{ const r=$('#tray');
   r.onclick=openBasket;
-  r.addEventListener('dragover',e=>{ if(draggingOut){ e.preventDefault(); r.classList.add('drop'); } });
-  r.addEventListener('dragleave',()=>r.classList.remove('drop'));
+  r.addEventListener('dragover',e=>{ e.preventDefault(); r.classList.add('drop'); });
+  r.addEventListener('dragleave',e=>{ if(!r.contains(e.relatedTarget)) r.classList.remove('drop'); });
   const z=$('#bdrop');
   z.addEventListener('dragover',e=>{ if(draggingOut){ e.preventDefault(); z.classList.add('over'); } });
   z.addEventListener('dragleave',()=>z.classList.remove('over')); }
@@ -1714,10 +1740,18 @@ document.addEventListener('dragleave',e=>{if(!hasFiles(e))return;if(--dragN<=0){
 document.addEventListener('dragover',e=>e.preventDefault());
 document.addEventListener('drop',async e=>{
   e.preventDefault(); dragN=0; delete document.body.dataset.drop;
-  const bRow=$('#bRow'); bRow.classList.remove('drop');
-  // pliki przeciągnięte z siatki na „Koszyk” w panelu bocznym albo na duże pole na dole okna
-  if(draggingOut&&e.target.closest&&e.target.closest('#bRow,#bdrop')){ dragDone(); const n=basketAdd(lastOutItems); SFX('tick'); zoomTip(n?(n===1?'W koszyku':'Dodano do koszyka: '+n)+' · razem '+S.basket.length:'Już są w koszyku'); return; }
+  $('#tray').classList.remove('drop');
+  // pliki przeciągnięte z siatki na koszyk w panelu bocznym albo na duże pole na dole okna
+  if(draggingOut&&e.target.closest&&e.target.closest('#tray,#bdrop')){ dragDone(); const n=basketAdd(lastOutItems); SFX('tick'); zoomTip(n?(n===1?'W koszyku':'Dodano do koszyka: '+n)+' · razem '+S.basket.length:'Już są w koszyku'); return; }
   if(draggingOut){dragDone();return;}
+  // pliki z Findera, Eksploratora albo z innego okna Gapy upuszczone na koszyk
+  if(e.target.closest&&e.target.closest('#tray,#bdrop')&&api.statFiles){
+    const ps=[...e.dataTransfer.files].map(f=>api.pathForFile(f)).filter(p=>p&&EXT[extOf(p)]);
+    if(!ps.length){ zoomTip('Do koszyka trafiają tylko obrazy i pliki, które Gapa pokazuje'); return; }
+    const st=await api.statFiles(ps);
+    const n=basketAdd(ps.map((p,k)=>st[k]&&{kind:'file',name:api.basename(p),path:p,size:st[k].size,mtime:st[k].mtime,type:EXT[extOf(p)],state:null}).filter(Boolean));
+    SFX('tick'); zoomTip(n?(n===1?'W koszyku':'Dodano do koszyka: '+n)+' · razem '+S.basket.length:'Już są w koszyku'); return;
+  }
   if(api.addDropped){ const it=[...e.dataTransfer.items].find(i=>i.kind==='file'); if(it){ const p=await api.addDropped(it); if(p){ await loadRoots(); go(p); } } return; }
   const f=e.dataTransfer.files[0]; if(!f) return;
   const p=api.pathForFile(f); if(!p) return;
@@ -1749,6 +1783,18 @@ document.addEventListener('mouseout',e=>{ if(tipFor&&!(e.relatedTarget&&tipFor.c
 addEventListener('mousedown',hideTip,true); addEventListener('keydown',hideTip,true); addEventListener('blur',hideTip); main.addEventListener('scroll',hideTip,{passive:true});
 
 
+/* --- okienko potwierdzenia w stylu programu (zamiast systemowego confirm) --- */
+let dlgDone=null;
+function askConfirm(title,body,ok){
+  return new Promise(res=>{
+    const o=$('#dlg'); o.innerHTML='<div class="dc"><b></b><p></p><div class="db"><button class="no">Anuluj</button><button class="yes"></button></div></div>';
+    o.querySelector('b').textContent=title; o.querySelector('p').textContent=body; o.querySelector('.yes').textContent=ok||'OK';
+    const end=v=>{ o.classList.remove('on'); dlgDone=null; res(v); };
+    dlgDone=end; o.querySelector('.yes').onclick=()=>end(true); o.querySelector('.no').onclick=()=>end(false);
+    o.onclick=e=>{ if(e.target===o) end(false); };
+    o.classList.add('on'); o.querySelector('.yes').focus();
+  });
+}
 /* --- ściąga skrótów (?) i jednorazowe podpowiedzi; opisy zależą od systemu (Mac / Windows) --- */
 const KL={mod:isMac?'⌘':'Ctrl+',del:isMac?'⌘⌫':'Delete',back:isMac?'⌘[':'Alt+←',fwd:isMac?'⌘]':'Alt+→',wheel:isMac?'⌘ + kółko albo szczypnięcie':'Ctrl + kółko'};
 function renderKeys(){

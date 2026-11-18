@@ -45,7 +45,7 @@ contextBridge.exposeInMainWorld('api', {
   onLibStatus: cb => ipcRenderer.on('lib-status', (e, s) => cb(s)),
   newWindow: p => ipcRenderer.send('new-window', p),
   startPath: (() => { try { return new URLSearchParams(location.search).get('p'); } catch (e) { return null; } })(),
-  dragOut: files => ipcRenderer.send('drag-out', files),
+  dragOut: (files, icon) => ipcRenderer.send('drag-out', files, icon),
   osThumb: (p, size) => ipcRenderer.invoke('os-thumb', p, size),
   fileHref: p => require('url').pathToFileURL(p).href,
   pathForFile: f => { try { return webUtils.getPathForFile(f); } catch (e) { return null; } }

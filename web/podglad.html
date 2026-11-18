@@ -94,7 +94,7 @@ body.noside #hspace{display:none}
 .nav li:hover .rf,.rf:focus-visible{opacity:1}
 .rf:hover{color:var(--text);background:var(--hover2,rgba(0,0,0,.06))}
 .rf.on{opacity:1;color:#c99a2e}
-.tile .tf{position:absolute;top:24px;right:14px;width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.9);color:#4a4945;opacity:0;transition:opacity .12s;z-index:3}
+.tile .tf{position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.9);color:#4a4945;opacity:0;transition:opacity .12s;z-index:3}
 [data-theme=dark] .tile .tf{background:rgba(22,22,22,.8);color:#d0d0cd}
 .tile.dir:hover .tf,.tile .tf.on{opacity:1}
 .tile .tf.on{color:#c99a2e}
@@ -158,6 +158,10 @@ body.noside aside{display:none}
 
 /* --- siatka --- */
 main{grid-row:2;grid-column:2;overflow:auto;padding:10px 24px 32px 24px;position:relative;outline:none;min-width:0}
+/* opcjonalna siatka: cienkie szare linie między kafelkami (G) */
+body.gridlines #grid.icons{column-gap:0;row-gap:0;border-top:1px solid var(--line);border-left:1px solid var(--line)}
+body.gridlines #grid.icons>.tile{padding:calc(var(--tile-w)*.08) calc(var(--tile-w)*.075) calc(var(--tile-w)*.06);border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+body.gridlines #grid.icons>.grp{border-right:1px solid var(--line);border-bottom:1px solid var(--line);margin:0;padding:18px 12px 8px}
 #grid.icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(var(--tile-w),100%),1fr));column-gap:calc(var(--tile-w)*.15);row-gap:calc(var(--tile-w)*.1)}
 #grid.list{display:block}
 .tile{position:relative;display:flex;flex-direction:column;gap:8px;min-width:0;cursor:default}
@@ -203,27 +207,25 @@ body.bare .vbox video{max-height:calc(100vh - 60px)}
 .tile:not(.dir) .box:has(.ph){background:var(--soft);border-radius:6px}
 body.nonames .tile:not(.dir) .nm{display:none}
 body.nodirnames .tile.dir .nm{display:none}
-/* folder wygląda jak teczka: zakładka u góry i ramka, w której leży okładka — od razu odróżnia się od pliku */
-.tile.dir .box{background:transparent;overflow:hidden}
-.tile.dir .box::before{content:"";position:absolute;left:0;top:0;width:42%;height:16px;border-radius:9px 9px 0 0;background:var(--folder);transition:background .15s}
-.tile.dir .box::after{content:"";position:absolute;inset:10px 0 0 0;border-radius:3px 11px 11px 11px;background:var(--folder);transition:background .15s,box-shadow .18s}
-.tile.dir:hover .box::before,.tile.dir:hover .box::after{background:var(--folder2)}
-.tile.dir .box canvas{position:absolute;left:7px;top:17px;width:calc(100% - 14px);height:calc(100% - 24px);object-fit:cover;border-radius:6px;z-index:1}
-.tile.dir .box .ph{position:relative;z-index:1;margin-top:10px}
-/* zaznaczony folder: cała teczka w kolorze zaznaczenia, bez obwódek, które ucinałyby się na krawędziach */
-.tile.dir.sel .box::before,.tile.dir.sel .box::after,.tile.dir.sel:hover .box::before,.tile.dir.sel:hover .box::after{background:var(--ring)}
+/* folder: okładka jak dawniej, a za nią dwie cienkie kartki wystające u góry — subtelny znak „tu jest więcej” */
+.tile.dir .box{overflow:visible;isolation:isolate;transition:box-shadow .18s}
+.tile.dir .box::before,.tile.dir .box::after{content:"";position:absolute;left:14px;right:14px;top:-5px;height:12px;border-radius:7px 7px 0 0;background:var(--folder);z-index:0;transition:transform .18s}
+.tile.dir .box::after{left:28px;right:28px;top:-9px;background:var(--folder2);z-index:-1}
+.tile.dir:hover .box::before{transform:translateY(-1px)}
+.tile.dir:hover .box::after{transform:translateY(-2px)}
+.tile.dir .box canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:10px;z-index:1}
+.tile.dir .box .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;border-radius:10px;background:var(--soft);z-index:1}
+.tile.dir .box{border-radius:10px}
+.tile.dir.sel .box{box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--ring)}
 .tile.dir .nm{color:var(--text);font-weight:500}
-.tile.dir .nm::before{content:"";display:inline-block;width:13px;height:11px;margin-right:6px;vertical-align:-1px;background:currentColor;opacity:.55;
-  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 11'%3E%3Cpath d='M0 1.6C0 .7.7 0 1.6 0h3.1c.4 0 .8.2 1.1.5L7 1.7h4.4c.9 0 1.6.7 1.6 1.6v6.1c0 .9-.7 1.6-1.6 1.6H1.6C.7 11 0 10.3 0 9.4z'/%3E%3C/svg%3E") center/contain no-repeat;
-  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 11'%3E%3Cpath d='M0 1.6C0 .7.7 0 1.6 0h3.1c.4 0 .8.2 1.1.5L7 1.7h4.4c.9 0 1.6.7 1.6 1.6v6.1c0 .9-.7 1.6-1.6 1.6H1.6C.7 11 0 10.3 0 9.4z'/%3E%3C/svg%3E") center/contain no-repeat}
 .tile.dir .ph{font-size:0}
 .tile.dir .ph svg{width:24px;height:24px;color:var(--muted2)}
-.chip{position:absolute;left:14px;bottom:14px;height:22px;padding:0 8px;border-radius:6px;background:rgba(255,255,255,.88);color:#4a4945;font-size:11px;display:flex;align-items:center;gap:5px;z-index:2;font-variant-numeric:tabular-nums}
+.chip{position:absolute;left:8px;bottom:8px;height:22px;padding:0 8px;border-radius:6px;background:rgba(255,255,255,.88);color:#4a4945;font-size:11px;display:flex;align-items:center;gap:5px;z-index:2;font-variant-numeric:tabular-nums}
 [data-theme=dark] .chip{background:rgba(22,22,22,.78);color:#d0d0cd}
-.sk{position:absolute;left:16px;right:16px;bottom:13px;display:flex;gap:3px;height:2px;opacity:0;transition:opacity .15s;z-index:2}
+.sk{position:absolute;left:10px;right:10px;bottom:8px;display:flex;gap:3px;height:2px;opacity:0;transition:opacity .15s;z-index:2}
 .sk i{flex:1;background:rgba(255,255,255,.4);border-radius:1px}
 .sk i.on{background:#fff}
-.cnt{position:absolute;left:14px;top:24px;font-size:10px;padding:2px 6px;border-radius:5px;background:rgba(0,0,0,.5);color:#fff;font-variant-numeric:tabular-nums;opacity:0;z-index:2;pointer-events:none}
+.cnt{position:absolute;left:8px;top:8px;font-size:10px;padding:2px 6px;border-radius:5px;background:rgba(0,0,0,.5);color:#fff;font-variant-numeric:tabular-nums;opacity:0;z-index:2;pointer-events:none}
 .tile.dir .box:hover .sk,.tile.dir .box:hover .cnt{opacity:1}
 .tile.dir .box:hover .chip{opacity:0}
 /* nagłówki podfolderów w trybie „wszystko w środku” */
@@ -1119,6 +1121,7 @@ function markModes(){
 function setMode(m){if(S.mode===m)return;S.mode=m;save();markModes();render();}
 document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>setMode(b.dataset.v));
 function setNames(v){S.names=v;save();document.body.classList.toggle('nonames',!v);}
+function setGridLines(v){S.gridlines=v;save();document.body.classList.toggle('gridlines',!!v);}
 function setDirNames(v){S.dirNames=v;save();document.body.classList.toggle('nodirnames',!v);}
 function setSide(v){S.side=v;save();document.body.classList.toggle('noside',!v);press($('#sideBtn'),v);}
 $('#sideBtn').onclick=()=>setSide(S.side===false);
@@ -1165,6 +1168,7 @@ function settingsMenu(){
     {label:'Ciemny',check:t==='dark',keys:['T'],run:()=>setTheme('dark')},
     '-',
     {label:'Nazwy plików',box:S.names!==false,keys:['N'],keep:true,run:()=>{setNames(!(S.names!==false));settingsMenu();}},
+    {label:'Siatka między miniaturami',box:!!S.gridlines,keys:['G'],keep:true,run:()=>{setGridLines(!S.gridlines);settingsMenu();}},
     {label:'Nazwy folderów',box:S.dirNames!==false,keys:['⇧','N'],keep:true,run:()=>{setDirNames(!(S.dirNames!==false));settingsMenu();}},
     {label:'Ukryj interfejs',keys:['Tab'],run:toggleBare},
     {label:'Dźwięki',box:S.sound!==false,keys:['S'],keep:true,run:()=>{S.sound=!(S.sound!==false);save();if(S.sound)SFX('on');settingsMenu();}},
@@ -2291,6 +2295,7 @@ document.addEventListener('keydown',e=>{
   else if(k==='-'){zstep(-1);}
   else if(k==='r'){scan(true);}
   else if(k==='t'){cycleTheme();}
+  else if(k==='g'&&!mod){setGridLines(!S.gridlines);zoomTip(S.gridlines?'Siatka włączona':'Siatka wyłączona');}
   else if(k==='s'&&!mod){S.sound=!(S.sound!==false);save();if(S.sound)SFX('on');zoomTip(S.sound?'Dźwięki włączone':'Dźwięki wyciszone');}
   else if(k==='N'||(k==='n'&&e.shiftKey)){setDirNames(!(S.dirNames!==false));}
   else if(k==='n'){setNames(!(S.names!==false));}
@@ -2341,7 +2346,7 @@ addEventListener('mousedown',hideTip,true); addEventListener('keydown',hideTip,t
 
 /* --- start --- */
 $('#empty-open').onclick=pickFolder;
-markSort(); markModes(); setNames(S.names!==false); setDirNames(S.dirNames!==false); if(S.vmin) viewer.classList.add('min'); setSide(S.side!==false); setInsp(!!S.insp);
+markSort(); markModes(); setNames(S.names!==false); setDirNames(S.dirNames!==false); setGridLines(!!S.gridlines); if(S.vmin) viewer.classList.add('min'); setSide(S.side!==false); setInsp(!!S.insp);
 renderSide(); renderCrumbs(); renderTypes(); cacheInfo();
 loadRoots().then(async()=>{ if(S.last&&await api.exists(S.last)) go(S.last); else { render(); syncTree(); } });
 

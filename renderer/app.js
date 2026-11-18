@@ -117,6 +117,7 @@ function markModes(){
 function setMode(m){if(S.mode===m)return;S.mode=m;save();markModes();render();}
 document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>setMode(b.dataset.v));
 function setNames(v){S.names=v;save();document.body.classList.toggle('nonames',!v);}
+function setGridLines(v){S.gridlines=v;save();document.body.classList.toggle('gridlines',!!v);}
 function setDirNames(v){S.dirNames=v;save();document.body.classList.toggle('nodirnames',!v);}
 function setSide(v){S.side=v;save();document.body.classList.toggle('noside',!v);press($('#sideBtn'),v);}
 $('#sideBtn').onclick=()=>setSide(S.side===false);
@@ -163,6 +164,7 @@ function settingsMenu(){
     {label:'Ciemny',check:t==='dark',keys:['T'],run:()=>setTheme('dark')},
     '-',
     {label:'Nazwy plików',box:S.names!==false,keys:['N'],keep:true,run:()=>{setNames(!(S.names!==false));settingsMenu();}},
+    {label:'Siatka między miniaturami',box:!!S.gridlines,keys:['G'],keep:true,run:()=>{setGridLines(!S.gridlines);settingsMenu();}},
     {label:'Nazwy folderów',box:S.dirNames!==false,keys:['⇧','N'],keep:true,run:()=>{setDirNames(!(S.dirNames!==false));settingsMenu();}},
     {label:'Ukryj interfejs',keys:['Tab'],run:toggleBare},
     {label:'Dźwięki',box:S.sound!==false,keys:['S'],keep:true,run:()=>{S.sound=!(S.sound!==false);save();if(S.sound)SFX('on');settingsMenu();}},
@@ -1289,6 +1291,7 @@ document.addEventListener('keydown',e=>{
   else if(k==='-'){zstep(-1);}
   else if(k==='r'){scan(true);}
   else if(k==='t'){cycleTheme();}
+  else if(k==='g'&&!mod){setGridLines(!S.gridlines);zoomTip(S.gridlines?'Siatka włączona':'Siatka wyłączona');}
   else if(k==='s'&&!mod){S.sound=!(S.sound!==false);save();if(S.sound)SFX('on');zoomTip(S.sound?'Dźwięki włączone':'Dźwięki wyciszone');}
   else if(k==='N'||(k==='n'&&e.shiftKey)){setDirNames(!(S.dirNames!==false));}
   else if(k==='n'){setNames(!(S.names!==false));}
@@ -1339,6 +1342,6 @@ addEventListener('mousedown',hideTip,true); addEventListener('keydown',hideTip,t
 
 /* --- start --- */
 $('#empty-open').onclick=pickFolder;
-markSort(); markModes(); setNames(S.names!==false); setDirNames(S.dirNames!==false); if(S.vmin) viewer.classList.add('min'); setSide(S.side!==false); setInsp(!!S.insp);
+markSort(); markModes(); setNames(S.names!==false); setDirNames(S.dirNames!==false); setGridLines(!!S.gridlines); if(S.vmin) viewer.classList.add('min'); setSide(S.side!==false); setInsp(!!S.insp);
 renderSide(); renderCrumbs(); renderTypes(); cacheInfo();
 loadRoots().then(async()=>{ if(S.last&&await api.exists(S.last)) go(S.last); else { render(); syncTree(); } });

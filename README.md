@@ -57,6 +57,7 @@ Po wejściu do folderu najpierw liczą się widoczne miniatury, potem w tle resz
 | Shift+N | pokaż / ukryj nazwy folderów |
 | K, M | film: odtwórz / pauza, wycisz |
 | S | dźwięki interfejsu: włącz / wycisz |
+| G | siatka linii między miniaturami |
 | ⌘L / Ctrl+L (też ⌘⇧G) | wpisz lub wklej ścieżkę; Enter przechodzi, ścieżka do pliku otwiera jego folder i zaznacza plik |
 | ⌥⌘C / Ctrl+Alt+C | kopiuj ścieżkę zaznaczonych plików, a bez zaznaczenia — bieżącego folderu |
 | ⌘V / Ctrl+V | wklejona ścieżka przenosi od razu do folderu |

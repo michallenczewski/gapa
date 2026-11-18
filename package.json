@@ -1,7 +1,7 @@
 {
   "name": "podglad",
   "productName": "Gapa",
-  "version": "0.4.11",
+  "version": "0.4.12",
   "description": "Prosta przeglądarka obrazów — zamiennik Adobe Bridge",
   "author": "Michał Lenczewski",
   "license": "UNLICENSED",
@@ -59,7 +59,7 @@
           ]
         }
       ],
-      "icon": "build/icon.png",
+      "icon": "build/icon-win.png",
       "executableName": "Gapa"
     },
     "nsis": {

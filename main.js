@@ -103,7 +103,8 @@ ipcMain.handle('cache-clear', async () => {
   idx = { items: {} }; cacheBytes = 0; idxDirty = true; saveIndexNow();
 });
 // ikona programu: „3d” (domyślna) albo „retro”; na Macu podmieniamy ikonę w Docku na czas działania programu
-const iconFile = n => path.join(__dirname, 'renderer', n === 'retro' ? 'icon-retro.png' : 'icon.png');
+// na Windows ikona bez marginesów macOS — inaczej na pasku zadań wychodzi za mała
+const iconFile = n => path.join(__dirname, 'renderer', (n === 'retro' ? 'icon-retro' : 'icon') + (process.platform === 'win32' ? '-win' : '') + '.png');
 function applyIcon() {
   const img = nativeImage.createFromPath(iconFile(settings.icon));
   if (process.platform === 'darwin') app.dock.setIcon(img);

@@ -6,7 +6,7 @@
 <title>Gapa</title>
 <style>
 /* ===== Podgląd — wygląd „A”: jeden cienki pasek, panel informacji na żądanie ===== */
-:root{
+:root{--r:8px;
   --bg:#f7f7f5; --text:#1a1a19; --text2:#4a4945; --muted:#8a8984; --muted2:#a3a29d;
   --folder:#dcd8cd; --folder2:#d0cbbf; --selbg:#e3e1da;
   --soft:#efeeea; --hover:#ecebe7; --line:#e6e5e1; --card:#ffffff; --cardline:#ecebe7;
@@ -200,24 +200,27 @@ body.bare .vbox video{max-height:calc(100vh - 60px)}
 /* plik: wyśrodkowany w równej komórce 4:3; wysoki obraz nie rozpycha rzędu */
 .tile:not(.dir) .box{min-height:0;overflow:visible}
 .tile:not(.dir) .box>canvas{position:absolute;inset:0;margin:auto}
-.tile:not(.dir) canvas{max-width:100%;max-height:100%;width:auto;height:auto;display:block;border-radius:3px;transition:transform .18s cubic-bezier(.2,.7,.3,1),box-shadow .18s}
+.tile:not(.dir) canvas{display:block;border-radius:var(--r);transition:transform .18s cubic-bezier(.2,.7,.3,1),box-shadow .18s}
+/* miniatura wypełnia komórkę 4:3 (także powiększana przy dużych kafelkach): szersze od 4:3 — na szerokość, węższe — na wysokość */
+.tile:not(.dir) .box>canvas.w{width:100%;height:auto}
+.tile:not(.dir) .box>canvas.h{height:100%;width:auto}
 .tile:not(.dir):hover canvas{transform:scale(1.04);box-shadow:0 8px 24px rgba(0,0,0,.14)}
 /* zaznaczenie (S2): tło pod całym kafelkiem, jak w Finderze */
-/* promień tła = promień okładki (10) + odstęp (8), więc rogi biegną równolegle; zaznaczony kafelek nie powiększa się po najechaniu */
-.tile.sel{background:var(--selbg);border-radius:10px;box-shadow:0 0 0 8px var(--selbg)}
+/* jeden promień rogów (--r) dla miniatur, okładek folderów, pustych pól i tła zaznaczenia */
+.tile{isolation:isolate}
+.tile.sel::before{content:"";position:absolute;inset:-8px;border-radius:var(--r);background:var(--selbg);z-index:-1}
 .tile.sel:not(.dir):hover canvas,.tile.dir.sel:hover .box canvas{transform:none}
-.tile.sel:not(.dir) canvas{border-radius:4px}
-body.gridlines #grid.icons>.tile.sel{border-radius:0;box-shadow:none}
+body.gridlines #grid.icons>.tile.sel::before{inset:0;border-radius:0}
 .tile.sel:not(.dir):hover canvas{box-shadow:0 8px 24px rgba(0,0,0,.14)}
 .tile .nm{display:block;font-size:12px;color:var(--muted);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tile.sel .nm{color:var(--text)}
 .tile .sub{display:none}
 .tile .ph{color:var(--muted2);font-size:11px;letter-spacing:.04em;text-transform:uppercase}
-.tile:not(.dir) .box:has(.ph){background:var(--soft);border-radius:6px}
+.tile:not(.dir) .box:has(.ph){background:var(--soft);border-radius:var(--r)}
 body.nonames .tile:not(.dir) .nm{display:none}
 body.nodirnames .tile.dir .nm{display:none}
 /* folder: zaokrąglona okładka jak w wersji 0.9; zaznaczenie — tło pod kafelkiem, bez obwódek */
-.tile.dir .box{border-radius:10px;background:var(--soft);overflow:hidden}
+.tile.dir .box{border-radius:var(--r);background:var(--soft);overflow:hidden}
 .tile.dir .box canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform .25s cubic-bezier(.2,.7,.3,1)}
 .tile.dir:hover .box canvas{transform:scale(1.03)}
 .tile.dir .nm{color:var(--text);font-weight:500}
@@ -363,7 +366,7 @@ body.bare #grid .nm{display:none}
 #bRow.on svg,#bRow:hover svg{color:var(--text)}
 #bRow .n{flex:none;margin-left:auto;color:var(--muted2);font-size:11.5px;font-weight:400;font-variant-numeric:tabular-nums}
 #bRow.drop{background:var(--selbg);color:var(--text)}
-.tile.inb .box::before{content:"";position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:7px;background:var(--pill);box-shadow:var(--pillsh);z-index:3;pointer-events:none}
+.tile.inb .box::before{content:"";position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:6px;background:var(--pill);box-shadow:var(--pillsh);z-index:3;pointer-events:none}
 .tile.inb .box::after{content:"";position:absolute;top:11px;right:11px;width:12px;height:12px;background:var(--text);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linejoin='round' stroke-linecap='round'%3E%3Cpath d='M2.3 6.5h11.4l-1.25 6.2a1.3 1.3 0 0 1-1.27 1H4.82a1.3 1.3 0 0 1-1.27-1z'/%3E%3Cpath d='M5.6 6.5 7.6 2.6M10.4 6.5 8.4 2.6'/%3E%3C/svg%3E") center/contain no-repeat;z-index:4;pointer-events:none}
 tr.inb .nm::after{content:"";display:inline-block;width:11px;height:11px;margin-left:7px;vertical-align:-1px;background:var(--muted);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linejoin='round' stroke-linecap='round'%3E%3Cpath d='M2.3 6.5h11.4l-1.25 6.2a1.3 1.3 0 0 1-1.27 1H4.82a1.3 1.3 0 0 1-1.27-1z'/%3E%3Cpath d='M5.6 6.5 7.6 2.6M10.4 6.5 8.4 2.6'/%3E%3C/svg%3E") center/contain no-repeat}
 .vbar{grid-column:1/-1;display:flex;align-items:center;gap:8px;padding:0 2px 6px;font-size:12px;color:var(--muted);min-width:0}
@@ -379,6 +382,15 @@ tr.inb .nm::after{content:"";display:inline-block;width:11px;height:11px;margin-
 #grid.list>.vbar{padding:2px 8px 10px}
 #navh{display:flex;gap:2px;flex:none;margin-right:6px}
 #navh .ib:disabled{opacity:.3;cursor:default}
+/* podczas przeciągania miniatur: duże pole „do koszyka” na dole okna */
+#bdrop{position:fixed;left:50%;bottom:28px;transform:translate(-50%,12px);z-index:40;display:flex;align-items:center;gap:14px;width:340px;height:92px;padding:0 24px;border-radius:16px;
+  background:var(--card);box-shadow:0 0 0 1px var(--cardline),0 12px 40px rgba(0,0,0,.16);color:var(--text2);font-size:13px;line-height:1.4;opacity:0;pointer-events:none;transition:opacity .15s,transform .15s}
+#bdrop svg{flex:none;color:var(--muted)}
+#bdrop b{display:block;color:var(--text);font-weight:500;font-size:14px}
+body.dragout #bdrop{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+#bdrop.over{background:var(--selbg);box-shadow:0 0 0 2px var(--text),0 12px 40px rgba(0,0,0,.2)}
+#bdrop.over svg{color:var(--text)}
+body.dragout #bRow{background:var(--hover)}
 </style>
 </head>
 <body>
@@ -460,6 +472,7 @@ tr.inb .nm::after{content:"";display:inline-block;width:11px;height:11px;margin-
 </section>
 
 <div class="ctx" id="ctx" hidden role="menu"></div>
+<div id="bdrop" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round" stroke-linecap="round"><path d="M2.3 6.5h11.4l-1.25 6.2a1.3 1.3 0 0 1-1.27 1H4.82a1.3 1.3 0 0 1-1.27-1z"/><path d="M5.6 6.5 7.6 2.6M10.4 6.5 8.4 2.6"/></svg><div><b>Upuść tutaj</b>żeby dodać do koszyka</div></div>
 <div class="dropzone" aria-hidden="true"><span>Upuść folder, żeby go otworzyć</span></div>
 
 <div id="viewer" role="dialog" aria-modal="true">

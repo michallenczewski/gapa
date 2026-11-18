@@ -5,7 +5,7 @@
 <title>Gapa (wersja w przeglądarce)</title>
 <style>
 /* ===== Podgląd — wygląd „A”: jeden cienki pasek, panel informacji na żądanie ===== */
-:root{
+:root{--r:8px;
   --bg:#f7f7f5; --text:#1a1a19; --text2:#4a4945; --muted:#8a8984; --muted2:#a3a29d;
   --folder:#dcd8cd; --folder2:#d0cbbf; --selbg:#e3e1da;
   --soft:#efeeea; --hover:#ecebe7; --line:#e6e5e1; --card:#ffffff; --cardline:#ecebe7;
@@ -199,24 +199,27 @@ body.bare .vbox video{max-height:calc(100vh - 60px)}
 /* plik: wyśrodkowany w równej komórce 4:3; wysoki obraz nie rozpycha rzędu */
 .tile:not(.dir) .box{min-height:0;overflow:visible}
 .tile:not(.dir) .box>canvas{position:absolute;inset:0;margin:auto}
-.tile:not(.dir) canvas{max-width:100%;max-height:100%;width:auto;height:auto;display:block;border-radius:3px;transition:transform .18s cubic-bezier(.2,.7,.3,1),box-shadow .18s}
+.tile:not(.dir) canvas{display:block;border-radius:var(--r);transition:transform .18s cubic-bezier(.2,.7,.3,1),box-shadow .18s}
+/* miniatura wypełnia komórkę 4:3 (także powiększana przy dużych kafelkach): szersze od 4:3 — na szerokość, węższe — na wysokość */
+.tile:not(.dir) .box>canvas.w{width:100%;height:auto}
+.tile:not(.dir) .box>canvas.h{height:100%;width:auto}
 .tile:not(.dir):hover canvas{transform:scale(1.04);box-shadow:0 8px 24px rgba(0,0,0,.14)}
 /* zaznaczenie (S2): tło pod całym kafelkiem, jak w Finderze */
-/* promień tła = promień okładki (10) + odstęp (8), więc rogi biegną równolegle; zaznaczony kafelek nie powiększa się po najechaniu */
-.tile.sel{background:var(--selbg);border-radius:10px;box-shadow:0 0 0 8px var(--selbg)}
+/* jeden promień rogów (--r) dla miniatur, okładek folderów, pustych pól i tła zaznaczenia */
+.tile{isolation:isolate}
+.tile.sel::before{content:"";position:absolute;inset:-8px;border-radius:var(--r);background:var(--selbg);z-index:-1}
 .tile.sel:not(.dir):hover canvas,.tile.dir.sel:hover .box canvas{transform:none}
-.tile.sel:not(.dir) canvas{border-radius:4px}
-body.gridlines #grid.icons>.tile.sel{border-radius:0;box-shadow:none}
+body.gridlines #grid.icons>.tile.sel::before{inset:0;border-radius:0}
 .tile.sel:not(.dir):hover canvas{box-shadow:0 8px 24px rgba(0,0,0,.14)}
 .tile .nm{display:block;font-size:12px;color:var(--muted);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tile.sel .nm{color:var(--text)}
 .tile .sub{display:none}
 .tile .ph{color:var(--muted2);font-size:11px;letter-spacing:.04em;text-transform:uppercase}
-.tile:not(.dir) .box:has(.ph){background:var(--soft);border-radius:6px}
+.tile:not(.dir) .box:has(.ph){background:var(--soft);border-radius:var(--r)}
 body.nonames .tile:not(.dir) .nm{display:none}
 body.nodirnames .tile.dir .nm{display:none}
 /* folder: zaokrąglona okładka jak w wersji 0.9; zaznaczenie — tło pod kafelkiem, bez obwódek */
-.tile.dir .box{border-radius:10px;background:var(--soft);overflow:hidden}
+.tile.dir .box{border-radius:var(--r);background:var(--soft);overflow:hidden}
 .tile.dir .box canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform .25s cubic-bezier(.2,.7,.3,1)}
 .tile.dir:hover .box canvas{transform:scale(1.03)}
 .tile.dir .nm{color:var(--text);font-weight:500}
@@ -362,7 +365,7 @@ body.bare #grid .nm{display:none}
 #bRow.on svg,#bRow:hover svg{color:var(--text)}
 #bRow .n{flex:none;margin-left:auto;color:var(--muted2);font-size:11.5px;font-weight:400;font-variant-numeric:tabular-nums}
 #bRow.drop{background:var(--selbg);color:var(--text)}
-.tile.inb .box::before{content:"";position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:7px;background:var(--pill);box-shadow:var(--pillsh);z-index:3;pointer-events:none}
+.tile.inb .box::before{content:"";position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:6px;background:var(--pill);box-shadow:var(--pillsh);z-index:3;pointer-events:none}
 .tile.inb .box::after{content:"";position:absolute;top:11px;right:11px;width:12px;height:12px;background:var(--text);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linejoin='round' stroke-linecap='round'%3E%3Cpath d='M2.3 6.5h11.4l-1.25 6.2a1.3 1.3 0 0 1-1.27 1H4.82a1.3 1.3 0 0 1-1.27-1z'/%3E%3Cpath d='M5.6 6.5 7.6 2.6M10.4 6.5 8.4 2.6'/%3E%3C/svg%3E") center/contain no-repeat;z-index:4;pointer-events:none}
 tr.inb .nm::after{content:"";display:inline-block;width:11px;height:11px;margin-left:7px;vertical-align:-1px;background:var(--muted);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linejoin='round' stroke-linecap='round'%3E%3Cpath d='M2.3 6.5h11.4l-1.25 6.2a1.3 1.3 0 0 1-1.27 1H4.82a1.3 1.3 0 0 1-1.27-1z'/%3E%3Cpath d='M5.6 6.5 7.6 2.6M10.4 6.5 8.4 2.6'/%3E%3C/svg%3E") center/contain no-repeat}
 .vbar{grid-column:1/-1;display:flex;align-items:center;gap:8px;padding:0 2px 6px;font-size:12px;color:var(--muted);min-width:0}
@@ -378,6 +381,15 @@ tr.inb .nm::after{content:"";display:inline-block;width:11px;height:11px;margin-
 #grid.list>.vbar{padding:2px 8px 10px}
 #navh{display:flex;gap:2px;flex:none;margin-right:6px}
 #navh .ib:disabled{opacity:.3;cursor:default}
+/* podczas przeciągania miniatur: duże pole „do koszyka” na dole okna */
+#bdrop{position:fixed;left:50%;bottom:28px;transform:translate(-50%,12px);z-index:40;display:flex;align-items:center;gap:14px;width:340px;height:92px;padding:0 24px;border-radius:16px;
+  background:var(--card);box-shadow:0 0 0 1px var(--cardline),0 12px 40px rgba(0,0,0,.16);color:var(--text2);font-size:13px;line-height:1.4;opacity:0;pointer-events:none;transition:opacity .15s,transform .15s}
+#bdrop svg{flex:none;color:var(--muted)}
+#bdrop b{display:block;color:var(--text);font-weight:500;font-size:14px}
+body.dragout #bdrop{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+#bdrop.over{background:var(--selbg);box-shadow:0 0 0 2px var(--text),0 12px 40px rgba(0,0,0,.2)}
+#bdrop.over svg{color:var(--text)}
+body.dragout #bRow{background:var(--hover)}
 </style>
 </head>
 <body>
@@ -459,6 +471,7 @@ tr.inb .nm::after{content:"";display:inline-block;width:11px;height:11px;margin-
 </section>
 
 <div class="ctx" id="ctx" hidden role="menu"></div>
+<div id="bdrop" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round" stroke-linecap="round"><path d="M2.3 6.5h11.4l-1.25 6.2a1.3 1.3 0 0 1-1.27 1H4.82a1.3 1.3 0 0 1-1.27-1z"/><path d="M5.6 6.5 7.6 2.6M10.4 6.5 8.4 2.6"/></svg><div><b>Upuść tutaj</b>żeby dodać do koszyka</div></div>
 <div class="dropzone" aria-hidden="true"><span>Upuść folder, żeby go otworzyć</span></div>
 
 <div id="viewer" role="dialog" aria-modal="true">
@@ -1091,7 +1104,7 @@ function maxTile(){ const m=document.getElementById('main'); const w=(m&&m.clien
 addEventListener('resize',()=>{ const mx=maxTile(); if(S.mode!=='list'&&S.size>mx) setSize(mx); else sliderFill&&sliderFill(); });
 function setSize(v,tip){
   if(S.mode==='list'){S.lic=Math.round(Math.max(16,Math.min(96,v)));document.documentElement.style.setProperty('--lic',S.lic+'px');if(tip)zoomTip(S.lic+' px');}
-  else{S.size=Math.round(Math.max(90,Math.min(maxTile(),v)));$('#size').value=S.size;document.documentElement.style.setProperty('--tile-w',S.size+'px');sliderFill();
+  else{S.size=Math.round(Math.max(90,Math.min(maxTile(),v)));$('#size').value=S.size;document.documentElement.style.setProperty('--tile-w',S.size+'px');sliderFill();if(typeof hdAll==='function')hdAll();
     if(tip){const n=cols();zoomTip(n+' '+plural(n,'kolumna','kolumny','kolumn'));}}
   save();
 }
@@ -1664,7 +1677,58 @@ function basketView(q,keepPath){
   finishView(keepPath);
 }
 const io=new IntersectionObserver(es=>{for(const e of es){const it=e.target._it;if(!it)continue;it.visible=e.isIntersecting;
-  if(!it.visible)continue; if(it.kind==='dir')loadDir(it,true); else enqueue(it,true);}},{root:main,rootMargin:'600px'});
+  if(!it.visible)continue; if(it.kind==='dir')loadDir(it,true); else { enqueue(it,true); if(it.thumb) wantHD(it); } }},{root:main,rootMargin:'600px'});
+
+/* --- ostre miniatury dla dużych kafelków: zwykła miniatura ma 480 px; gdy komórka jest większa,
+       widoczne pliki dostają wersję w rozdzielczości komórki (do 2048 px), trzymaną tylko w pamięci --- */
+const hdQ=[]; let hdRun=0; const hdLRU=new Set(); let hdPx=0; const HD_PX=160e6;
+function hdNeed(it){
+  const box=it.tile&&it.tile.firstChild; if(!box||it.tile.tagName==='TR') return 0;
+  const w=box.clientWidth*devicePixelRatio, h=box.clientHeight*devicePixelRatio; if(!w) return 0;
+  const a=it.dims?it.dims[0]/it.dims[1]:(it.thumb?it.thumb.width/it.thumb.height:4/3);
+  const need=Math.min(2048,Math.ceil(Math.max(Math.min(w,h*a),Math.min(h,w/a))/128)*128);   // dłuższy bok obrazu w komórce
+  const base=it.thumb?Math.max(it.thumb.width,it.thumb.height):TH;
+  if(need<=base*1.1) return 0;
+  if(it.dims&&Math.max(it.dims[0],it.dims[1])<=base*1.05) return 0;       // oryginał nie jest większy od miniatury
+  return need;
+}
+var hdT=0;
+function wantHD(it){
+  if(it.kind!=='file'||it.type==='vid'||DOCS.has(it.type)||it.state!=='done'||!it.visible) return;
+  const need=hdNeed(it); if(!need) return;
+  if(it.hd&&it.hd.size>=need*0.9) return;
+  if(it.hdBusy||it.hdFail) return;
+  if(!hdQ.includes(it)) hdQ.push(it); hdPump();
+}
+function hdAll(){ clearTimeout(hdT); hdT=setTimeout(()=>{ for(const it of view) if(it.visible&&it.thumb) wantHD(it); },250); }
+function hdPump(){
+  while(hdRun<2&&hdQ.length){
+    const it=hdQ.shift(); if(!it.visible||!it.tile||!it.tile.isConnected) continue;
+    const need=hdNeed(it); if(!need) continue;
+    hdRun++; it.hdBusy=true;
+    hdMake(it,need).then(c=>{
+      if(!c) return;
+      if(it.hd){ hdPx-=it.hd.c.width*it.hd.c.height; hdLRU.delete(it); }
+      it.hd={c,size:need}; hdPx+=c.width*c.height; hdLRU.add(it);
+      for(const x of hdLRU){ if(hdPx<=HD_PX) break; if(x.visible&&x!==it) continue; hdPx-=x.hd.c.width*x.hd.c.height; x.hd=null; hdLRU.delete(x); if(x.tile&&x.tile.isConnected) paint(x); }
+      if(it.tile&&it.tile.isConnected) paint(it);
+    },()=>{ it.hdFail=true; }).finally(()=>{ it.hdBusy=false; hdRun--; hdPump(); });
+  }
+}
+async function hdMake(it,max){
+  let bmp;
+  if(it.type==='svg'){ const im=await loadImg(api.fileUrl(it.path)); const w=im.naturalWidth||1024,h=im.naturalHeight||1024,k=max/Math.max(w,h);
+    const c=new OffscreenCanvas(Math.round(w*k),Math.round(h*k)); c.getContext('2d').drawImage(im,0,0,c.width,c.height); bmp=c.transferToImageBitmap(); }
+  else if(NATIVE.has(it.type)) bmp=await createImageBitmap(await blobOf(it));
+  else { const r=await decode(ref(it),it.type,max); bmp=await toBitmap(r); }
+  const s=Math.min(1,max/Math.max(bmp.width,bmp.height)), w=Math.max(1,Math.round(bmp.width*s)), h=Math.max(1,Math.round(bmp.height*s));
+  if(Math.max(w,h)<=Math.max(it.thumb.width,it.thumb.height)*1.05){ bmp.close(); return null; }
+  const small=s<1?await createImageBitmap(bmp,{resizeWidth:w,resizeHeight:h,resizeQuality:'high'}):bmp;
+  let c; if(OPAQUE.has(it.type)){ c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(small,0,0); }
+  else c=paintOn(small,w,h,Math.max(4,Math.round(Math.max(w,h)/48)));
+  if(small!==bmp) small.close(); bmp.close();
+  return c;
+}
 
 let scanInfo={error:null,other:[]};
 const hiddenByType=()=>!deep&&items.length>0&&!items.some(it=>on(it.type));
@@ -1780,7 +1844,7 @@ function paint(it){
   const box=el.firstChild;
   if(it.kind==='dir'){ el.querySelector('.sub').textContent=dirSub(it); return paintDir(it); }
   box.textContent='';
-  if(it.thumb){box.appendChild(it.thumb);if(it.type==='vid'){const d=document.createElement('span');d.className='dur';d.innerHTML='<svg width="7" height="8" viewBox="0 0 7 8" aria-hidden="true"><path d="M0 0v8l7-4z" fill="currentColor"/></svg>';d.append(it.meta&&it.meta.mode||'');box.appendChild(d);}return;}
+  if(it.thumb){const c=(it.hd&&it.hd.c)||it.thumb; c.className=c.width/c.height>=4/3?'w':'h'; box.appendChild(c); wantHD(it);if(it.type==='vid'){const d=document.createElement('span');d.className='dur';d.innerHTML='<svg width="7" height="8" viewBox="0 0 7 8" aria-hidden="true"><path d="M0 0v8l7-4z" fill="currentColor"/></svg>';d.append(it.meta&&it.meta.mode||'');box.appendChild(d);}return;}
   const s=document.createElement('span'); s.className='ph';
   s.textContent=(it.state==='error'?extOf(it.name)+' · brak podglądu':extOf(it.name));
   if(it.err) el.title=it.name+'\n'+it.err;
@@ -1886,9 +1950,12 @@ grid.addEventListener('dragstart',e=>{
   const it=view[+t.dataset.i]; if(!it||it.kind!=='file') return;
   e.preventDefault();
   if(!picked.has(it)) select(+t.dataset.i);
-  draggingOut=true; lastOutItems=pickedFiles(it); lastOut=lastOutItems.map(x=>x.path); api.dragOut(lastOut);
+  draggingOut=true; dragT=performance.now(); if(virt!=='basket') document.body.classList.add('dragout'); lastOutItems=pickedFiles(it); lastOut=lastOutItems.map(x=>x.path); api.dragOut(lastOut);
 });
-addEventListener('pointermove',()=>{draggingOut=false;});
+let dragT=0;
+const dragDone=()=>{draggingOut=false;document.body.classList.remove('dragout');$('#bdrop').classList.remove('over');};
+addEventListener('pointermove',()=>{ if(draggingOut&&performance.now()-dragT>400) dragDone(); });
+addEventListener('keydown',e=>{ if(e.key==='Escape'&&draggingOut) dragDone(); });
 
 /* --- kolejka miniatur: najpierw widoczne, potem w tle cały folder i okładki podfolderów --- */
 const hiQ=[], loQ=[]; let running=0;
@@ -2364,7 +2431,7 @@ stage.addEventListener('pointerdown',e=>{
   const up=()=>{ stage.removeEventListener('pointermove',mv); stage.removeEventListener('pointerup',up); stage.classList.remove('pan'); setTimeout(()=>panMoved=false,0); };
   stage.addEventListener('pointermove',mv); stage.addEventListener('pointerup',up);
 });
-addEventListener('resize',()=>{ if(zm) renderZoom(); });
+addEventListener('resize',()=>{ if(zm) renderZoom(); hdAll(); });
 function closeViewer(){if(viewer.classList.contains('open'))SFX('close');stopMedia();viewer.classList.remove('open');chromeSync();vTok++;stage.textContent='';vEl=null;main.focus();}
 stage.addEventListener('click',e=>{if(e.target===stage)closeViewer();});
 // kółko myszy i gładzik przewijają obrazy (w trybie 100% przewijają sam obraz)
@@ -2632,7 +2699,10 @@ api.onMenu(a=>{ if(a==='open') pickFolder(); });
 { const r=$('#bRow');
   r.onclick=openBasket;
   r.addEventListener('dragover',e=>{ if(draggingOut){ e.preventDefault(); r.classList.add('drop'); } });
-  r.addEventListener('dragleave',()=>r.classList.remove('drop')); }
+  r.addEventListener('dragleave',()=>r.classList.remove('drop'));
+  const z=$('#bdrop');
+  z.addEventListener('dragover',e=>{ if(draggingOut){ e.preventDefault(); z.classList.add('over'); } });
+  z.addEventListener('dragleave',()=>z.classList.remove('over')); }
 /* --- upuszczenie folderu lub pliku na okno --- */
 let dragN=0;
 const hasFiles=e=>e.dataTransfer&&[...e.dataTransfer.types].includes('Files');
@@ -2642,9 +2712,9 @@ document.addEventListener('dragover',e=>e.preventDefault());
 document.addEventListener('drop',async e=>{
   e.preventDefault(); dragN=0; delete document.body.dataset.drop;
   const bRow=$('#bRow'); bRow.classList.remove('drop');
-  // pliki przeciągnięte z siatki na „Koszyk” w panelu bocznym
-  if(draggingOut&&e.target.closest&&e.target.closest('#bRow')){ draggingOut=false; const n=basketAdd(lastOutItems); SFX('tick'); zoomTip(n?(n===1?'W koszyku':'Dodano do koszyka: '+n)+' · razem '+S.basket.length:'Już są w koszyku'); return; }
-  if(draggingOut){draggingOut=false;return;}
+  // pliki przeciągnięte z siatki na „Koszyk” w panelu bocznym albo na duże pole na dole okna
+  if(draggingOut&&e.target.closest&&e.target.closest('#bRow,#bdrop')){ dragDone(); const n=basketAdd(lastOutItems); SFX('tick'); zoomTip(n?(n===1?'W koszyku':'Dodano do koszyka: '+n)+' · razem '+S.basket.length:'Już są w koszyku'); return; }
+  if(draggingOut){dragDone();return;}
   if(api.addDropped){ const it=[...e.dataTransfer.items].find(i=>i.kind==='file'); if(it){ const p=await api.addDropped(it); if(p){ await loadRoots(); go(p); } } return; }
   const f=e.dataTransfer.files[0]; if(!f) return;
   const p=api.pathForFile(f); if(!p) return;

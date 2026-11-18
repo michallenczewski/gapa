@@ -1118,7 +1118,9 @@ setSize(S.size);
 $('#size').oninput=e=>{S.mode==='list'?setSize(+e.target.value/6):setSize(+e.target.value);};
 function sliderFill(){const s=$('#size');s.style.setProperty('--p',((s.value-s.min)/(s.max-s.min)*100)+'%');}
 $('#size').addEventListener('input',sliderFill);
-main.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();setSize(zcur()*Math.exp(-e.deltaY/100),true);},{passive:false});
+// Ctrl/⌘ + kółko albo szczypnięcie: płynna zmiana wielkości miniatur (ząbek kółka ≈ 6%, gładzik jeszcze drobniej)
+main.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();
+  const d=e.deltaMode===1?e.deltaY*33:e.deltaY; setSize(zcur()*Math.exp(-Math.max(-120,Math.min(120,d))/1600),true);},{passive:false});
 
 /* filtry, sortowanie, widoki */
 function typeCounts(){const n={}; for(const it of items) n[it.type]=(n[it.type]||0)+1; return n;}
@@ -2439,7 +2441,7 @@ let wAcc=0, wT=0;
 stage.addEventListener('wheel',e=>{
   if(vEl&&(vEl.tagName==='IFRAME'||vEl.isDoc)) return;
   // Ctrl/⌘ + kółko albo szczypnięcie gładzikiem: przybliżanie wokół kursora
-  if((e.ctrlKey||e.metaKey)&&isImg()){ e.preventDefault(); zoomTo((zm||fitScale())*Math.exp(-e.deltaY/(e.deltaMode?8:240)),e.clientX,e.clientY); return; }
+  if((e.ctrlKey||e.metaKey)&&isImg()){ e.preventDefault(); { const d=e.deltaMode===1?e.deltaY*33:e.deltaY; zoomTo((zm||fitScale())*Math.exp(-Math.max(-120,Math.min(120,d))/900),e.clientX,e.clientY); } return; }
   // po przybliżeniu kółko i gładzik przesuwają obraz
   if(zm){ e.preventDefault(); const k=e.deltaMode===1?30:1; if(e.shiftKey&&!e.deltaX){zx-=e.deltaY*k;}else{zx-=e.deltaX*k;zy-=e.deltaY*k;} renderZoom(); return; }
   e.preventDefault();

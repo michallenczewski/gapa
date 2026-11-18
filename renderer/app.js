@@ -256,6 +256,7 @@ async function scan(keepScroll,selectPath){
   status('Wczytywanie…');
   const r=await api.list(here,EXTS);
   if(tok!==scanTok) return;
+  scanInfo={error:r.error||null,other:r.other||[]};
   if(r.error){status('Błąd: '+r.error);}
   // zachowaj już policzone miniatury tych samych plików
   const old=new Map(items.map(it=>[it.path+'|'+it.size+'|'+it.mtime,it]));
@@ -457,12 +458,24 @@ function applyView(keepPath){
 const io=new IntersectionObserver(es=>{for(const e of es){const it=e.target._it;if(!it)continue;it.visible=e.isIntersecting;
   if(!it.visible)continue; if(it.kind==='dir')loadDir(it,true); else enqueue(it,true);}},{root:main,rootMargin:'600px'});
 
+let scanInfo={error:null,other:[]};
+const hiddenByType=()=>!deep&&items.length>0&&!items.some(it=>on(it.type));
+// pusty widok mówi, dlaczego jest pusty: błąd odczytu, filtr typów albo pliki w formatach, których Gapa nie pokazuje
+function emptyText(){
+  if(scanInfo.error) return 'Nie udało się odczytać folderu: '+scanInfo.error+'.';
+  if(hiddenByType()) return 'Obrazy tu są ('+items.length+'), ale ukrywa je filtr typów.';
+  const o=scanInfo.other; if(o.length){ const n=o.reduce((s,x)=>s+x[1],0); return 'W tym folderze jest '+n+' '+plural(n,'plik','pliki','plików')+', ale w formatach, których Gapa nie pokazuje: '+o.slice(0,6).map(x=>'.'+x[0]).join(', ')+(o.length>6?'…':'')+'.'; }
+  return 'W tym folderze nie ma obrazów.';
+}
 function render(){
   io.disconnect(); grid.textContent=''; grid.className=S.mode==='list'?'list':'icons';
   if(S.mode==='list') renderList(); else renderIcons();
   $('#empty').style.display=curPath?'none':'';
-  if(curPath&&!view.length){const p=document.createElement('p');p.className='ph';p.style.cssText='font-size:13px;margin:4px;text-transform:none;letter-spacing:0';
-    p.textContent=$('#q').value?'Nic nie pasuje do „'+$('#q').value+'”.':'W tym folderze nie ma obrazów.';grid.appendChild(p);}
+  if(curPath&&(!view.length||(!$('#q').value&&hiddenByType()))){
+    const p=document.createElement('p');p.className='ph';p.style.cssText='font-size:13px;margin:4px;text-transform:none;letter-spacing:0;grid-column:1/-1';
+    p.textContent=$('#q').value?'Nic nie pasuje do „'+$('#q').value+'”.':emptyText(); grid.appendChild(p);
+    if(!$('#q').value&&hiddenByType()){const bt=document.createElement('button');bt.className='ok-show';bt.style.gridColumn='1/-1';bt.style.justifySelf='start';bt.textContent='Pokaż wszystkie typy';bt.onclick=()=>{S.types={};save();renderTypes();applyView(keep());};grid.appendChild(bt);}
+  }
   status();
 }
 function renderIcons(){

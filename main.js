@@ -131,19 +131,21 @@ ipcMain.handle('list', async (e, dir, exts) => {
   const skip = new Set(['$RECYCLE.BIN', 'System Volume Information', '$Recycle.Bin', 'node_modules']);
   try {
     const ents = await fsp.readdir(dir, { withFileTypes: true });
-    const dirs = [], files = [];
+    const dirs = [], files = [], other = new Map();
     await Promise.all(ents.map(async d => {
       if (d.name.startsWith('.') || skip.has(d.name)) return;
       const p = path.join(dir, d.name);
       let isDir = d.isDirectory(), isFile = d.isFile();
-      if (d.isSymbolicLink()) { try { const s = await fsp.stat(p); isDir = s.isDirectory(); isFile = s.isFile(); } catch (err) { return; } }
+      // dowiązania, pliki z OneDrive / chmury i niektóre dyski sieciowe nie podają typu od razu — wtedy pytamy system o szczegóły
+      if (d.isSymbolicLink() || (!isDir && !isFile)) { try { const s = await fsp.stat(p); isDir = s.isDirectory(); isFile = s.isFile(); } catch (err) { return; } }
       if (isDir) { dirs.push({ name: d.name, path: p }); return; }
       if (!isFile) return;
       const i = d.name.lastIndexOf('.'); if (i < 0) return;
-      if (ok.size && !ok.has(d.name.slice(i + 1).toLowerCase())) return;
+      const ext = d.name.slice(i + 1).toLowerCase();
+      if (ok.size && !ok.has(ext)) { other.set(ext, (other.get(ext) || 0) + 1); return; }
       try { const s = await fsp.stat(p); files.push({ name: d.name, path: p, size: s.size, mtime: Math.round(s.mtimeMs) }); } catch (err) {}
     }));
-    return { dirs, files };
+    return { dirs, files, other: [...other].sort((a, b) => b[1] - a[1]) };
   } catch (err) { return { error: err.code === 'EACCES' || err.code === 'EPERM' ? 'brak dostępu do folderu' : err.message, dirs: [], files: [] }; }
 });
 // wklejona ścieżka: zdejmij cudzysłowy, rozwiń ~ i file://, sprawdź, czy to folder czy plik

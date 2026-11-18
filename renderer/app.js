@@ -722,7 +722,8 @@ async function pdfViewer(it){
   const data=new Uint8Array(await (await blobOf(it)).arrayBuffer());
   const doc=await pdfjs.getDocument({data,isEvalSupported:false}).promise;
   it.pages=doc.numPages;
-  const el=document.createElement('div'); el.className='pdfdoc'; el.isDoc=true; el._doc=doc; el.tabIndex=-1;
+  const wrap=document.createElement('div'); wrap.className='pdfwrap'; wrap.isDoc=true; wrap._doc=doc;
+  const el=document.createElement('div'); el.className='pdfdoc'; el.tabIndex=-1; wrap.appendChild(el);
   const pages=[];
   const io=new IntersectionObserver(es=>{for(const e of es){ if(e.isIntersecting&&!e.target._done){ e.target._done=true; drawPage(e.target); } }},{root:el,rootMargin:'600px 0px'});
   async function drawPage(box){
@@ -740,7 +741,15 @@ async function pdfViewer(it){
   }
   el.addEventListener('scroll',()=>{const t=$('#vinfo'); const mid=el.scrollTop+el.clientHeight/2; let k=1; for(const b of pages){ if(b.offsetTop<=mid) k=b._n; } t.textContent=info(it)+'  ·  strona '+k+' z '+doc.numPages;},{passive:true});
   el.addEventListener('wheel',e=>e.stopPropagation(),{passive:true});
-  return el;
+  // strony: przyciski na dole i klawisze ↑ ↓ / PageUp PageDown (← → dalej zmieniają plik)
+  const cur=()=>{const mid=el.scrollTop+el.clientHeight/2; let k=1; for(const b of pages){ if(b.offsetTop<=mid) k=b._n; } return k;};
+  const nav=document.createElement('div'); nav.className='pgnav';
+  nav.innerHTML='<button aria-label="Poprzednia strona" title="Poprzednia strona (↑)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m4 10 4-4 4 4"/></svg></button><span></span><button aria-label="Następna strona" title="Następna strona (↓)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m4 6 4 4 4-4"/></svg></button>';
+  const lab=nav.querySelector('span'), upd=()=>lab.textContent=cur()+' / '+doc.numPages;
+  wrap.pageBy=d=>{ const k=Math.max(1,Math.min(pages.length,cur()+d)); el.scrollTo({top:pages[k-1].offsetTop-12,behavior:'smooth'}); SFX('tick'); };
+  nav.children[0].onclick=e=>{e.stopPropagation();wrap.pageBy(-1);}; nav.children[2].onclick=e=>{e.stopPropagation();wrap.pageBy(1);};
+  el.addEventListener('scroll',upd,{passive:true}); upd(); wrap.appendChild(nav);
+  return wrap;
 }
 async function pdfThumb(it){
   if(api.web) throw new Error('miniatury PDF są w programie; dwuklik otwiera dokument');
@@ -871,7 +880,7 @@ function renderInsp(){
 
 /* --- podgląd powiększony: natychmiast miniatura, potem pełny obraz; sąsiedzi wczytywani z wyprzedzeniem --- */
 const viewer=$('#viewer'), stage=$('#stage');
-let vTok=0, vEl=null, actual=false, vList=[], vi=0, lastStep=0;
+let vTok=0, vEl=null, actual=false, zm=null, zx=0, zy=0, vList=[], vi=0, lastStep=0;
 const vCache=new Map(); // pełne obrazy ostatnio oglądane i wczytane z wyprzedzeniem
 const VC_PX=180e6;      // limit pamięci podglądów (w pikselach)
 const bigCell=(w,h)=>Math.max(8,Math.round(Math.max(w,h)/80));
@@ -975,7 +984,7 @@ function videoPlayer(vid){
   vid.addEventListener('playing',()=>setTimeout(()=>{if(!frames&&!vid.paused&&vid.requestVideoFrameCallback){const m=document.createElement('div');m.className='vmsg';m.textContent='Tego kodeka obrazu nie da się tu odtworzyć (np. ProRes). Naciśnij E, żeby otworzyć w odtwarzaczu systemowym.';box.appendChild(m);}},2500),{once:true});
   sync(); time(); wake(); w.video=vid; return w;
 }
-function stopMedia(){for(const m of stage.querySelectorAll('video'))m.pause(); for(const d of stage.querySelectorAll('.pdfdoc')){try{d._doc.destroy();}catch(e){}}}
+function stopMedia(){for(const m of stage.querySelectorAll('video'))m.pause(); for(const d of stage.querySelectorAll('.pdfwrap')){try{d._doc.destroy();}catch(e){}}}
 function mount(el,low,it){
   stopMedia(); stage.textContent=''; stage.appendChild(el); vEl=low?null:el;
   el.classList.toggle('low',!!low);
@@ -985,8 +994,8 @@ function mount(el,low,it){
     const [dw,dh]=it.dims||[el.width,el.height];
     const s=Math.min(aw/dw,ah/dh,1); el.style.width=Math.round(dw*s)+'px'; el.style.height=Math.round(dh*s)+'px';
   } else {
-    if(el.tagName!=='IFRAME'&&!el.video&&!el.isDoc) el.onclick=ev=>{ev.stopPropagation();actual=!actual;applyZoom(true);};
-    if(!el.video) el.draggable=true; el.ondragstart=ev=>{ev.preventDefault();api.dragOut([it.path]);};
+    if(el.tagName!=='IFRAME'&&!el.video&&!el.isDoc) el.onclick=ev=>{ev.stopPropagation(); if(panMoved) return; if(zm) zoomFit(true); else zoomTo(Math.max(1,fitScale()*2),ev.clientX,ev.clientY,true);};
+    if(!el.video) el.draggable=true; el.ondragstart=ev=>{ev.preventDefault();if(zm)return;api.dragOut([it.path]);};
     applyZoom();
     if(el.video) el.video.play().catch(()=>{});
   }
@@ -996,7 +1005,7 @@ async function showV(){
   const now=performance.now(), fast=now-lastStep<180; lastStep=now;
   const i=view.indexOf(it); if(i>=0&&picked.size<=1) select(i); else if(i>=0){sel=i;}
   $('#vname').textContent=it.name; $('#vname').title=it.path; $('#vinfo').textContent=info(it); $('#vcount').textContent=(vi+1)+' / '+vList.length;
-  stage.className=actual?'actual':'fit';
+  zm=null; stage.className='fit';
   if(vCache.has(it)){ const v=await fullOf(it); if(tok!==vTok) return; mount(v.el,false,it); afterShow(it,v,tok); return; }
   // od razu: miniatura z pamięci
   if(it.thumb){ const c=document.createElement('canvas'); c.width=it.thumb.width; c.height=it.thumb.height; c.getContext('2d').drawImage(it.thumb,0,0); mount(c,true,it); }
@@ -1022,17 +1031,50 @@ function afterShow(it,v,tok){
   },60);
 }
 function stepV(d){if(!vList.length)return;SFX('tick');vi=(vi+d+vList.length)%vList.length;showV();}
-function applyZoom(tip){
-  stage.className=actual?'actual':'fit';
-  if(vEl&&!vEl.video&&!vEl.isDoc){const w=(vEl.naturalWidth||vEl.width)/devicePixelRatio;vEl.style.width=actual?w+'px':'';vEl.style.height='';}
-  if(tip) zoomTip(actual?'100%':'Dopasuj');
+function applyZoom(){ if(zm) renderZoom(); else { stage.className='fit'; if(vEl&&!vEl.video&&!vEl.isDoc){vEl.style.width=vEl.style.height='';vEl.style.transform='';if(vEl.tagName!=='IFRAME')vEl.draggable=true;} } }
+const isImg=()=>vEl&&!vEl.video&&!vEl.isDoc&&vEl.tagName!=='IFRAME';
+const natW=()=>(vEl.naturalWidth||vEl.width)/devicePixelRatio, natH=()=>(vEl.naturalHeight||vEl.height)/devicePixelRatio;
+function fitScale(){ const r=stage.getBoundingClientRect(), m=viewer.classList.contains('min'); return Math.min((r.width-(m?20:128))/natW(),(r.height-(m?20:38))/natH(),1); }
+function zoomFit(tip){ zm=null; applyZoom(); if(tip) zoomTip('Dopasuj'); }
+// przybliż do skali z (1 = 100%), trzymając pod kursorem ten sam punkt obrazu
+function zoomTo(z,cx,cy,tip){
+  if(!isImg()) return;
+  const r=stage.getBoundingClientRect(), f=fitScale(); z=Math.min(Math.max(z,f),16);
+  if(z<=f*1.001){ zoomFit(tip); return; }
+  if(cx==null){cx=r.left+r.width/2;cy=r.top+r.height/2;}
+  let s0,ox,oy;
+  if(zm){s0=zm;ox=zx;oy=zy;} else { s0=f; const b=vEl.getBoundingClientRect(); const w=natW()*f,h=natH()*f; ox=b.left-r.left+(b.width-w)/2; oy=b.top-r.top+(b.height-h)/2; }
+  const ix=(cx-r.left-ox)/s0, iy=(cy-r.top-oy)/s0;
+  zm=z; zx=cx-r.left-ix*z; zy=cy-r.top-iy*z; renderZoom();
+  if(tip) zoomTip(Math.round(z*100)+'%');
 }
+function renderZoom(){
+  if(!isImg()) return;
+  const r=stage.getBoundingClientRect(), w=natW()*zm, h=natH()*zm;
+  zx=w<=r.width?(r.width-w)/2:Math.min(0,Math.max(r.width-w,zx));
+  zy=h<=r.height?(r.height-h)/2:Math.min(0,Math.max(r.height-h,zy));
+  stage.className='zoomed'; vEl.draggable=false; vEl.style.width=w+'px'; vEl.style.height=h+'px'; vEl.style.transform=`translate(${zx}px,${zy}px)`;
+}
+// przeciąganie powiększonego obrazu
+let panMoved=false;
+stage.addEventListener('pointerdown',e=>{
+  if(!zm||!isImg()||e.button!==0) return; e.preventDefault();
+  const sx=e.clientX, sy=e.clientY, x0=zx, y0=zy; panMoved=false; stage.setPointerCapture(e.pointerId);
+  const mv=ev=>{ const dx=ev.clientX-sx, dy=ev.clientY-sy; if(Math.abs(dx)+Math.abs(dy)>3){panMoved=true;stage.classList.add('pan');} zx=x0+dx; zy=y0+dy; renderZoom(); stage.classList.toggle('pan',panMoved); };
+  const up=()=>{ stage.removeEventListener('pointermove',mv); stage.removeEventListener('pointerup',up); stage.classList.remove('pan'); setTimeout(()=>panMoved=false,0); };
+  stage.addEventListener('pointermove',mv); stage.addEventListener('pointerup',up);
+});
+addEventListener('resize',()=>{ if(zm) renderZoom(); });
 function closeViewer(){if(viewer.classList.contains('open'))SFX('close');stopMedia();viewer.classList.remove('open');chromeSync();vTok++;stage.textContent='';vEl=null;main.focus();}
 stage.addEventListener('click',e=>{if(e.target===stage)closeViewer();});
 // kółko myszy i gładzik przewijają obrazy (w trybie 100% przewijają sam obraz)
 let wAcc=0, wT=0;
 stage.addEventListener('wheel',e=>{
-  if(actual||e.ctrlKey||e.metaKey||(vEl&&(vEl.tagName==='IFRAME'||vEl.isDoc))) return;
+  if(vEl&&(vEl.tagName==='IFRAME'||vEl.isDoc)) return;
+  // Ctrl/⌘ + kółko albo szczypnięcie gładzikiem: przybliżanie wokół kursora
+  if((e.ctrlKey||e.metaKey)&&isImg()){ e.preventDefault(); zoomTo((zm||fitScale())*Math.exp(-e.deltaY/(e.deltaMode?8:240)),e.clientX,e.clientY); return; }
+  // po przybliżeniu kółko i gładzik przesuwają obraz
+  if(zm){ e.preventDefault(); const k=e.deltaMode===1?30:1; if(e.shiftKey&&!e.deltaX){zx-=e.deltaY*k;}else{zx-=e.deltaX*k;zy-=e.deltaY*k;} renderZoom(); return; }
   e.preventDefault();
   const d=Math.abs(e.deltaY)>=Math.abs(e.deltaX)?e.deltaY:e.deltaX;
   wAcc+=e.deltaMode===1?d*30:d; clearTimeout(wT); wT=setTimeout(()=>wAcc=0,200);
@@ -1054,12 +1096,14 @@ function viewerMenu(){
   showMenu(r.right-230,r.bottom+6,null,[
     {label:'Pokaż w '+FINDER,key:'R',run:()=>api.showInFolder(it.path)},
     {label:'Otwórz w '+(editorName||'Photoshopie'),key:'E',run:()=>openInEditor([it.path])},
-    {label:actual?'Dopasuj do okna':'Rozmiar oryginalny',key:'Z',run:()=>{actual=!actual;applyZoom(true);}},
+    {label:zm?'Dopasuj do okna':'Rozmiar oryginalny (100%)',key:'Z',run:()=>{zm?zoomFit(true):zoomTo(1,null,null,true);}},
+    {label:'Tryb minimalny',box:viewer.classList.contains('min'),key:'Tab',run:toggleVMin},
     {label:'Kopiuj obraz',key:'C',run:()=>copyImage(it)},
     {label:'Kopiuj ścieżkę',key:'P',run:()=>copyText(it.path)},
     '-',{label:'Ukryj interfejs',key:'Tab',run:toggleBare}]);
 }
 $('#vmore').onclick=e=>{e.stopPropagation();ctx.hidden?viewerMenu():hideMenu();};
+function toggleVMin(){ const on=!viewer.classList.contains('min'); viewer.classList.toggle('min',on); S.vmin=on; save(); applyZoom(); zoomTip(on?'Tryb minimalny — Tab przywraca':'Pasek widoczny'); }
 function toggleBare(){document.body.classList.toggle('bare');zoomTip(document.body.classList.contains('bare')?'Tab — pokaż interfejs':'Interfejs widoczny');}
 
 /* --- programy zewnętrzne --- */
@@ -1155,15 +1199,20 @@ document.addEventListener('keydown',e=>{
   if(mod&&k.toLowerCase()==='e'){e.preventDefault();const f=open_?[vList[vi]]:pickedFiles();if(f.length&&f[0])openInEditor(f.map(x=>x.path));return;}
   if(open_){
     if(k==='Escape'||k===' '){e.preventDefault();closeViewer();}
+    else if(vEl&&vEl.pageBy&&(k==='ArrowDown'||k==='PageDown')){e.preventDefault();vEl.pageBy(1);}
+    else if(vEl&&vEl.pageBy&&(k==='ArrowUp'||k==='PageUp')){e.preventDefault();vEl.pageBy(-1);}
     else if(k==='ArrowRight'||k==='ArrowDown'){e.preventDefault();stepV(1);}
     else if(k==='ArrowLeft'||k==='ArrowUp'){e.preventDefault();stepV(-1);}
+    else if((k==='+'||k==='=')&&isImg()){zoomTo((zm||fitScale())*1.25,null,null,true);}
+    else if(k==='-'&&isImg()){zoomTo((zm||fitScale())/1.25,null,null,true);}
+    else if(k==='0'){zoomFit(true);}
     else if((k==='k'||k==='m')&&vEl&&vEl.video){const m=vEl.video; if(k==='k') m.paused?m.play().catch(()=>{}):m.pause(); else {m.muted=!m.muted;if(!m.muted&&!m.volume)m.volume=.5;S.mute=m.muted;S.vol=m.volume;save();}}
-    else if(k==='z'||k==='1'){actual=!actual;applyZoom(true);}
+    else if(k==='z'||k==='1'){zm?zoomFit(true):zoomTo(1,null,null,true);}
     else if(k==='r'){api.showInFolder(vList[vi].path);}
     else if(k==='e'){const c=vList[vi]; if(c.type==='vid') api.openDefault(c.path); else openInEditor([c.path]);}
     else if(k==='c'&&!mod){copyImage(vList[vi]);}
     else if(k==='p'){copyText(vList[vi].path);}
-    else if(k==='Tab'){e.preventDefault();toggleBare();}
+    else if(k==='Tab'){e.preventDefault();toggleVMin();}
     else if(k==='PageDown'){e.preventDefault();stepV(1);}
     else if(k==='PageUp'){e.preventDefault();stepV(-1);}
     else if(k==='Home'){e.preventDefault();vi=0;showV();}
@@ -1186,8 +1235,8 @@ document.addEventListener('keydown',e=>{
   else if(k==='Enter'&&e.shiftKey&&view[sel]&&view[sel].kind==='dir'){e.preventDefault();go(view[sel].path,null,true);}
   else if(k===' '||k==='Enter'){e.preventDefault();if(sel>=0)open(sel);}
   else if(k==='w'){setDeep(!deep);}
-  else if(k==='i'){setInsp(!S.insp);}
-  else if(k==='\\'){setSide(S.side===false);}
+  else if(k==='i'||k===']'||(mod&&e.altKey&&e.code==='KeyI')){e.preventDefault();setInsp(!S.insp);}
+  else if(k==='\\'||k==='['||(mod&&e.altKey&&e.code==='KeyS')){e.preventDefault();setSide(S.side===false);}
   else if(k==='Backspace'){e.preventDefault();goUp();}
   else if(k==='+'||k==='='){zstep(1);}
   else if(k==='-'){zstep(-1);}
@@ -1243,6 +1292,6 @@ addEventListener('mousedown',hideTip,true); addEventListener('keydown',hideTip,t
 
 /* --- start --- */
 $('#empty-open').onclick=pickFolder;
-markSort(); markModes(); setNames(S.names!==false); setDirNames(S.dirNames!==false); setSide(S.side!==false); setInsp(!!S.insp);
+markSort(); markModes(); setNames(S.names!==false); setDirNames(S.dirNames!==false); if(S.vmin) viewer.classList.add('min'); setSide(S.side!==false); setInsp(!!S.insp);
 renderSide(); renderCrumbs(); renderTypes(); cacheInfo();
 loadRoots().then(async()=>{ if(S.last&&await api.exists(S.last)) go(S.last); else { render(); syncTree(); } });

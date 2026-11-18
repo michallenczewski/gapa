@@ -57,6 +57,12 @@ Po wejściu do folderu najpierw liczą się widoczne miniatury, potem w tle resz
 | Shift+N | pokaż / ukryj nazwy folderów |
 | K, M | film: odtwórz / pauza, wycisz |
 | S | dźwięki interfejsu: włącz / wycisz |
+| [ | panel folderów (też \\ albo ⌘⌥S / Ctrl+Alt+S) |
+| ] | panel informacji (też I albo ⌘⌥I / Ctrl+Alt+I) |
+| Tab (w podglądzie) | tryb minimalny — bez paska z nazwą i strzałek |
+| klik / Z (w podglądzie) | dopasuj ↔ powiększ; potem przeciągaj, przewijaj kółkiem lub gładzikiem |
+| Ctrl/⌘ + kółko, szczypnięcie | przybliżanie wokół kursora; + i − co 25%, 0 dopasowuje |
+| ↑ ↓ (PDF) | poprzednia / następna strona |
 | T | jasny / ciemny |
 | R | odśwież |
 | / albo ⌘/Ctrl + F | szukaj |

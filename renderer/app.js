@@ -1064,7 +1064,7 @@ function applyZoom(){ if(zm) renderZoom(); else { stage.className='fit'; if(vEl&
 const isImg=()=>vEl&&!vEl.video&&!vEl.isDoc&&vEl.tagName!=='IFRAME';
 const natW=()=>(vEl.naturalWidth||vEl.width)/devicePixelRatio, natH=()=>(vEl.naturalHeight||vEl.height)/devicePixelRatio;
 function fitScale(){ const r=stage.getBoundingClientRect(), m=viewer.classList.contains('min'); return Math.min((r.width-(m?20:128))/natW(),(r.height-(m?20:38))/natH(),1); }
-function zoomFit(tip){ zm=null; applyZoom(); if(tip) zoomTip('Dopasuj'); }
+function zoomFit(tip){ zm=null; applyZoom(); if(tip){ zoomTip('Dopasuj'); SFX('tick'); } }
 // przybliż do skali z (1 = 100%), trzymając pod kursorem ten sam punkt obrazu
 function zoomTo(z,cx,cy,tip){
   if(!isImg()) return;
@@ -1075,7 +1075,7 @@ function zoomTo(z,cx,cy,tip){
   if(zm){s0=zm;ox=zx;oy=zy;} else { s0=f; const b=vEl.getBoundingClientRect(); const w=natW()*f,h=natH()*f; ox=b.left-r.left+(b.width-w)/2; oy=b.top-r.top+(b.height-h)/2; }
   const ix=(cx-r.left-ox)/s0, iy=(cy-r.top-oy)/s0;
   zm=z; zx=cx-r.left-ix*z; zy=cy-r.top-iy*z; renderZoom();
-  if(tip) zoomTip(Math.round(z*100)+'%');
+  if(tip){ zoomTip(Math.round(z*100)+'%'); SFX('tick'); }
 }
 function renderZoom(){
   if(!isImg()) return;

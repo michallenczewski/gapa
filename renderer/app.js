@@ -1580,20 +1580,24 @@ document.addEventListener('keydown',e=>{
     if(k==='Escape'||k===' '){e.preventDefault();closeViewer();}
     else if(vEl&&vEl.pageBy&&(k==='ArrowDown'||k==='PageDown')){e.preventDefault();vEl.pageBy(1);}
     else if(vEl&&vEl.pageBy&&(k==='ArrowUp'||k==='PageUp')){e.preventDefault();vEl.pageBy(-1);}
-    else if(k==='ArrowRight'||k==='ArrowDown'){e.preventDefault();stepV(1);}
-    else if(k==='ArrowLeft'||k==='ArrowUp'){e.preventDefault();stepV(-1);}
+    else if(k==='ArrowRight'||k==='ArrowDown'||e.code==='KeyD'){e.preventDefault();stepV(1);}
+    else if(k==='ArrowLeft'||k==='ArrowUp'||e.code==='KeyA'){e.preventDefault();stepV(-1);}
+    else if(e.code==='Digit2'&&isImg()){zoomTo((zm||fitScale())*1.25,null,null,true);}
+    else if(e.code==='Digit1'&&isImg()){zoomTo((zm||fitScale())/1.25,null,null,true);}
     else if((k==='+'||k==='=')&&isImg()){zoomTo((zm||fitScale())*1.25,null,null,true);}
     else if(k==='-'&&isImg()){zoomTo((zm||fitScale())/1.25,null,null,true);}
     else if(k==='0'){zoomFit(true);}
     else if((k==='t'||k==='T')&&!e.metaKey&&!e.ctrlKey){cycleTheme();}
     else if((k==='s'||k==='S')&&!e.metaKey&&!e.ctrlKey){S.sound=!(S.sound!==false);save();if(S.sound)SFX('tick');zoomTip(S.sound?'Dźwięki włączone':'Dźwięki wyciszone');}
     else if((k==='k'||k==='m')&&vEl&&vEl.video){const m=vEl.video; if(k==='k') m.paused?m.play().catch(()=>{}):m.pause(); else {m.muted=!m.muted;if(!m.muted&&!m.volume)m.volume=.5;S.mute=m.muted;S.vol=m.volume;save();}}
-    else if(k==='z'||k==='1'){zm?zoomFit(true):zoomTo(1,null,null,true);}
+    else if(k==='z'){zm?zoomFit(true):zoomTo(1,null,null,true);}
     else if(k==='r'){api.showInFolder(vList[vi].path);}
     else if((isMac&&(e.metaKey||e.ctrlKey)&&k==='Backspace')||(!isMac&&k==='Delete')){e.preventDefault();if(virt==='basket')basketRemove([vList[vi]]);else if(api.trash)trashItems([vList[vi]]);}
     else if((k==='b'||k==='B')&&!mod){basketToggle([vList[vi]]);}
     else if(k==='e'){const c=vList[vi]; if(c.type==='vid') api.openDefault(c.path); else openInEditor([c.path]);}
+    else if(e.code==='KeyC'&&e.shiftKey&&!mod){copyText(vList[vi].path);}
     else if(k==='c'&&!mod){copyImage(vList[vi]);}
+    else if(e.code==='KeyQ'){e.preventDefault();closeViewer();}
     else if(k==='p'){copyText(vList[vi].path);}
     else if(k==='Tab'){e.preventDefault();toggleVMin();}
     else if(k==='PageDown'){e.preventDefault();stepV(1);}
@@ -1637,7 +1641,21 @@ document.addEventListener('keydown',e=>{
   else if(k==='Backspace'){e.preventDefault();goUp();}
   else if(k==='+'||k==='='){zstep(1);}
   else if(k==='-'){zstep(-1);}
-  else if(k==='r'){scan(true);}
+  // lewa ręka (prawa zostaje na myszce): A D poprzedni/następny, Q w górę, E edycja, R pokaż w Finderze, F szukaj,
+  // X panel boczny (⇧X informacje), C kopiuj obraz (⇧C ścieżki), V ikony/lista, 1 2 mniejsze/większe
+  else if(e.code==='KeyA'){mv(-1);}
+  else if(e.code==='KeyD'){mv(1);}
+  else if(e.code==='KeyQ'){e.preventDefault();goUp();}
+  else if(e.code==='KeyE'){const f=pickedFiles();if(f.length)openInEditor(f.map(x=>x.path));}
+  else if(e.code==='KeyR'&&e.shiftKey){scan(true);zoomTip('Odświeżono');}
+  else if(e.code==='KeyR'){const it=view[sel];if(it)api.showInFolder(it.path);else if(curPath)api.openDefault(curPath);}
+  else if(e.code==='KeyF'){e.preventDefault();if(e.shiftKey&&api.libSearch){if(virt)closeVirt();setQIn('lib');}$('#q').focus();$('#q').select();}
+  else if(e.code==='KeyX'){e.preventDefault();e.shiftKey?setInsp(!S.insp):setSide(S.side===false);}
+  else if(e.code==='KeyC'&&e.shiftKey){const s=[...picked];copyText(s.length?s.map(x=>x.path).join('\n'):curPath||'');}
+  else if(e.code==='KeyC'){const it=view[sel];if(it&&it.kind==='file')copyImage(it);}
+  else if(e.code==='KeyV'){setMode(S.mode==='list'?'icons':'list');}
+  else if(e.code==='Digit1'){zstep(-1);}
+  else if(e.code==='Digit2'){zstep(1);}
   else if(k==='t'){cycleTheme();}
   else if(k==='g'&&!mod){setGridLines(!S.gridlines);zoomTip(S.gridlines?'Siatka włączona':'Siatka wyłączona');}
   else if(k==='s'&&!mod){S.sound=!(S.sound!==false);save();if(S.sound)SFX('on');zoomTip(S.sound?'Dźwięki włączone':'Dźwięki wyciszone');}
@@ -1647,7 +1665,16 @@ document.addEventListener('keydown',e=>{
   else if(k==='/'){e.preventDefault();$('#q').focus();}
   else if(k==='Tab'){e.preventDefault();toggleBare();}
 });
-api.onMenu(a=>{ if(a==='open') pickFolder(); });
+api.onMenu(a=>{ if(a==='open') pickFolder(); else if(a==='new-window') newWindow(); });
+// nowe okno startuje w tym samym folderze; Koszyk i Ulubione są wspólne dla wszystkich okien
+function newWindow(){ if(!api.newWindow){ zoomTip('Nowe okna są w programie, nie w przeglądarce'); return; } api.newWindow(virt?null:curPath); }
+addEventListener('storage',e=>{
+  if(e.key!=='podglad'||!e.newValue) return;
+  let o; try{ o=JSON.parse(e.newValue); }catch(err){ return; }
+  const favCh=JSON.stringify(o.favs||[])!==JSON.stringify(S.favs), bCh=JSON.stringify(o.basket||[])!==JSON.stringify(S.basket);
+  if(favCh){ S.favs=o.favs||[]; renderSide(); for(const t of document.querySelectorAll('.tile.dir'))t._sync&&t._sync(); }
+  if(bCh){ S.basket=o.basket||[]; bSet=new Set(S.basket.map(b=>bKey(b.path))); basketChanged(); }
+});
 
 /* --- Koszyk w panelu bocznym: klik otwiera, upuszczenie plików z siatki dodaje --- */
 { const r=$('#bRow');
@@ -1703,4 +1730,4 @@ addEventListener('mousedown',hideTip,true); addEventListener('keydown',hideTip,t
 $('#empty-open').onclick=pickFolder;
 markSort(); markModes(); setNames(S.names!==false); setDirNames(S.dirNames!==false); setGridLines(!!S.gridlines); setSide(S.side!==false); setInsp(!!S.insp);
 renderSide(); renderCrumbs(); renderTypes(); cacheInfo(); renderBasketNav(); libSync();
-loadRoots().then(async()=>{ if(S.last&&await api.exists(S.last)) go(S.last); else { render(); syncTree(); } });
+loadRoots().then(async()=>{ const sp=api.startPath; if(sp&&await api.exists(sp)) go(sp); else if(S.last&&await api.exists(S.last)) go(S.last); else { render(); syncTree(); } });

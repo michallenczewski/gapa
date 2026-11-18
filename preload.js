@@ -43,6 +43,8 @@ contextBridge.exposeInMainWorld('api', {
   libRoots: (roots, exts, force) => ipcRenderer.invoke('lib-roots', roots, exts, force),
   libSearch: (q, exts, names) => ipcRenderer.invoke('lib-search', q, exts, names),
   onLibStatus: cb => ipcRenderer.on('lib-status', (e, s) => cb(s)),
+  newWindow: p => ipcRenderer.send('new-window', p),
+  startPath: (() => { try { return new URLSearchParams(location.search).get('p'); } catch (e) { return null; } })(),
   dragOut: files => ipcRenderer.send('drag-out', files),
   osThumb: (p, size) => ipcRenderer.invoke('os-thumb', p, size),
   fileHref: p => require('url').pathToFileURL(p).href,

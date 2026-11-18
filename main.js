@@ -108,7 +108,7 @@ const iconFile = n => path.join(__dirname, 'renderer', (n === 'retro' ? 'icon-re
 function applyIcon() {
   const img = nativeImage.createFromPath(iconFile(settings.icon));
   if (process.platform === 'darwin') app.dock.setIcon(img);
-  else if (win) win.setIcon(img);
+  else for (const w of BrowserWindow.getAllWindows()) w.setIcon(img);
 }
 ipcMain.handle('icon-get', () => settings.icon || '3d');
 ipcMain.handle('icon-set', (e, n) => { settings.icon = n === 'retro' ? 'retro' : '3d'; saveSettings(); applyIcon(); return settings.icon; });
@@ -222,7 +222,7 @@ function libStatus() {
 let libSendT = 0;
 function libTell(now) {
   if (libSendT && !now) return;
-  const go = () => { libSendT = 0; if (win && !win.isDestroyed()) win.webContents.send('lib-status', libStatus()); };
+  const go = () => { libSendT = 0; for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('lib-status', libStatus()); };
   if (now) { clearTimeout(libSendT); go(); } else libSendT = setTimeout(go, 700);
 }
 async function libWalk(root) {
@@ -314,16 +314,21 @@ ipcMain.handle('pick-folder', async e => {
 });
 
 /* obserwowanie bieżącego folderu: nowy render pojawia się sam */
-let watcher = null, watchTimer = null;
+// obserwowanie bieżącego folderu — osobno dla każdego okna
+const watchers = new Map();
 ipcMain.handle('watch', (e, dir) => {
-  if (watcher) { watcher.close(); watcher = null; }
+  const id = e.sender.id, old = watchers.get(id);
+  if (old) { old.w.close(); clearTimeout(old.t); watchers.delete(id); }
   if (!dir) return;
   try {
-    watcher = fs.watch(dir, { persistent: false }, () => {
-      clearTimeout(watchTimer);
-      watchTimer = setTimeout(() => { if (!e.sender.isDestroyed()) e.sender.send('dir-changed', dir); }, 600);
+    const rec = { w: null, t: 0 };
+    rec.w = fs.watch(dir, { persistent: false }, () => {
+      clearTimeout(rec.t);
+      rec.t = setTimeout(() => { if (!e.sender.isDestroyed()) e.sender.send('dir-changed', dir); }, 600);
     });
-    watcher.on('error', () => {});
+    rec.w.on('error', () => {});
+    watchers.set(id, rec);
+    e.sender.once('destroyed', () => { const r = watchers.get(id); if (r) { r.w.close(); watchers.delete(id); } });
   } catch (err) {}
 });
 
@@ -337,7 +342,7 @@ ipcMain.handle('os-thumb', async (e, p, size) => {
 });
 
 /* ---------- system: Finder/Eksplorator, programy, przeciąganie ---------- */
-ipcMain.on('chrome-colors', (e, c) => { try { if (win && process.platform !== 'darwin') win.setTitleBarOverlay({ color: c.bg, symbolColor: c.fg, height: c.h || 52 }); } catch (_) {} });
+ipcMain.on('chrome-colors', (e, c) => { try { const w = BrowserWindow.fromWebContents(e.sender); if (w && process.platform !== 'darwin') w.setTitleBarOverlay({ color: c.bg, symbolColor: c.fg, height: c.h || 52 }); } catch (_) {} });
 ipcMain.handle('show-in-folder', (e, p) => shell.showItemInFolder(p));
 ipcMain.handle('open-default', (e, p) => shell.openPath(p));
 
@@ -393,10 +398,12 @@ ipcMain.on('drag-out', (e, files) => {
 });
 
 /* ---------- okno ---------- */
-let win = null;
-function createWindow() {
-  const b = settings.bounds || { width: 1400, height: 900 };
-  win = new BrowserWindow({
+// nowe okno: zaczyna w podanym folderze (zwykle tym samym co okno, z którego je otwarto), lekko przesunięte
+function createWindow(startPath) {
+  let b = settings.bounds || { width: 1400, height: 900 };
+  const from = BrowserWindow.getFocusedWindow();
+  if (from && !from.isFullScreen()) { const r = from.getBounds(); b = { x: r.x + 28, y: r.y + 28, width: r.width, height: r.height }; }
+  const win = new BrowserWindow({
     ...b, minWidth: 720, minHeight: 480, show: false,
     title: 'Gapa', backgroundColor: '#1b1b1b',
     icon: iconFile(settings.icon),
@@ -407,9 +414,9 @@ function createWindow() {
       : { titleBarStyle: 'hidden', titleBarOverlay: { color: '#f7f7f5', symbolColor: '#4a4945', height: 52 } }),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: false, plugins: true }
   });
-  if (settings.maximized) win.maximize();
+  if (settings.maximized && !from) win.maximize();
   win.once('ready-to-show', () => win.show());
-  win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  win.loadFile(path.join(__dirname, 'renderer', 'index.html'), startPath ? { query: { p: startPath } } : undefined);
   const remember = () => { if (!win.isMaximized() && !win.isMinimized()) settings.bounds = win.getBounds(); settings.maximized = win.isMaximized(); };
   win.on('resize', remember); win.on('move', remember);
   // pełny ekran: przyciski okna znikają, więc pasek programu oddaje zarezerwowane dla nich miejsce
@@ -418,14 +425,17 @@ function createWindow() {
   win.on('close', () => { remember(); saveSettings(); });
   // linki zewnętrzne w przeglądarce, nie w oknie programu
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
+  return win;
 }
+ipcMain.on('new-window', (e, p) => createWindow(p || null));
 
 function buildMenu() {
   const tpl = [
     ...(isMac ? [{ role: 'appMenu' }] : []),
     { label: 'Plik', submenu: [
-      { label: 'Otwórz folder…', accelerator: 'CmdOrCtrl+O', click: () => win && win.webContents.send('menu', 'open') },
-      { type: 'separator' }, isMac ? { role: 'close' } : { role: 'quit', label: 'Zakończ' }] },
+      { label: 'Nowe okno', accelerator: 'CmdOrCtrl+N', click: () => { const w = BrowserWindow.getFocusedWindow(); if (w) w.webContents.send('menu', 'new-window'); else createWindow(); } },
+      { label: 'Otwórz folder…', accelerator: 'CmdOrCtrl+O', click: () => { const w = BrowserWindow.getFocusedWindow(); if (w) w.webContents.send('menu', 'open'); } },
+      { type: 'separator' }, { role: 'close', label: 'Zamknij okno' }, ...(isMac ? [] : [{ role: 'quit', label: 'Zakończ' }])] },
     { role: 'editMenu', label: 'Edycja' },
     { label: 'Widok', submenu: [
       { role: 'reload', label: 'Przeładuj' }, { role: 'toggleDevTools', label: 'Narzędzia deweloperskie' },
@@ -442,7 +452,7 @@ const MIME = { jpg: 'image/jpeg', jpeg: 'image/jpeg', jpe: 'image/jpeg', jfif: '
 
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
-  app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
+  app.on('second-instance', () => { const w = BrowserWindow.getAllWindows()[0]; if (w) { if (w.isMinimized()) w.restore(); w.focus(); } });
   app.whenReady().then(() => {
     loadSettings(); libLoad();
     openCache(settings.cacheDir);

@@ -44,43 +44,38 @@ Po wejściu do folderu najpierw liczą się widoczne miniatury, potem w tle resz
 
 ## Skróty
 
+Najczęstsze skróty leżą pod lewą ręką, żeby prawa mogła zostać na myszce. Te same klawisze działają w siatce i w podglądzie.
+
 | Klawisz | Działanie |
 |---|---|
-| Enter / spacja | otwórz podgląd lub folder; spacja w podglądzie wraca do siatki |
-| kółko / gładzik w podglądzie | następny / poprzedni obraz |
-| R, E, Z, C, P w podglądzie | pokaż w Finderze, Photoshop, 100%, kopiuj obraz, kopiuj ścieżkę |
-| Tab | ukryj / pokaż interfejs |
-| I | panel informacji o zaznaczonym pliku |
-| \\ | panel boczny |
-| W / ⇧Enter na folderze | wszystko w środku: obrazy z podfolderów z nagłówkami folderów |
-| ← → ↑ ↓ | poruszanie się po siatce |
-| Backspace / ⌘↑ | folder wyżej |
-| ⌘/Ctrl + E | otwórz w Photoshopie |
-| ⌘/Ctrl + A | zaznacz wszystkie |
-| + / − | wielkość miniatur |
-| L | ikony / lista |
-| N | pokaż / ukryj nazwy plików |
-| Shift+N | pokaż / ukryj nazwy folderów |
-| K, M | film: odtwórz / pauza, wycisz |
-| S | dźwięki interfejsu: włącz / wycisz |
-| G | siatka linii między miniaturami |
-| ⌘⌫ (Mac) / Delete (Windows) | przenieś zaznaczone do Kosza (też w podglądzie) |
-| B | dodaj zaznaczone do koszyka albo je z niego wyjmij (też w podglądzie) |
-| ⇧B | otwórz koszyk |
-| ⌘[ ⌘] (Mac) / Alt+← Alt+→ (Windows) | wstecz / dalej po odwiedzonych folderach (też strzałki < > w górnym pasku i boczne przyciski myszy) |
-| ⌘⇧F / Ctrl+Shift+F | szukaj w całej bibliotece (wszystkie ulubione foldery) |
-| ⌘L / Ctrl+L (też ⌘⇧G) | wpisz lub wklej ścieżkę; Enter przechodzi, ścieżka do pliku otwiera jego folder i zaznacza plik |
-| ⌥⌘C / Ctrl+Alt+C | kopiuj ścieżkę zaznaczonych plików, a bez zaznaczenia — bieżącego folderu |
-| ⌘V / Ctrl+V | wklejona ścieżka przenosi od razu do folderu |
-| [ | panel folderów (też \\ albo ⌘⌥S / Ctrl+Alt+S) |
-| ] | panel informacji (też I albo ⌘⌥I / Ctrl+Alt+I) |
-| Tab | chowa interfejs — w siatce i w podglądzie (bez paska z nazwą i strzałek) |
-| klik / Z (w podglądzie) | dopasuj ↔ powiększ; potem przeciągaj, przewijaj kółkiem lub gładzikiem |
-| Ctrl/⌘ + kółko, szczypnięcie | przybliżanie wokół kursora; + i − co 25%, 0 dopasowuje |
-| ↑ ↓ (PDF) | poprzednia / następna strona |
+| spacja | otwórz podgląd / wróć do siatki |
+| A / D | poprzedni / następny plik (także ← →) |
+| Q | folder wyżej (także Backspace); w podglądzie wraca do siatki |
+| W | tylko ten folder ↔ wszystko w środku z podfolderami |
+| E | otwórz w Photoshopie (także ⌘/Ctrl+E) |
+| R / ⇧R | pokaż w Finderze lub Eksploratorze / odśwież folder |
 | T | jasny / ciemny |
-| R | odśwież |
-| / albo ⌘/Ctrl + F | szukaj |
+| F / ⇧F | szukaj tutaj / szukaj w całej bibliotece (także ⌘/Ctrl+F, ⌘⇧F) |
+| G | siatka linii między miniaturami |
+| S | dźwięki interfejsu |
+| Z | w podglądzie: dopasuj ↔ 100% |
+| X / ⇧X | panel folderów / panel informacji (także [ ] \\ I) |
+| C / ⇧C | kopiuj obraz / kopiuj ścieżki (także P, ⌥⌘C) |
+| V | ikony ↔ lista (także L) |
+| B / ⇧B | dodaj do koszyka lub wyjmij / otwórz koszyk |
+| 1 / 2 | mniejsze / większe miniatury; w podglądzie oddal / przybliż (także − +) |
+| Tab | ukryj / pokaż interfejs |
+| Esc | zamknij podgląd, wyczyść wyszukiwanie |
+| ⌘/Ctrl + N | nowe okno w tym samym folderze (Koszyk i Ulubione są wspólne) |
+| ⌘[ ⌘] (Mac) / Alt+← Alt+→ (Windows) | wstecz / dalej po odwiedzonych miejscach (też strzałki < > i boczne przyciski myszy) |
+| ⌘/Ctrl + kółko, szczypnięcie | płynna zmiana wielkości miniatur; w podglądzie przybliżanie wokół kursora |
+| ⌘⌫ (Mac) / Delete (Windows) | przenieś do Kosza; w koszyku tylko wyjmuje z koszyka |
+| ⌘/Ctrl + A | zaznacz wszystkie |
+| ⌘L / Ctrl+L | wpisz lub wklej ścieżkę (wklejenie ścieżki gdziekolwiek też przenosi) |
+| ⌘/Ctrl + D | dodaj folder do ulubionych |
+| N / ⇧N | nazwy plików / nazwy folderów |
+| K, M | film: odtwórz / pauza, wycisz |
+| ↑ ↓ (PDF) | poprzednia / następna strona |
 
 Pliki można przeciągać z Podglądu prosto do Photoshopa, 3ds Maxa czy Findera/Eksploratora.
 

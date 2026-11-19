@@ -70,6 +70,8 @@ aside ::-webkit-scrollbar-thumb:hover{background:var(--scroll2);background-clip:
 .frame-win header,.frame-win #viewer .top{padding-right:150px}
 /* pasek podglądu tak wysoki jak pasek przycisków okna Windows (52 px), żeby przyciski nie zachodziły na obraz */
 .frame-win #viewer .top{min-height:52px;box-sizing:border-box}
+/* okno podglądu ze spacji ma tylko dwa przyciski (bez minimalizacji) — menu bliżej nich */
+.frame-win body.peekmode #viewer .top{padding-right:100px}
 .frame-mac header{padding-left:84px}
 .frame-mac #viewer .top{padding-left:84px}
 .frame-mac #hspace{width:calc(220px - 112px)}

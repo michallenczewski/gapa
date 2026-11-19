@@ -1495,7 +1495,7 @@ let peekClosing=false;
 function closeViewer(){ if(PEEK&&!peekClosing){ api.peekClose(); return; } if(hintId==='viewer')hideHint();if(viewer.classList.contains('open'))SFX('close');stopMedia();viewer.classList.remove('open');chromeSync();vTok++;stage.textContent='';vEl=null;main.focus();}
 // trzy poziomy: siatka → podgląd → przybliżenie. Klik w obraz schodzi poziom niżej (przybliża, a przybliżony wraca do dopasowania),
 // klik obok obrazu wraca o jeden poziom: z przybliżenia do dopasowania, z dopasowania do siatki
-stage.addEventListener('click',e=>{ if(e.target!==stage||panMoved) return; if(zm) zoomFit(true); else closeViewer(); });
+stage.addEventListener('click',e=>{ if(e.target!==stage&&!e.target.classList.contains('sheet')||panMoved) return; if(zm) zoomFit(true); else if(sheet&&!inSheet()) renderSheet(); else closeViewer(); });
 // kółko myszy i gładzik przewijają obrazy (w trybie 100% przewijają sam obraz)
 let wAcc=0, wT=0;
 stage.addEventListener('wheel',e=>{
@@ -1721,7 +1721,20 @@ document.addEventListener('keydown',e=>{
   const mod=e.metaKey||e.ctrlKey;
   const open_=viewer.classList.contains('open');
   if(mod&&k.toLowerCase()==='e'){e.preventDefault();const f=open_?[vList[vi]]:pickedFiles();if(f.length&&f[0])openInEditor(f.map(x=>x.path));return;}
+  if(open_&&inSheet()){
+    const n=sheet.list.length, c=sheetCols(n);
+    if(k==='Escape'||k===' '){e.preventDefault();closeViewer();}
+    else if(k==='ArrowRight'||e.code==='KeyD'){e.preventDefault();sheet.at=Math.min(n-1,sheet.at+1);sheetMark();}
+    else if(k==='ArrowLeft'||e.code==='KeyA'){e.preventDefault();sheet.at=Math.max(0,sheet.at-1);sheetMark();}
+    else if(k==='ArrowDown'){e.preventDefault();sheet.at=Math.min(n-1,sheet.at+c);sheetMark();}
+    else if(k==='ArrowUp'){e.preventDefault();sheet.at=Math.max(0,sheet.at-c);sheetMark();}
+    else if(k==='Home'){e.preventDefault();sheet.at=0;sheetMark();}
+    else if(k==='End'){e.preventDefault();sheet.at=n-1;sheetMark();}
+    else if(k==='Enter'){e.preventDefault();sheetOpen();}
+    return;
+  }
   if(open_){
+    if(sheet&&k==='Backspace'){e.preventDefault();renderSheet();return;}
     if(k==='Escape'||k===' '){e.preventDefault();closeViewer();}
     else if(vEl&&vEl.pageBy&&(k==='ArrowDown'||k==='PageDown')){e.preventDefault();vEl.pageBy(1);}
     else if(vEl&&vEl.pageBy&&(k==='ArrowUp'||k==='PageUp')){e.preventDefault();vEl.pageBy(-1);}
@@ -2006,7 +2019,26 @@ markSort(); markModes(); setNames(S.names!==false); setDirNames(S.dirNames!==fal
 renderSide(); renderCrumbs(); renderTypes(); cacheInfo(); renderBasketNav(); libSync(); setShowMem(!!S.showMem);
 if(!S.seenKeys&&!api.startPath&&!PEEK) setTimeout(()=>{ if(!S.seenKeys) toggleKeys(true); },1400);
 /* --- tryb podglądu: otwiera wskazany plik, strzałki w Eksploratorze przesuwają podgląd --- */
+// kilka zaznaczonych plików: arkusz ze wszystkimi naraz; klik / Enter otwiera jeden, strzałki chodzą tylko po zaznaczonych
+let sheet=null;                       // {list, at} gdy pokazujemy podgląd kilku plików
+async function peekLoad(d,paths){
+  if(!samePath(curPath,d)||!paths.every(p=>items.some(x=>samePath(x.path,p)))){
+    go(d,paths[0]);
+    for(let i=0;i<80&&!paths.every(p=>items.some(x=>samePath(x.path,p)));i++) await new Promise(r=>setTimeout(r,40));
+  }
+}
 async function peekOpen(p){
+  if(p&&typeof p==='object'){
+    if(!(p.paths&&p.paths.length>1)) return peekOpen(p.path);
+    await peekLoad(api.dirname(p.paths[0]),p.paths);
+    const list=p.paths.map(x=>items.find(y=>samePath(y.path,x))).filter(Boolean);
+    if(list.length<2) return list[0]?peekOpen(list[0].path):undefined;
+    sheet={list,at:Math.max(0,list.findIndex(x=>samePath(x.path,p.path)))};
+    vList=list; vi=sheet.at;
+    if(!viewer.classList.contains('open')){ viewer.classList.add('open'); chromeSync(); }
+    renderSheet(); return;
+  }
+  sheet=null;
   const d=api.dirname(p);
   if(!samePath(curPath,d)||!items.some(x=>samePath(x.path,p))){
     go(d,p);
@@ -2019,8 +2051,40 @@ async function peekOpen(p){
 if(PEEK){
   document.body.classList.add('peekmode'); S.types={}; S.insp=false;
   api.onPeekOpen(p=>peekOpen(p));
-  api.onPeekHidden(()=>{ peekClosing=true; closeViewer(); peekClosing=false; });
+  api.onPeekHidden(()=>{ peekClosing=true; closeViewer(); peekClosing=false; sheet=null; });
+  // klawisze przechwycone w Eksploratorze przy podglądzie kilku plików
+  if(api.onPeekKey) api.onPeekKey(k=>document.body.dispatchEvent(new KeyboardEvent('keydown',{key:k,code:k,bubbles:true})));
 }
+function sheetCols(n){                // tyle kolumn, żeby obrazy 4:3 były jak największe
+  const r=stage.getBoundingClientRect(), W=r.width||innerWidth, H=(r.height||innerHeight-60);
+  let best=1,bs=0;
+  for(let c=1;c<=n;c++){ const rows=Math.ceil(n/c), cw=W/c, ch=H/rows-22, s=Math.min(cw,ch*4/3); if(s>bs){bs=s;best=c;} }
+  return best;
+}
+function renderSheet(){
+  if(!sheet) return;
+  vTok++; zm=null; vEl=null; stopMedia(); stage.className='sheetmode'; stage.textContent='';
+  $('#vname').textContent='Zaznaczone pliki'; $('#vname').title=''; $('#vinfo').textContent=api.dirname(sheet.list[0].path);
+  $('#vcount').textContent=sheet.list.length+' '+plural(sheet.list.length,'plik','pliki','plików');
+  const g=document.createElement('div'); g.className='sheet'; g.style.gridTemplateColumns='repeat('+sheetCols(sheet.list.length)+',minmax(0,1fr))';
+  sheet.list.forEach((it,i)=>{
+    const c=document.createElement('div'); c.className='sc'+(i===sheet.at?' on':''); c.title=it.name;
+    const b=document.createElement('div'); b.className='sb'; c.appendChild(b);
+    const n=document.createElement('div'); n.className='sn'; n.textContent=it.name; c.appendChild(n);
+    c.onclick=e=>{ e.stopPropagation(); sheet.at=i; sheetOpen(); };
+    g.appendChild(c);
+    const put=cv=>{ b.textContent=''; cv.className=cv.width/cv.height>=4/3?'w':'h'; b.appendChild(cv); };
+    const draw=()=>{ if(!it.thumb) return; const k=document.createElement('canvas'); k.width=it.thumb.width; k.height=it.thumb.height; k.getContext('2d').drawImage(it.thumb,0,0); put(k);
+      // większa komórka niż miniatura — ostrzejsza wersja w rozdzielczości komórki
+      requestAnimationFrame(async()=>{ const need=Math.min(2048,Math.ceil(Math.max(b.clientWidth,b.clientHeight*4/3)*devicePixelRatio));
+        if(need>Math.max(it.thumb.width,it.thumb.height)*1.1&&it.type!=='vid'&&!DOCS.has(it.type)){ try{ const h=(it.hd&&it.hd.size>=need*0.9)?it.hd.c:await hdMake(it,need); if(h&&sheet&&b.isConnected){ const k2=document.createElement('canvas'); k2.width=h.width; k2.height=h.height; k2.getContext('2d').drawImage(h,0,0); put(k2); } }catch(e){} } }); };
+    if(it.thumb) draw(); else thumbOf(it).then(()=>{ it.state='done'; draw(); },()=>{ b.textContent=extOf(it.name); });
+  });
+  stage.appendChild(g);
+}
+function sheetOpen(){ if(!sheet) return; vList=sheet.list; vi=sheet.at; stage.className='fit'; showV(); }
+function sheetMark(){ stage.querySelectorAll('.sc').forEach((x,i)=>x.classList.toggle('on',i===sheet.at)); }
+const inSheet=()=>!!(sheet&&stage.classList.contains('sheetmode'));
 // ustawienia podglądu spacją (tylko Windows)
 let peekState=null; if(api.peekGet&&!PEEK) api.peekGet().then(r=>{ peekState=r; });
-loadRoots().then(async()=>{ if(PEEK){ peekOpen(api.peekPath); return; } const sp=api.startPath; if(sp&&await api.exists(sp)) go(sp); else if(S.last&&await api.exists(S.last)) go(S.last); else { render(); syncTree(); } });
+loadRoots().then(async()=>{ if(PEEK){ if(!api.peekMulti) peekOpen(api.peekPath); return; } const sp=api.startPath; if(sp&&await api.exists(sp)) go(sp); else if(S.last&&await api.exists(S.last)) go(S.last); else { render(); syncTree(); } });

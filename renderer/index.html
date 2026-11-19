@@ -456,6 +456,17 @@ body.dragout.noside #bdrop{opacity:1;transform:translate(-50%,0);pointer-events:
 tr input.ren{text-align:left;margin:0}
 /* okno podglądu ze spacji w Eksploratorze: tylko przeglądarka obrazu */
 body.peekmode>header,body.peekmode>aside,body.peekmode>main{visibility:hidden}
+/* arkusz kilku zaznaczonych plików (podgląd spacją w Eksploratorze) */
+#stage.sheetmode{display:block;overflow:auto;padding:8px 24px 24px}
+.sheet{display:grid;gap:18px 18px;align-content:center;min-height:100%}
+.sheet .sc{position:relative;display:flex;flex-direction:column;gap:6px;cursor:pointer;isolation:isolate;align-self:start}
+.sheet .sc.on::before{content:"";position:absolute;inset:-8px;border-radius:var(--r);background:var(--selbg);z-index:-1}
+.sheet .sb{position:relative;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;text-transform:uppercase}
+.sheet .sb canvas{position:absolute;inset:0;margin:auto;display:block;border-radius:var(--r)}
+.sheet .sb canvas.w{width:100%;height:auto}
+.sheet .sb canvas.h{height:100%;width:auto}
+.sheet .sn{font-size:11.5px;color:var(--muted);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sheet .sc.on .sn{color:var(--text)}
 </style>
 </head>
 <body>

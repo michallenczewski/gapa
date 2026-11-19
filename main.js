@@ -540,10 +540,13 @@ function peekStart() {
       if (!line) continue;
       let m; try { m = JSON.parse(line); } catch (e) { continue; }
       if (m.t === 'space') {
+        const many = (m.paths || []).filter(peekSupported);
         if (peekVisible) peekHide();
+        else if (many.length > 1) peekShow({ path: peekSupported(m.path) ? m.path : many[0], paths: many });   // kilka plików: arkusz
         else if (m.path && peekSupported(m.path)) peekShow(m.path);
         else peekSend('pass');                                  // nieobsługiwany plik — spacja wraca do Eksploratora
       } else if (m.t === 'esc') peekHide();
+      else if (m.t === 'key' && peekVisible && peekWin) peekWin.webContents.send('peek-key', m.k);
       else if (m.t === 'sel' && peekVisible && m.path && peekSupported(m.path)) peekWin.webContents.send('peek-open', m.path);
     }
   });
@@ -561,7 +564,8 @@ function peekCreate(first) {
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: false, plugins: true }
   });
   peekReady = false;
-  peekWin.loadFile(path.join(__dirname, 'renderer', 'index.html'), { query: { peek: first } });
+  peekWin.loadFile(path.join(__dirname, 'renderer', 'index.html'), { query: typeof first === 'string' ? { peek: first } : { peek: first.path, multi: '1' } });
+  if (typeof first !== 'string') peekPending = first;
   peekWin.webContents.once('did-finish-load', () => { peekReady = true; if (peekPending) { peekWin.webContents.send('peek-open', peekPending); peekPending = null; } });
   peekWin.on('close', e => { if (!quitting) { e.preventDefault(); peekHide(); } });   // zostaje w pamięci — następny podgląd otwiera się od razu
   peekWin.on('closed', () => { peekWin = null; peekVisible = false; });
@@ -573,11 +577,11 @@ function peekShow(p) {
   peekWin.setAlwaysOnTop(true, 'floating');
   if (!peekWin.isVisible()) peekWin.showInactive();                 // bez zabierania fokusu Eksploratorowi
   peekWin.moveTop();
-  peekVisible = true; peekSend('open 1');
+  peekVisible = true; peekSend('multi ' + (p && p.paths ? 1 : 0)); peekSend('open 1');
 }
 function peekHide() {
   if (peekWin && peekWin.isVisible()) { peekWin.webContents.send('peek-hidden'); peekWin.hide(); }
-  peekVisible = false; peekSend('open 0');
+  peekVisible = false; peekSend('open 0'); peekSend('multi 0');
 }
 ipcMain.on('peek-close', () => peekHide());
 function trayUpdate() {

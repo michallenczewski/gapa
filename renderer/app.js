@@ -2089,9 +2089,10 @@ if(PEEK){
   if(api.onPeekKey) api.onPeekKey(k=>document.body.dispatchEvent(new KeyboardEvent('keydown',{key:k,code:k,bubbles:true})));
 }
 function sheetCols(n){                // tyle kolumn, żeby obrazy 4:3 były jak największe
-  const r=stage.getBoundingClientRect(), W=r.width||innerWidth, H=(r.height||innerHeight-60);
+  // rozmiar sceny bywa chwilowo zerowy (np. tuż po wejściu w pełny ekran) — wtedy liczymy od okna
+  const r=stage.getBoundingClientRect(), W=Math.max(r.width,innerWidth*0.6)-48, H=Math.max(r.height,innerHeight*0.6)-32;
   let best=1,bs=0;
-  for(let c=1;c<=n;c++){ const rows=Math.ceil(n/c), cw=W/c, ch=H/rows-22, s=Math.min(cw,ch*4/3); if(s>bs){bs=s;best=c;} }
+  for(let c=1;c<=n;c++){ const rows=Math.ceil(n/c), cw=(W-18*(c-1))/c, ch=(H-18*(rows-1))/rows-22, sz=Math.min(cw,ch*4/3); if(sz>bs){bs=sz;best=c;} }
   return best;
 }
 function renderSheet(){

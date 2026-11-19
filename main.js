@@ -548,7 +548,7 @@ ipcMain.on('new-window', (e, p) => createWindow(p || null));
 // Podgląd to osobne, lekkie okno Gapy: pokazuje się bez odbierania fokusu Eksploratorowi, więc strzałki
 // w Eksploratorze dalej zmieniają zaznaczenie, a podgląd za nim podąża. Spacja albo Esc zamykają podgląd.
 // Gapa zostaje wtedy w tle (ikona w zasobniku), żeby podgląd otwierał się od razu.
-let peekProc = null, peekWin = null, peekVisible = false, peekReady = false, peekPending = null, tray = null, quitting = false;
+let peekProc = null, peekWin = null, peekVisible = false, peekMulti = false, peekReady = false, peekPending = null, tray = null, quitting = false;
 const mainWindows = () => BrowserWindow.getAllWindows().filter(w => w !== peekWin && !w.isDestroyed());
 const PEEK_EXTS_FALLBACK = ['jpg','jpeg','png','webp','avif','gif','bmp','tif','tiff','psd','psb','tga','exr','hdr','svg','pdf','mp4','mov','m4v','webm','mkv','avi','dwg','skp','max','3dm','pln','heic','cr2','cr3','nef','arw','dng','raf','orf','rw2'];
 function peekSupported(p) {
@@ -575,7 +575,7 @@ function peekStart() {
         else if (many.length > 1) peekShow({ path: peekSupported(m.path) ? m.path : many[0], paths: many });   // kilka plików: arkusz
         else if (m.path && peekSupported(m.path)) peekShow(m.path);
         else peekSend('pass');                                  // nieobsługiwany plik — spacja wraca do Eksploratora
-      } else if (m.t === 'esc') peekHide();
+      } else if (m.t === 'esc') { if (peekMulti && peekWin) peekWin.webContents.send('peek-key', 'Escape'); else peekHide(); }   // arkusz: Esc najpierw wraca z pojedynczego zdjęcia
       else if (m.t === 'key' && peekVisible && peekWin) peekWin.webContents.send('peek-key', m.k);
       else if (m.t === 'sel' && peekVisible && m.path && peekSupported(m.path)) peekWin.webContents.send('peek-open', m.path);
     }
@@ -607,11 +607,11 @@ function peekShow(p) {
   peekWin.setAlwaysOnTop(true, 'floating');
   if (!peekWin.isVisible()) peekWin.showInactive();                 // bez zabierania fokusu Eksploratorowi
   peekWin.moveTop();
-  peekVisible = true; peekSend('multi ' + (p && p.paths ? 1 : 0)); peekSend('open 1');
+  peekMulti = !!(p && p.paths); peekVisible = true; peekSend('multi ' + (peekMulti ? 1 : 0)); peekSend('open 1');
 }
 function peekHide() {
   if (peekWin && peekWin.isVisible()) { peekWin.webContents.send('peek-hidden'); peekWin.hide(); }
-  peekVisible = false; peekSend('open 0'); peekSend('multi 0');
+  peekVisible = false; peekMulti = false; peekSend('open 0'); peekSend('multi 0');
 }
 ipcMain.on('peek-close', () => peekHide());
 function trayUpdate() {

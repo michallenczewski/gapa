@@ -1519,7 +1519,7 @@ stage.addEventListener('pointerdown',e=>{
 });
 addEventListener('resize',()=>{ if(zm) renderZoom(); hdAll(); });
 let peekClosing=false;
-function closeViewer(){ if(PEEK&&!peekClosing){ api.peekClose(); return; } if(hintId==='viewer')hideHint();if(viewer.classList.contains('open'))SFX('close');stopMedia();viewer.classList.remove('open');chromeSync();vTok++;stage.textContent='';vEl=null;main.focus();}
+function closeViewer(){ if(PEEK&&!peekClosing){ if(sheet&&!inSheet()){ renderSheet(); return; } api.peekClose(); return; }   /* z pojedynczego zdjęcia arkusza wracamy do arkusza */ if(hintId==='viewer')hideHint();if(viewer.classList.contains('open'))SFX('close');stopMedia();viewer.classList.remove('open');chromeSync();vTok++;stage.textContent='';vEl=null;main.focus();}
 // trzy poziomy: siatka → podgląd → przybliżenie. Klik w obraz schodzi poziom niżej (przybliża, a przybliżony wraca do dopasowania),
 // klik obok obrazu wraca o jeden poziom: z przybliżenia do dopasowania, z dopasowania do siatki
 stage.addEventListener('click',e=>{ if(e.target!==stage&&!e.target.classList.contains('sheet')||panMoved) return; if(zm) zoomFit(true); else if(sheet&&!inSheet()) renderSheet(); else closeViewer(); });
@@ -1764,7 +1764,8 @@ document.addEventListener('keydown',e=>{
   }
   if(open_){
     if(sheet&&k==='Backspace'){e.preventDefault();renderSheet();return;}
-    if(k==='Escape'||k===' '){e.preventDefault();closeViewer();}
+    if(k===' '&&PEEK){e.preventDefault();api.peekClose();}      // spacja w podglądzie z Eksploratora zamyka od razu, jak na Macu
+    else if(k==='Escape'||k===' '){e.preventDefault();closeViewer();}
     else if(vEl&&vEl.pageBy&&(k==='ArrowDown'||k==='PageDown')){e.preventDefault();vEl.pageBy(1);}
     else if(vEl&&vEl.pageBy&&(k==='ArrowUp'||k==='PageUp')){e.preventDefault();vEl.pageBy(-1);}
     else if(k==='ArrowRight'||k==='ArrowDown'||e.code==='KeyD'){e.preventDefault();stepV(1);}

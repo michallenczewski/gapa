@@ -48,6 +48,19 @@ if(api.onFullscreen) api.onFullscreen(v=>{
   // po zmianie rozmiaru okna przerysowujemy obraz albo arkusz w nowym rozmiarze
   setTimeout(()=>{ if(!viewer.classList.contains('open')) return; if(inSheet()) renderSheet(); else if(zm) renderZoom(); else if(vList[vi]) showV(); },180);
 });
+// ikona pełnego ekranu i pastylka w trybie minimal / pełnym ekranie
+{ const FSK=isMac?'⌃⌘F':'Ctrl+spacja';
+  const tips=()=>{ const fs=document.documentElement.classList.contains('fs');
+    for(const b of [$('#vfs'),$('#pillFs')]) b.title=fs?'Wyjdź z pełnego ekranu ('+FSK+' / Esc)':'Pełny ekran ('+FSK+')';
+    $('#pillUi').title=document.body.classList.contains('bare')?'Pokaż interfejs (Tab)':'Ukryj interfejs (Tab)'; };
+  $('#vfs').onclick=e=>{ e.stopPropagation(); fullscreenToggle(); };
+  $('#pillFs').onclick=e=>{ e.stopPropagation(); fullscreenToggle(); };
+  $('#pillUi').onclick=e=>{ e.stopPropagation(); toggleBare(); tips(); };
+  let idleT=0;
+  addEventListener('mousemove',()=>{ const b=document.body; b.classList.add('moving'); b.classList.remove('idle'); tips(); clearTimeout(idleT);
+    idleT=setTimeout(()=>{ if($('#fspill').matches(':hover')) return; b.classList.remove('moving'); b.classList.add('idle'); },2000); });
+  if(api.onFullscreen) api.onFullscreen(()=>setTimeout(tips,50));
+}
 function fullscreenToggle(){ fsWant=!document.documentElement.classList.contains('fs'); if(api.fullscreenToggle) api.fullscreenToggle(); else if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(()=>{}); }
 function chromeSync(){
   if(api.web||!api.chromeColors) return;

@@ -322,7 +322,7 @@ body[data-drop] .dropzone{display:block}
 /* --- podgląd --- */
 #viewer{position:fixed;inset:0;background:var(--stage);display:none;flex-direction:column;z-index:10}
 #viewer.open{display:flex}
-#viewer .top{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:12px;padding:10px 12px 4px;white-space:nowrap}
+#viewer .top{display:grid;grid-template-columns:auto 1fr auto auto auto;align-items:center;gap:12px;padding:10px 12px 4px;white-space:nowrap}
 #viewer .top .ib{color:var(--text2)}
 .vt{text-align:center;min-width:0;line-height:1.35}
 #vname{font-weight:500;overflow:hidden;text-overflow:ellipsis}
@@ -470,6 +470,17 @@ body.peekmode>header,body.peekmode>aside,body.peekmode>main{visibility:hidden}
 .sheet .sc.on .sn{color:var(--text);font-weight:500}
 .sheet .sc.on canvas{outline:1.5px solid var(--muted2);outline-offset:4px}
 #viewer:has(#stage.sheetmode) .navb{display:none}
+/* przełączanie widoku: ikona pełnego ekranu w pasku podglądu; w trybie minimal i w pełnym ekranie
+   mała pastylka w prawym górnym rogu, widoczna po ruchu myszą, znika po 2 s razem z kursorem */
+.fsb svg+svg{display:none}
+.fs .fsb svg{display:none}
+.fs .fsb svg+svg{display:block}
+#fspill{position:fixed;top:10px;right:12px;z-index:60;display:flex;gap:2px;padding:3px;border-radius:10px;background:var(--card);box-shadow:0 0 0 1px var(--cardline),0 6px 20px rgba(0,0,0,.14);opacity:0;pointer-events:none;transition:opacity .2s}
+#fspill .ib{width:30px;height:28px;color:var(--text)}
+.frame-win body.bare #fspill{top:44px}
+.fs.frame-win body.bare #fspill{top:10px}
+body.bare.moving #fspill,.fs body.moving #fspill{opacity:1;pointer-events:auto}
+body.bare.idle,body.bare.idle *,.fs body.idle,.fs body.idle *{cursor:none!important}
 </style>
 </head>
 <body>
@@ -556,6 +567,7 @@ body.peekmode>header,body.peekmode>aside,body.peekmode>main{visibility:hidden}
 
 <div class="ctx" id="ctx" hidden role="menu"></div>
 <div id="bdrop" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round" stroke-linecap="round"><path d="M2.3 6.5h11.4l-1.25 6.2a1.3 1.3 0 0 1-1.27 1H4.82a1.3 1.3 0 0 1-1.27-1z"/><path d="M5.6 6.5 7.6 2.6M10.4 6.5 8.4 2.6"/></svg><div><b>Upuść tutaj</b>żeby dodać do koszyka</div></div>
+<div id="fspill" aria-label="Widok"><button id="pillUi" class="ib" aria-label="Pokaż interfejs"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 6.2h12"/></svg></button><button id="pillFs" class="ib fsb" aria-label="Pełny ekran"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5V6H2.5M13.5 6H10V2.5M10 13.5V10h3.5M2.5 10H6v3.5"/></svg></button></div>
 <div id="dlg" role="alertdialog"></div>
 <div id="keys" role="dialog" aria-label="Skróty klawiszowe"></div>
 <div class="dropzone" aria-hidden="true"><span>Upuść folder, żeby go otworzyć</span></div>
@@ -566,6 +578,7 @@ body.peekmode>header,body.peekmode>aside,body.peekmode>main{visibility:hidden}
     <div class="vt"><div id="vname"></div><div id="vinfo"></div></div>
     <span id="vcount"></span>
     <button id="vmore" class="ib" aria-label="Więcej" title="Więcej"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="8" r="1.2"/><circle cx="8" cy="8" r="1.2"/><circle cx="12.5" cy="8" r="1.2"/></svg></button>
+    <button id="vfs" class="ib fsb" aria-label="Pełny ekran" title="Pełny ekran"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5V6H2.5M13.5 6H10V2.5M10 13.5V10h3.5M2.5 10H6v3.5"/></svg></button>
   </div>
   <div id="stage" class="fit"></div>
   <button class="navb" id="vprev" aria-label="Poprzedni" title="Poprzedni (←)"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg></button>

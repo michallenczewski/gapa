@@ -78,6 +78,8 @@ Najczęstsze skróty leżą pod lewą ręką, żeby prawa mogła zostać na mysz
 | 1 / 2 | mniejsze / większe miniatury; w podglądzie oddal / przybliż (także − + oraz ⌘/Ctrl + − +, ⌘/Ctrl+0 przywraca) |
 | Tab | ukryj / pokaż interfejs |
 | Ctrl+spacja (Windows) / ⌃⌘F (Mac) | pełny ekran 100%: bez paska zadań, paska okna i interfejsu; wyjście tym samym skrótem albo Esc |
+
+W pasku podglądu obok „…” jest ikona pełnego ekranu. Gdy interfejs jest schowany albo okno jest na pełnym ekranie, po poruszeniu myszą w prawym górnym rogu pojawia się mała pastylka z dwoma przyciskami: pokaż interfejs oraz wejdź na pełny ekran albo z niego wyjdź. Po dwóch sekundach bez ruchu pastylka znika razem z kursorem.
 | Esc | zamknij podgląd, wyczyść wyszukiwanie |
 | ⌘/Ctrl + N | nowe okno w tym samym folderze (Koszyk i Ulubione są wspólne) |
 | ⌘[ ⌘] (Mac) / Alt+← Alt+→ (Windows) | wstecz / dalej po odwiedzonych miejscach (też strzałki < > i boczne przyciski myszy) |

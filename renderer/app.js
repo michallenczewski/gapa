@@ -45,6 +45,8 @@ if(api.onFullscreen) api.onFullscreen(v=>{
   if(v&&fsWant&&fsBare===null){ fsBare=document.body.classList.contains('bare'); if(!fsBare) toggleBare(); }
   else if(!v&&fsBare!==null){ if(!fsBare&&document.body.classList.contains('bare')) toggleBare(); fsBare=null; }
   fsWant=false;
+  // po zmianie rozmiaru okna przerysowujemy obraz albo arkusz w nowym rozmiarze
+  setTimeout(()=>{ if(!viewer.classList.contains('open')) return; if(inSheet()) renderSheet(); else if(zm) renderZoom(); else if(vList[vi]) showV(); },180);
 });
 function fullscreenToggle(){ fsWant=!document.documentElement.classList.contains('fs'); if(api.fullscreenToggle) api.fullscreenToggle(); else if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(()=>{}); }
 function chromeSync(){

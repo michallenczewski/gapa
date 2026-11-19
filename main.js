@@ -599,6 +599,8 @@ function peekCreate(first) {
   peekWin.webContents.once('did-finish-load', () => { peekReady = true; if (peekPending) { peekWin.webContents.send('peek-open', peekPending); peekPending = null; } });
   peekWin.on('close', e => { if (!quitting) { e.preventDefault(); peekHide(); } });   // zostaje w pamięci — następny podgląd otwiera się od razu
   peekWin.on('closed', () => { peekWin = null; peekVisible = false; });
+  peekWin.on('enter-full-screen', () => peekWin.webContents.send('fullscreen', true));
+  peekWin.on('leave-full-screen', () => peekWin.webContents.send('fullscreen', false));
 }
 function peekShow(p) {
   if (!peekWin) peekCreate(p);

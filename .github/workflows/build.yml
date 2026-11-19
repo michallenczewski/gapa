@@ -5,6 +5,10 @@ name: Buduj instalatory
 # więc jedno wydanie zużywa ok. 50 minut z miesięcznej puli 2000.
 on:
   workflow_dispatch:
+    inputs:
+      os:
+        description: 'Dla jakiego systemu (win / mac / oba)'
+        default: 'oba'
 
 permissions:
   contents: write
@@ -40,7 +44,7 @@ jobs:
       fail-fast: false
       matrix:
         # Mac budujemy na maszynie z Intelem — tych GitHub ma więcej; dmg i tak powstaje dla arm64 i x64
-        os: [macos-15-intel, windows-latest]
+        os: ${{ fromJSON(inputs.os == 'win' && '["windows-latest"]' || inputs.os == 'mac' && '["macos-15-intel"]' || '["macos-15-intel","windows-latest"]') }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

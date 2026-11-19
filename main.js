@@ -535,7 +535,7 @@ const MIME = { jpg: 'image/jpeg', jpeg: 'image/jpeg', jpe: 'image/jpeg', jfif: '
 
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
-  app.on('second-instance', () => { const w = BrowserWindow.getAllWindows()[0]; if (w) { if (w.isMinimized()) w.restore(); w.focus(); } });
+  app.on('second-instance', () => { const w = BrowserWindow.getAllWindows()[0]; if (w) { if (w.isMinimized()) w.restore(); w.focus(); } else createWindow(); });
   app.whenReady().then(() => {
     loadSettings(); libLoad();
     openCache(settings.cacheDir);
@@ -568,5 +568,6 @@ else {
     app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
   });
   app.on('before-quit', () => { saveIndexNow(); saveSettings(); });
-  app.on('window-all-closed', () => { saveIndexNow(); app.quit(); });
+  // na Macu zamknięcie ostatniego okna nie kończy programu (zostaje w Docku, ⌘Q kończy); na Windows kończy
+  app.on('window-all-closed', () => { saveIndexNow(); saveSettings(); if (!isMac) app.quit(); });
 }

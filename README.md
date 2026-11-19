@@ -31,6 +31,12 @@ Program nie jest podpisany płatnym certyfikatem, więc system za pierwszym raze
 
 Przeciągnięcie plików na folder (kafelek, folder w drzewie albo w Ulubionych) albo na siatkę innego okna przenosi je, jeśli są na tym samym dysku, a kopiuje, jeśli na innym; z Alt (⌥ na Macu) zawsze kopiuje. Pod kursorem widać, co się stanie. Nic nie jest nadpisywane — powtórzona nazwa dostaje dopisek „(2)”. ⌘Z / Ctrl+Z cofa ostatnią operację (cofnięta kopia trafia do Kosza). To samo działa przez ⌘C / ⌘X i ⌘V.
 
+## Windows: podgląd spacją w Eksploratorze
+
+Ustawienia → „Podgląd spacją w Eksploratorze”. Potem wystarczy zaznaczyć plik w Eksploratorze i nacisnąć spację: otwiera się okno podglądu Gapy, a Eksplorator zostaje aktywny, więc strzałkami przechodzisz do kolejnych plików i podgląd za nimi podąża. Spacja albo Esc zamyka podgląd. Kliknięcie w okno podglądu daje pełną obsługę jak w Gapie (przybliżanie, A / D, Z).
+
+Gapa zostaje wtedy w tle z ikoną w zasobniku obok zegara (menu: otwórz, włącz / wyłącz, uruchamianie z Windows, zakończ). Działa w oknach Eksploratora (także w kartach Windows 11), nie na pulpicie. Spacja w polu nazwy, adresu albo wyszukiwania działa normalnie, tak samo z Ctrl, Shift albo Alt; foldery i nieobsługiwane pliki dostają zwykłą spację. Za nasłuchiwanie odpowiada mały pomocnik `GapaSpacja.exe` (źródło: `helper/GapaSpacja.cs`).
+
 ## Koszyk i wyszukiwanie w bibliotece
 
 **Koszyk** zbiera pliki z różnych folderów podczas przeglądania: zaznacz i naciśnij B, wybierz „Dodaj do koszyka” z menu albo przeciągnij miniatury na „Koszyk” w panelu bocznym. Pliki zostają na swoich miejscach. W koszyku przycisk „Przeciągnij wszystkie” przenosi całość naraz do Photoshopa, 3ds Maxa albo Findera, a „Kopiuj do folderu…” kopiuje pliki do folderu projektu (bez nadpisywania). Delete / ⌘⌫ w koszyku tylko wyjmuje plik z koszyka. Koszyk pamięta się między uruchomieniami.

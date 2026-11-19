@@ -48,6 +48,13 @@ jobs:
         with:
           node-version: 20
       - run: npm install
+      # pomocnik „spacja w Eksploratorze” (helper/GapaSpacja.cs) — kompilator C# jest w każdym Windows
+      - name: Zbuduj pomocnika Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /target:winexe /optimize /r:Microsoft.CSharp.dll /r:System.Core.dll /out:helper\GapaSpacja.exe helper\GapaSpacja.cs
+          if ($LASTEXITCODE -ne 0) { exit 1 }
       # na maszynach GitHuba XProtect potrafi trzymać obraz dysku i hdiutil nie może go odłączyć
       - name: Zatrzymaj XProtect
         if: runner.os == 'macOS'

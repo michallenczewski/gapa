@@ -41,6 +41,10 @@ Przy każdej większej zmianie warto sprawdzić, czy nie zachodzi któryś z tyc
 3. **Wydajność dekodowania.** Wielogigabajtowe PSB albo duże EXR są wyraźnie za wolne w JavaScripcie.
 4. **Wspólny kod z Asset Browserem Staszka** (Rust, egui/wgpu, SQLite). Na przykład wspólne dekodery albo wspólny katalog biblioteki.
 
+## Pierwszy kod natywny: pomocnik „spacja w Eksploratorze” (0.8.0)
+
+Podgląd spacją w Eksploratorze wymagał integracji z systemem (sygnał 2). Zrobiony jest małym programem w C# (`helper/GapaSpacja.cs`, ok. 14 KB), kompilowanym w GitHub Actions kompilatorem wbudowanym w Windows. Pomocnik słucha klawiatury (niskopoziomowy hak), czyta zaznaczenie Eksploratora przez COM (Shell.Application, z rozpoznaniem aktywnej karty w Windows 11) i rozmawia z Gapą przez stdin/stdout. Okno podglądu to zwykłe okno Gapy pokazywane bez odbierania fokusu. Gapa zostaje w tle (zasobnik), co kosztuje stały RAM — tylko gdy funkcja jest włączona.
+
 ## Kolejność możliwych kroków
 
 1. **Electron z modułem natywnym w Ruście (napi-rs).** Interfejs zostaje, a tylko ciężkie albo systemowe części powstają jako moduł w Ruście: dekodowanie dużych plików, schowek zgodny z systemem, operacje na plikach z postępem. Rozwiązuje punkty 2–4, można sięgać po kod Staszka. To pierwszy krok, gdy pojawi się któryś sygnał.

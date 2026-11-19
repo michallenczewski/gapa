@@ -1,5 +1,5 @@
 // Podgląd — proces główny: okno, dostęp do dysku, pamięć miniatur, integracja z systemem.
-const { app, BrowserWindow, ipcMain, dialog, shell, protocol, nativeImage, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, protocol, nativeImage, Menu, Tray, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const fsp = fs.promises;
@@ -484,7 +484,7 @@ ipcMain.on('drag-out', (e, files, icon) => {
 // nowe okno: zaczyna w podanym folderze (zwykle tym samym co okno, z którego je otwarto), lekko przesunięte
 function createWindow(startPath) {
   let b = settings.bounds || { width: 1400, height: 900 };
-  const from = BrowserWindow.getFocusedWindow();
+  let from = BrowserWindow.getFocusedWindow(); if (from && from === peekWin) from = null;
   if (from && !from.isFullScreen()) { const r = from.getBounds(); b = { x: r.x + 28, y: r.y + 28, width: r.width, height: r.height }; }
   const win = new BrowserWindow({
     ...b, minWidth: 720, minHeight: 480, show: false,
@@ -506,11 +506,106 @@ function createWindow(startPath) {
   win.on('enter-full-screen', () => win.webContents.send('fullscreen', true));
   win.on('leave-full-screen', () => win.webContents.send('fullscreen', false));
   win.on('close', () => { remember(); saveSettings(); });
+  win.on('closed', () => { if (isWin && !settings.peek && !quitting && !mainWindows().length) app.quit(); });
   // linki zewnętrzne w przeglądarce, nie w oknie programu
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
   return win;
 }
 ipcMain.on('new-window', (e, p) => createWindow(p || null));
+
+/* ---------- Windows: spacja w Eksploratorze otwiera podgląd w Gapie ---------- */
+// Pomocnik GapaSpacja.exe (helper/GapaSpacja.cs) słucha klawiatury i czyta zaznaczenie w Eksploratorze.
+// Podgląd to osobne, lekkie okno Gapy: pokazuje się bez odbierania fokusu Eksploratorowi, więc strzałki
+// w Eksploratorze dalej zmieniają zaznaczenie, a podgląd za nim podąża. Spacja albo Esc zamykają podgląd.
+// Gapa zostaje wtedy w tle (ikona w zasobniku), żeby podgląd otwierał się od razu.
+let peekProc = null, peekWin = null, peekVisible = false, peekReady = false, peekPending = null, tray = null, quitting = false;
+const mainWindows = () => BrowserWindow.getAllWindows().filter(w => w !== peekWin && !w.isDestroyed());
+const PEEK_EXTS_FALLBACK = ['jpg','jpeg','png','webp','avif','gif','bmp','tif','tiff','psd','psb','tga','exr','hdr','svg','pdf','mp4','mov','m4v','webm','mkv','avi','dwg','skp','max','3dm','pln','heic','cr2','cr3','nef','arw','dng','raf','orf','rw2'];
+function peekSupported(p) {
+  const ext = path.extname(p || '').slice(1).toLowerCase();
+  return !!ext && (lib.exts && lib.exts.length ? lib.exts : PEEK_EXTS_FALLBACK).includes(ext);
+}
+function peekSend(line) { try { if (peekProc && peekProc.stdin.writable) peekProc.stdin.write(line + '\n'); } catch (e) {} }
+function peekStart() {
+  if (!isWin || peekProc || !settings.peek) return;
+  const exe = app.isPackaged ? path.join(process.resourcesPath, 'GapaSpacja.exe') : path.join(__dirname, 'helper', 'GapaSpacja.exe');
+  if (!fs.existsSync(exe)) return;
+  try { peekProc = spawn(exe, [], { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true }); } catch (e) { peekProc = null; return; }
+  let buf = '';
+  peekProc.stdout.on('data', d => {
+    buf += d.toString('utf8');
+    let i;
+    while ((i = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+      if (!line) continue;
+      let m; try { m = JSON.parse(line); } catch (e) { continue; }
+      if (m.t === 'space') {
+        if (peekVisible) peekHide();
+        else if (m.path && peekSupported(m.path)) peekShow(m.path);
+        else peekSend('pass');                                  // nieobsługiwany plik — spacja wraca do Eksploratora
+      } else if (m.t === 'esc') peekHide();
+      else if (m.t === 'sel' && peekVisible && m.path && peekSupported(m.path)) peekWin.webContents.send('peek-open', m.path);
+    }
+  });
+  peekProc.on('exit', () => { peekProc = null; if (settings.peek && !quitting) setTimeout(peekStart, 3000); });
+}
+function peekStop() { if (peekProc) { try { peekProc.kill(); } catch (e) {} peekProc = null; } peekHide(); }
+function peekCreate(first) {
+  const d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  const w = Math.round(d.width * 0.72), h = Math.round(d.height * 0.8);
+  peekWin = new BrowserWindow({
+    x: d.x + Math.round((d.width - w) / 2), y: d.y + Math.round((d.height - h) / 2), width: w, height: h,
+    show: false, title: 'Gapa — podgląd', backgroundColor: '#1b1b1b', icon: iconFile(settings.icon), autoHideMenuBar: true,
+    alwaysOnTop: true, skipTaskbar: false, minimizable: false, fullscreenable: true,
+    titleBarStyle: 'hidden', titleBarOverlay: { color: '#f7f7f5', symbolColor: '#4a4945', height: 52 },
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: false, plugins: true }
+  });
+  peekReady = false;
+  peekWin.loadFile(path.join(__dirname, 'renderer', 'index.html'), { query: { peek: first } });
+  peekWin.webContents.once('did-finish-load', () => { peekReady = true; if (peekPending) { peekWin.webContents.send('peek-open', peekPending); peekPending = null; } });
+  peekWin.on('close', e => { if (!quitting) { e.preventDefault(); peekHide(); } });   // zostaje w pamięci — następny podgląd otwiera się od razu
+  peekWin.on('closed', () => { peekWin = null; peekVisible = false; });
+}
+function peekShow(p) {
+  if (!peekWin) peekCreate(p);
+  else if (peekReady) peekWin.webContents.send('peek-open', p);
+  else peekPending = p;
+  peekWin.setAlwaysOnTop(true, 'floating');
+  if (!peekWin.isVisible()) peekWin.showInactive();                 // bez zabierania fokusu Eksploratorowi
+  peekWin.moveTop();
+  peekVisible = true; peekSend('open 1');
+}
+function peekHide() {
+  if (peekWin && peekWin.isVisible()) { peekWin.webContents.send('peek-hidden'); peekWin.hide(); }
+  peekVisible = false; peekSend('open 0');
+}
+ipcMain.on('peek-close', () => peekHide());
+function trayUpdate() {
+  if (!isWin) return;
+  if (!settings.peek) { if (tray) { tray.destroy(); tray = null; } return; }
+  if (!tray) {
+    tray = new Tray(nativeImage.createFromPath(iconFile(settings.icon)).resize({ width: 16, height: 16 }));
+    tray.setToolTip('Gapa — spacja w Eksploratorze otwiera podgląd');
+    tray.on('click', () => { const w = mainWindows()[0]; if (w) { w.show(); w.focus(); } else createWindow(); });
+  }
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: 'Otwórz Gapę', click: () => { const w = mainWindows()[0]; if (w) { w.show(); w.focus(); } else createWindow(); } },
+    { type: 'separator' },
+    { label: 'Podgląd spacją w Eksploratorze', type: 'checkbox', checked: !!settings.peek, click: () => peekSet(!settings.peek) },
+    { label: 'Uruchamiaj razem z Windows', type: 'checkbox', checked: !!settings.autostart, click: () => autostartSet(!settings.autostart) },
+    { type: 'separator' },
+    { label: 'Zakończ Gapę', click: () => { quitting = true; app.quit(); } }
+  ]));
+}
+function peekSet(v) { settings.peek = !!v; saveSettings(); if (v) peekStart(); else peekStop(); trayUpdate(); }
+function autostartSet(v) {
+  settings.autostart = !!v; saveSettings();
+  try { app.setLoginItemSettings({ openAtLogin: !!v, args: ['--hidden'] }); } catch (e) {}
+  trayUpdate();
+}
+ipcMain.handle('peek-get', () => ({ available: isWin, peek: !!settings.peek, autostart: !!settings.autostart }));
+ipcMain.handle('peek-set', (e, v) => { peekSet(v); return true; });
+ipcMain.handle('autostart-set', (e, v) => { autostartSet(v); return true; });
 
 function buildMenu() {
   const tpl = [
@@ -535,7 +630,7 @@ const MIME = { jpg: 'image/jpeg', jpeg: 'image/jpeg', jpe: 'image/jpeg', jfif: '
 
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
-  app.on('second-instance', () => { const w = BrowserWindow.getAllWindows()[0]; if (w) { if (w.isMinimized()) w.restore(); w.focus(); } else createWindow(); });
+  app.on('second-instance', () => { const w = mainWindows()[0]; if (w) { if (w.isMinimized()) w.restore(); w.focus(); } else createWindow(); });
   app.whenReady().then(() => {
     loadSettings(); libLoad();
     openCache(settings.cacheDir);
@@ -563,11 +658,13 @@ else {
       } catch (err) { return new Response('', { status: 404 }); }
     });
     buildMenu();
-    createWindow();
+    // uruchomienie razem z Windows (--hidden): tylko w tle, z ikoną w zasobniku, bez okna
+    if (!(isWin && settings.peek && process.argv.includes('--hidden'))) createWindow();
+    if (isWin) { peekStart(); trayUpdate(); }
     if (settings.icon === 'retro') applyIcon();
     app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
   });
-  app.on('before-quit', () => { saveIndexNow(); saveSettings(); });
+  app.on('before-quit', () => { quitting = true; saveIndexNow(); saveSettings(); if (peekProc) try { peekProc.kill(); } catch (e) {} });
   // na Macu zamknięcie ostatniego okna nie kończy programu (zostaje w Docku, ⌘Q kończy); na Windows kończy
-  app.on('window-all-closed', () => { saveIndexNow(); saveSettings(); if (!isMac) app.quit(); });
+  app.on('window-all-closed', () => { saveIndexNow(); saveSettings(); if (!isMac && !settings.peek) app.quit(); });
 }

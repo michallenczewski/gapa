@@ -453,6 +453,8 @@ body.dragout.noside #bdrop{opacity:1;transform:translate(-50%,0);pointer-events:
 .nav li.dropon{background:var(--selbg);color:var(--text)}
 .tile input.ren,tr input.ren{width:100%;height:24px;margin-top:-4px;padding:0 6px;border:0;border-radius:6px;outline:0;font:inherit;font-size:12px;text-align:center;background:var(--card);color:var(--text);box-shadow:0 0 0 1.5px var(--text)}
 tr input.ren{text-align:left;margin:0}
+/* okno podglądu ze spacji w Eksploratorze: tylko przeglądarka obrazu */
+body.peekmode>header,body.peekmode>aside,body.peekmode>main{visibility:hidden}
 </style>
 </head>
 <body>
@@ -1142,7 +1144,9 @@ const grid=$('#grid'), main=$('#main');
 /* --- ustawienia (zapisywane lokalnie w programie) --- */
 const S=Object.assign({types:{},sort:'name',dir:1,size:180,lic:28,mode:'icons',names:true,theme:null,favs:[],last:null},
   (()=>{try{return JSON.parse(localStorage.getItem('podglad')||'{}');}catch(e){return {};}})());
-const save=()=>{try{localStorage.setItem('podglad',JSON.stringify(S));}catch(e){}};
+// okno podglądu ze spacji w Eksploratorze (Windows): korzysta z ustawień, ale niczego w nich nie zmienia
+const PEEK=!!api.peekPath;
+const save=()=>{ if(PEEK) return; try{localStorage.setItem('podglad',JSON.stringify(S));}catch(e){} };
 const press=(b,v)=>b.setAttribute('aria-pressed',v?'true':'false');
 
 function applyTheme(){
@@ -1344,6 +1348,8 @@ function settingsMenu(){
     {label:'Nazwy folderów',box:S.dirNames!==false,keys:['⇧','N'],keep:true,run:()=>{setDirNames(!(S.dirNames!==false));settingsMenu();}},
     {label:'Ukryj interfejs',keys:['Tab'],run:toggleBare},
     {label:'Skróty klawiszowe',keys:['?'],run:()=>toggleKeys(true)},
+    ...(peekState&&peekState.available?[{label:'Podgląd spacją w Eksploratorze',box:!!peekState.peek,keep:true,run:async()=>{ peekState.peek=!peekState.peek; await api.peekSet(peekState.peek); if(peekState.peek) zoomTip('Zaznacz plik w Eksploratorze i naciśnij spację'); settingsMenu(); }},
+      ...(peekState.peek?[{label:'Uruchamiaj razem z Windows',box:!!peekState.autostart,keep:true,run:async()=>{ peekState.autostart=!peekState.autostart; await api.autostartSet(peekState.autostart); settingsMenu(); }}]:[])]:[]),
     ...(api.mem?[{label:'Pokaż zużycie pamięci',box:!!S.showMem,keep:true,run:()=>{setShowMem(!S.showMem);settingsMenu();}}]:[]),
     {label:'Pokaż podpowiedzi od nowa',run:resetHints},
     {label:'Dźwięki',box:S.sound!==false,keys:['S'],keep:true,run:()=>{S.sound=!(S.sound!==false);save();if(S.sound)SFX('on');settingsMenu();}},
@@ -2604,7 +2610,8 @@ stage.addEventListener('pointerdown',e=>{
   stage.addEventListener('pointermove',mv); stage.addEventListener('pointerup',up);
 });
 addEventListener('resize',()=>{ if(zm) renderZoom(); hdAll(); });
-function closeViewer(){if(hintId==='viewer')hideHint();if(viewer.classList.contains('open'))SFX('close');stopMedia();viewer.classList.remove('open');chromeSync();vTok++;stage.textContent='';vEl=null;main.focus();}
+let peekClosing=false;
+function closeViewer(){ if(PEEK&&!peekClosing){ api.peekClose(); return; } if(hintId==='viewer')hideHint();if(viewer.classList.contains('open'))SFX('close');stopMedia();viewer.classList.remove('open');chromeSync();vTok++;stage.textContent='';vEl=null;main.focus();}
 // trzy poziomy: siatka → podgląd → przybliżenie. Klik w obraz schodzi poziom niżej (przybliża, a przybliżony wraca do dopasowania),
 // klik obok obrazu wraca o jeden poziom: z przybliżenia do dopasowania, z dopasowania do siatki
 stage.addEventListener('click',e=>{ if(e.target!==stage||panMoved) return; if(zm) zoomFit(true); else closeViewer(); });
@@ -3098,7 +3105,7 @@ let hintEl=null, hintT=0, hintId=null;
 function hideHint(){ clearTimeout(hintT); if(hintEl){ const h=hintEl; h.classList.remove('on'); setTimeout(()=>h.remove(),200); hintEl=null; hintId=null; } }
 function hintDone(id){ if(!S.hints[id]){ S.hints[id]=1; save(); } if(hintId===id) hideHint(); }
 function hint(id,anchor,html,where){
-  if(S.hints[id]||hintEl||$('#keys').classList.contains('on')) return;
+  if(PEEK||S.hints[id]||hintEl||$('#keys').classList.contains('on')) return;
   const r=anchor&&anchor.getBoundingClientRect?anchor.getBoundingClientRect():anchor; if(!r||!r.width) return;
   S.hints[id]=1; save();
   const h=document.createElement('div'); h.className='hint'; h.innerHTML=html+'<button aria-label="Zamknij">×</button>';
@@ -3116,8 +3123,26 @@ function resetHints(){ S.hints={}; S.seenKeys=false; save(); zoomTip('Podpowiedz
 $('#empty-open').onclick=pickFolder;
 markSort(); markModes(); setNames(S.names!==false); setDirNames(S.dirNames!==false); setGridLines(!!S.gridlines); setSide(S.side!==false); setInsp(!!S.insp);
 renderSide(); renderCrumbs(); renderTypes(); cacheInfo(); renderBasketNav(); libSync(); setShowMem(!!S.showMem);
-if(!S.seenKeys&&!api.startPath) setTimeout(()=>{ if(!S.seenKeys) toggleKeys(true); },1400);
-loadRoots().then(async()=>{ const sp=api.startPath; if(sp&&await api.exists(sp)) go(sp); else if(S.last&&await api.exists(S.last)) go(S.last); else { render(); syncTree(); } });
+if(!S.seenKeys&&!api.startPath&&!PEEK) setTimeout(()=>{ if(!S.seenKeys) toggleKeys(true); },1400);
+/* --- tryb podglądu: otwiera wskazany plik, strzałki w Eksploratorze przesuwają podgląd --- */
+async function peekOpen(p){
+  const d=api.dirname(p);
+  if(!samePath(curPath,d)||!items.some(x=>samePath(x.path,p))){
+    go(d,p);
+    for(let i=0;i<80&&!items.some(x=>samePath(x.path,p));i++) await new Promise(r=>setTimeout(r,40));
+  }
+  const it=items.find(x=>samePath(x.path,p)); if(!it) return;
+  if(viewer.classList.contains('open')){ const k=vList.indexOf(it); if(k>=0){ if(k!==vi){ vi=k; showV(); } return; } }
+  openViewer(it);
+}
+if(PEEK){
+  document.body.classList.add('peekmode'); S.types={}; S.insp=false;
+  api.onPeekOpen(p=>peekOpen(p));
+  api.onPeekHidden(()=>{ peekClosing=true; closeViewer(); peekClosing=false; });
+}
+// ustawienia podglądu spacją (tylko Windows)
+let peekState=null; if(api.peekGet&&!PEEK) api.peekGet().then(r=>{ peekState=r; });
+loadRoots().then(async()=>{ if(PEEK){ peekOpen(api.peekPath); return; } const sp=api.startPath; if(sp&&await api.exists(sp)) go(sp); else if(S.last&&await api.exists(S.last)) go(S.last); else { render(); syncTree(); } });
 
 </script>
 </body>

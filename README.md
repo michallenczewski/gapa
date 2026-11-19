@@ -33,13 +33,13 @@ Przeciągnięcie plików na folder (kafelek, folder w drzewie albo w Ulubionych)
 
 ## Windows: podgląd spacją w Eksploratorze
 
-Ustawienia → „Podgląd spacją w Eksploratorze”. Potem wystarczy zaznaczyć plik w Eksploratorze i nacisnąć spację: otwiera się okno podglądu Gapy, a Eksplorator zostaje aktywny, więc strzałkami przechodzisz do kolejnych plików i podgląd za nimi podąża. Spacja albo Esc zamyka podgląd. Kliknięcie w okno podglądu daje pełną obsługę jak w Gapie (przybliżanie, A / D, Z).
+Ustawienia → „Podgląd spacją w Eksploratorze”. Potem wystarczy zaznaczyć plik w Eksploratorze i nacisnąć spację: otwiera się okno podglądu Gapy, a Eksplorator zostaje aktywny, więc strzałkami przechodzisz do kolejnych plików i podgląd za nimi podąża. Przy kilku zaznaczonych plikach spacja pokazuje je wszystkie naraz na arkuszu; strzałki i Enter działają wtedy w podglądzie, a zaznaczenie w Eksploratorze zostaje nietknięte. Spacja działa też na pulpicie. Spacja albo Esc zamyka podgląd. Kliknięcie w okno podglądu daje pełną obsługę jak w Gapie (przybliżanie, A / D, Z).
 
-Gapa zostaje wtedy w tle z ikoną w zasobniku obok zegara (menu: otwórz, włącz / wyłącz, uruchamianie z Windows, zakończ). Działa w oknach Eksploratora (także w kartach Windows 11), nie na pulpicie. Spacja w polu nazwy, adresu albo wyszukiwania działa normalnie, tak samo z Ctrl, Shift albo Alt; foldery i nieobsługiwane pliki dostają zwykłą spację. Za nasłuchiwanie odpowiada mały pomocnik `GapaSpacja.exe` (źródło: `helper/GapaSpacja.cs`).
+Gapa zostaje wtedy w tle z ikoną w zasobniku obok zegara (menu: otwórz, włącz / wyłącz, uruchamianie z Windows, zakończ). Działa w oknach Eksploratora (także w kartach Windows 11) i na pulpicie. Spacja w polu nazwy, adresu albo wyszukiwania działa normalnie, tak samo z Ctrl, Shift albo Alt; foldery i nieobsługiwane pliki dostają zwykłą spację. Za nasłuchiwanie odpowiada mały pomocnik `GapaSpacja.exe` (źródło: `helper/GapaSpacja.cs`).
 
 ## Koszyk i wyszukiwanie w bibliotece
 
-**Koszyk** zbiera pliki z różnych folderów podczas przeglądania: zaznacz i naciśnij B, wybierz „Dodaj do koszyka” z menu albo przeciągnij miniatury na „Koszyk” w panelu bocznym. Pliki zostają na swoich miejscach. W koszyku przycisk „Przeciągnij wszystkie” przenosi całość naraz do Photoshopa, 3ds Maxa albo Findera, a „Kopiuj do folderu…” kopiuje pliki do folderu projektu (bez nadpisywania). Delete / ⌘⌫ w koszyku tylko wyjmuje plik z koszyka. Koszyk pamięta się między uruchomieniami.
+**Koszyk** zbiera pliki z różnych folderów podczas przeglądania: zaznacz i naciśnij B, wybierz „Dodaj do koszyka” z menu albo przeciągnij miniatury na „Koszyk” w panelu bocznym. Pliki zostają na swoich miejscach. W koszyku przycisk „Przeciągnij wszystkie” przenosi całość naraz do Photoshopa, 3ds Maxa albo Findera, a „Kopiuj do folderu…” kopiuje pliki do folderu projektu (bez nadpisywania). Delete / ⌘⌫ w koszyku tylko wyjmuje plik z koszyka. Przeciągnięcie z koszyka do folderu (także w drugim oknie Gapy) zawsze kopiuje, nigdy nie przenosi. Filtr typów działa też w koszyku. Koszyk pamięta się między uruchomieniami.
 
 **Biblioteka** to wszystkie foldery z Ulubionych razem z podfolderami. Gapa zapamiętuje nazwy plików w nich (indeks w pliku `biblioteka.json` obok ustawień) i odświeża go w tle po zmianie ulubionych, przy powrocie do okna, jeśli minęło 10 minut, albo na żądanie („Odśwież indeks”). Zakres wyszukiwania wybiera się przyciskiem w polu szukania: tu, podfoldery albo biblioteka. Słowa w zapytaniu muszą wystąpić wszystkie — w nazwie pliku albo folderu, więc „cegły czerwone” znajdzie pliki z folderu „Cegły/czerwone”.
 
@@ -77,12 +77,13 @@ Najczęstsze skróty leżą pod lewą ręką, żeby prawa mogła zostać na mysz
 | B / ⇧B | dodaj do koszyka lub wyjmij / otwórz koszyk |
 | 1 / 2 | mniejsze / większe miniatury; w podglądzie oddal / przybliż (także − + oraz ⌘/Ctrl + − +, ⌘/Ctrl+0 przywraca) |
 | Tab | ukryj / pokaż interfejs |
+| Ctrl+spacja (Windows) / ⌃⌘F (Mac) | pełny ekran 100%: bez paska zadań, paska okna i interfejsu; wyjście tym samym skrótem albo Esc |
 | Esc | zamknij podgląd, wyczyść wyszukiwanie |
 | ⌘/Ctrl + N | nowe okno w tym samym folderze (Koszyk i Ulubione są wspólne) |
 | ⌘[ ⌘] (Mac) / Alt+← Alt+→ (Windows) | wstecz / dalej po odwiedzonych miejscach (też strzałki < > i boczne przyciski myszy) |
 | ⌘/Ctrl + kółko, szczypnięcie | płynna zmiana wielkości miniatur; w podglądzie przybliżanie wokół kursora |
 | ⌘⌫ (Mac) / Delete (Windows) | przenieś do Kosza (foldery po potwierdzeniu); w koszyku tylko wyjmuje z koszyka |
-| ⌘C / ⌘X, potem ⌘V (Ctrl na Windows) | kopiuj albo wytnij zaznaczone pliki i foldery, wklej w bieżącym folderze |
+| ⌘C / ⌘X, potem ⌘V (Ctrl na Windows) | kopiuj albo wytnij zaznaczone pliki i foldery, wklej w bieżącym folderze — także w innym oknie Gapy, w Eksploratorze i w Finderze (i z nich do Gapy) |
 | F2 | zmień nazwę (Enter zapisuje, Esc anuluje) |
 | ⌘Enter / Ctrl+Enter | otwórz w domyślnym programie |
 | ⌘Z / Ctrl+Z | cofnij ostatnie przeniesienie, kopiowanie albo zmianę nazwy |

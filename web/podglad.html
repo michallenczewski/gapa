@@ -1168,7 +1168,15 @@ function applyTheme(){
 }
 // przyciski okna (Windows) w kolorze tła; na Macu „światła” po lewej
 if(!api.web) document.documentElement.classList.add(api.platform==='darwin'?'frame-mac':'frame-win');
-if(api.onFullscreen) api.onFullscreen(v=>document.documentElement.classList.toggle('fs',v));
+// pełny ekran ze skrótu: obraz na całym ekranie, bez paska zadań, paska okna i interfejsu; wyjście tym samym skrótem albo Esc
+let fsBare=null, fsWant=false;
+if(api.onFullscreen) api.onFullscreen(v=>{
+  document.documentElement.classList.toggle('fs',v);
+  if(v&&fsWant&&fsBare===null){ fsBare=document.body.classList.contains('bare'); if(!fsBare) toggleBare(); }
+  else if(!v&&fsBare!==null){ if(!fsBare&&document.body.classList.contains('bare')) toggleBare(); fsBare=null; }
+  fsWant=false;
+});
+function fullscreenToggle(){ fsWant=!document.documentElement.classList.contains('fs'); if(api.fullscreenToggle) api.fullscreenToggle(); else if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(()=>{}); }
 function chromeSync(){
   if(api.web||!api.chromeColors) return;
   const cs=getComputedStyle(document.documentElement), v=document.getElementById('viewer');
@@ -1229,7 +1237,7 @@ main.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefa
 let wheelT=0;
 
 /* filtry, sortowanie, widoki */
-function typeCounts(){const n={}; for(const it of items) n[it.type]=(n[it.type]||0)+1; return n;}
+function typeCounts(){const n={}; const src=virt==='basket'?S.basket.map(b=>({type:EXT[extOf(b.name)]})):items; for(const it of src) n[it.type]=(n[it.type]||0)+1; return n;}
 const TLABEL=t=>t==='tif'?'TIFF':t==='pln'?'Archicad':t==='vid'?'Wideo':t.toUpperCase();
 const fmtDur=s=>{if(!isFinite(s))return '';s=Math.round(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0');};
 const ICO_DOWN='<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="m2.5 4 2.5 2.5L7.5 4"/></svg>';
@@ -1468,7 +1476,7 @@ function renderBasketNav(){
 async function openBasket(){
   if(virt==='basket') return;
   record({basket:true}); SFX('tok'); virt='basket'; deep=false; markDeep(); $('#q').value=''; $('#qClear').hidden=true;
-  gen++; renderBasketNav(); renderSide(); renderTree(); renderCrumbs(); applyView(null); main.scrollTop=0; prefetch();
+  gen++; renderBasketNav(); renderSide(); renderTree(); renderCrumbs(); renderTypes(); applyView(null); main.scrollTop=0; prefetch();
   // pliki mogły się zmienić albo zniknąć od czasu dodania — sprawdź raz przy wejściu
   if(api.statFiles&&S.basket.length){
     const st=await api.statFiles(S.basket.map(b=>b.path)); if(virt!=='basket') return;
@@ -1479,7 +1487,7 @@ async function openBasket(){
     if(ch){ save(); applyView(keep()); prefetch(); }
   }
 }
-function closeVirt(){ virt=null; if(curPath) record({path:curPath}); renderBasketNav(); renderSide(); renderTree(); renderCrumbs(); applyView(null); main.scrollTop=0; if(curPath) prefetch(); }
+function closeVirt(){ virt=null; if(curPath) record({path:curPath}); renderBasketNav(); renderSide(); renderTree(); renderCrumbs(); renderTypes(); applyView(null); main.scrollTop=0; if(curPath) prefetch(); }
 async function copyBasketTo(list){
   if(!api.copyTo){ zoomTip('Kopiowanie działa w programie, nie w przeglądarce'); return; }
   const dir=await api.pickFolder(); if(!dir) return;
@@ -1647,16 +1655,27 @@ pathIn.addEventListener('keydown',async e=>{
 pathIn.addEventListener('blur',()=>setTimeout(()=>{ if(document.activeElement!==pathIn) endEditPath(); },120));
 $('#pathCopy').onclick=e=>{ e.stopPropagation(); copyText(curPath); };
 // wklejenie ścieżki gdziekolwiek w oknie (poza polami tekstowymi) przenosi do niej
+// schowek plików wspólny dla wszystkich okien Gapy; dodatkowo pliki trafiają do schowka systemowego (wklejanie w Eksploratorze / Finderze)
 let fileClip=null;
+function clipLoad(){ try{ const c=JSON.parse(localStorage.getItem('gapaClip')||'null'); fileClip=c&&c.paths?c:null; }catch(e){ fileClip=null; } return fileClip; }
+function clipSave(c){ fileClip=c; try{ if(c) localStorage.setItem('gapaClip',JSON.stringify(c)); else localStorage.removeItem('gapaClip'); }catch(e){} }
 document.addEventListener('paste',async e=>{
   if(e.target.closest&&e.target.closest('input,textarea')) return;
   const t=(e.clipboardData&&e.clipboardData.getData('text')||'').trim();
-  // pliki skopiowane albo wycięte w Gapie (⌘C / ⌘X) wklejamy do bieżącego folderu
-  if(fileClip&&t===fileClip.text){
+  // pliki skopiowane albo wycięte w Gapie (⌘C / ⌘X, w dowolnym oknie) wklejamy do bieżącego folderu
+  clipLoad();
+  let src=null;
+  if(!t&&api.clipReadFiles){
+    // pliki w schowku systemowym: skopiowane w Gapie albo w Eksploratorze / Finderze
+    const sys=await api.clipReadFiles();
+    if(sys&&sys.length){ const k=new Set(sys.map(bKey)), same=fileClip&&fileClip.paths.length===sys.length&&fileClip.paths.every(p=>k.has(bKey(p))); src={paths:sys,cut:!!(same&&fileClip.cut)}; }
+  } else if(fileClip&&t&&t===fileClip.text) src=fileClip;
+  if(!src&&!t&&fileClip&&!api.clipReadFiles) src=fileClip;
+  if(src){
     e.preventDefault();
     if(!curPath||virt||deep){ zoomTip('Otwórz folder, do którego mają trafić pliki'); return; }
-    const c=fileClip, r=await doTransfer(c.paths,{path:curPath,name:api.basename(curPath)||curPath},c.cut?'move':'copy');
-    if(c.cut&&r&&r.done.length){ fileClip=null; navigator.clipboard.writeText('').catch(()=>{}); }
+    const c=src, r=await doTransfer(c.paths,{path:curPath,name:api.basename(curPath)||curPath},c.cut?'move':'copy');
+    if(c.cut&&r&&r.done.length){ clipSave(null); navigator.clipboard.writeText('').catch(()=>{}); }
     return;
   }
   if(t&&!t.includes('\n')&&/^(["']?)(\/|~|[A-Za-z]:[\\/]|\\\\|file:\/\/)/.test(t)){ e.preventDefault(); goPath(t); }
@@ -1815,7 +1834,7 @@ async function libView(q,keepPath){
 }
 function basketView(q,keepPath){
   libInfo=null;
-  const fs=sortFiles(S.basket.map(b=>fileObj(bItems,b)).filter(it=>!q||matchQ(norm(it.name),q)));
+  const fs=sortFiles(S.basket.map(b=>fileObj(bItems,b)).filter(it=>on(it.type)&&(!q||matchQ(norm(it.name),q))));
   setGrouped(fs,it=>api.dirname(it.path),(a,b)=>coll.compare(api.basename(a),api.basename(b))||coll.compare(a,b),
     k=>({label:crumbsOf(k).filter(x=>x.name).slice(-2).map(x=>x.name).join(' / '),target:k}));
   finishView(keepPath);
@@ -1929,7 +1948,7 @@ function basketBar(){
     +'<button class="bb clear">Wyczyść</button>';
   bar.querySelector('.t').textContent=all.length+' '+plural(all.length,'plik','pliki','plików')+'  ·  '+fmtSize(size);
   const dr=bar.querySelector('.drag');
-  if(dr){ dr.ondragstart=e=>{e.preventDefault();draggingOut=true;lastOut=S.basket.map(b=>b.path);api.dragOut(lastOut,dragImage(S.basket.map(b=>bItems.get(b.path))));};
+  if(dr){ dr.ondragstart=e=>{e.preventDefault();draggingOut=true;lastOut=S.basket.map(b=>b.path);dragCopy=true;api.dragOut(lastOut,dragImage(S.basket.map(b=>bItems.get(b.path))),true);};
     dr.onclick=()=>zoomTip('Złap ten przycisk i przeciągnij do innego programu'); }
   const cp=bar.querySelector('.copy'); if(cp) cp.onclick=()=>copyBasketTo(S.basket);
   bar.querySelector('.clear').onclick=basketClear;
@@ -2101,7 +2120,7 @@ grid.addEventListener('dragstart',e=>{
   const it=view[+t.dataset.i]; if(!it||it.kind!=='file') return;
   e.preventDefault();
   if(!picked.has(it)) select(+t.dataset.i);
-  draggingOut=true; dragT=performance.now(); if(virt!=='basket') document.body.classList.add('dragout'); lastOutItems=pickedFiles(it); lastOut=lastOutItems.map(x=>x.path); api.dragOut(lastOut,dragImage(lastOutItems));
+  draggingOut=true; dragT=performance.now(); if(virt!=='basket') document.body.classList.add('dragout'); lastOutItems=pickedFiles(it); lastOut=lastOutItems.map(x=>x.path); dragCopy=virt==='basket'; api.dragOut(lastOut,dragImage(lastOutItems),dragCopy);
 });
 let dragT=0;
 // obraz pod kursorem przy przeciąganiu: miniatury (do trzech, ułożone w stos) i liczba plików
@@ -2789,7 +2808,7 @@ document.addEventListener('contextmenu',e=>{
     if(!curPath) return;
     showMenu(e.clientX,e.clientY,api.basename(curPath)||curPath,[
       {label:'Odśwież',key:'R',run:()=>scan(true)},
-      ...(fileClip&&api.transfer?[{label:(fileClip.cut?'Wklej (przenieś) ':'Wklej ')+fileClip.paths.length,key:MOD+'V',run:async()=>{ const c=fileClip, r=await doTransfer(c.paths,{path:curPath,name:api.basename(curPath)||curPath},c.cut?'move':'copy'); if(c.cut&&r&&r.done.length) fileClip=null; }},'-']:[]),
+      ...(clipLoad()&&api.transfer?[{label:(fileClip.cut?'Wklej (przenieś) ':'Wklej ')+fileClip.paths.length,key:MOD+'V',run:async()=>{ const c=fileClip, r=await doTransfer(c.paths,{path:curPath,name:api.basename(curPath)||curPath},c.cut?'move':'copy'); if(c.cut&&r&&r.done.length) clipSave(null); }},'-']:[]),
       {label:'Kopiuj ścieżkę folderu',run:()=>copyText(curPath)},
       {label:'Przejdź do ścieżki…',key:MOD+'L',run:editPath},
       {label:'Pokaż folder w '+FINDER,run:()=>api.openDefault(curPath)},
@@ -2838,6 +2857,8 @@ addEventListener('blur',hideMenu); main.addEventListener('scroll',hideMenu);
 /* --- klawiatura --- */
 document.addEventListener('keydown',e=>{
   const k=e.key;
+  if(!isMac&&e.ctrlKey&&!e.shiftKey&&!e.altKey&&k===' '){ e.preventDefault(); fullscreenToggle(); return; }
+  if(k==='Escape'&&document.documentElement.classList.contains('fs')&&fsBare!==null&&!dlgDone&&ctx.hidden){ e.preventDefault(); fullscreenToggle(); return; }
   if(dlgDone){ if(k==='Escape'){e.preventDefault();dlgDone(false);} else if(k==='Enter'){e.preventDefault();dlgDone(true);} return; }
   if(!ctx.hidden&&k==='Escape'){hideMenu();return;}
   if($('#keys').classList.contains('on')){ if(k==='Escape'||k==='?'){e.preventDefault();toggleKeys(false);} return; }
@@ -2913,8 +2934,8 @@ document.addEventListener('keydown',e=>{
   if(mod&&!e.shiftKey&&!e.altKey&&(e.code==='KeyC'||e.code==='KeyX')&&api.transfer){
     const s=[...picked]; if(!s.length) return;
     if(e.code==='KeyX'&&virt==='basket'){ zoomTip('W koszyku pliki można skopiować, nie wyciąć'); return; }
-    e.preventDefault(); fileClip={paths:s.map(x=>x.path),cut:e.code==='KeyX',text:s.map(x=>x.path).join('\n')};
-    navigator.clipboard.writeText(fileClip.text).catch(()=>{});
+    e.preventDefault(); clipSave({paths:s.map(x=>x.path),cut:e.code==='KeyX',text:s.map(x=>x.path).join('\n')});
+    if(api.clipFiles) api.clipFiles(fileClip.paths); else navigator.clipboard.writeText(fileClip.text).catch(()=>{});
     zoomTip((fileClip.cut?'Wycięto ':'Skopiowano ')+s.length+' — wklej ('+(isMac?'⌘V':'Ctrl+V')+') w docelowym folderze'); return;
   }
   if(mod&&k==='Enter'){ e.preventDefault(); const s=[...picked].slice(0,12); for(const x of s) api.openDefault(x.path); return; }
@@ -2988,7 +3009,7 @@ addEventListener('storage',e=>{
   z.addEventListener('dragleave',()=>z.classList.remove('over')); }
 /* --- upuszczanie: na folder (kafelek, drzewo, ulubione) albo na siatkę bieżącego folderu przenosi lub kopiuje pliki,
        jak w Finderze: ten sam dysk — przenosi, inny dysk albo z Alt / ⌥ — kopiuje; ⌘Z / Ctrl+Z cofa --- */
-let dragN=0, dropOn=null, dragSrc=null, dragSrcDev=null;
+let dragN=0, dropOn=null, dragSrc=null, dragSrcDev=null, dragCopy=false, dragSrcCopy=false;   // z koszyka zawsze kopiujemy
 const devCache=new Map();
 const hasFiles=e=>e.dataTransfer&&[...e.dataTransfer.types].includes('Files');
 const dropLab=document.createElement('div'); dropLab.id='droplab'; document.body.appendChild(dropLab);
@@ -3002,7 +3023,8 @@ function dropTarget(e){
   return null;
 }
 async function learnDrag(){            // co jest przeciągane: z tego okna wiemy od razu, z innego okna Gapy pytamy proces główny
-  dragSrc=draggingOut?lastOut:(api.currentDrag?await api.currentDrag():null);
+  const cd=draggingOut?{files:lastOut,copy:dragCopy}:(api.currentDrag?await api.currentDrag():null);
+  dragSrc=cd&&cd.files||null; dragSrcCopy=!!(cd&&cd.copy);
   dragSrcDev=null; if(dragSrc&&dragSrc.length&&api.devOf) dragSrcDev=(await api.devOf([dragSrc[0]]))[0];
 }
 function devOfDest(p){ if(devCache.has(p)) return devCache.get(p); devCache.set(p,undefined); if(api.devOf) api.devOf([p]).then(r=>devCache.set(p,r[0])); return undefined; }
@@ -3013,10 +3035,10 @@ function showDrop(t,e){
   const same=dragSrc&&dragSrc.length&&dragSrc.every(p=>samePath(api.dirname(p),t.path));
   if(same){ dropLab.classList.remove('on'); e.dataTransfer.dropEffect='none'; return; }
   let verb;
-  if(e.altKey) verb='Kopiuj';
+  if(e.altKey||dragSrcCopy) verb='Kopiuj';
   else { const d=devOfDest(t.path); verb=dragSrcDev==null||d==null?'Przenieś':(d===dragSrcDev?'Przenieś':'Kopiuj'); }
   e.dataTransfer.dropEffect=verb==='Kopiuj'?'copy':'move';
-  dropLab.textContent=verb+' do „'+t.name+'”'+(verb==='Przenieś'?'  ·  '+(isMac?'⌥':'Alt')+' kopiuje':'');
+  dropLab.textContent=verb+' do „'+t.name+'”'+(verb==='Przenieś'&&!dragSrcCopy?'  ·  '+(isMac?'⌥':'Alt')+' kopiuje':'');
   dropLab.style.left=(e.clientX+16)+'px'; dropLab.style.top=(e.clientY+18)+'px'; dropLab.classList.add('on');
 }
 document.addEventListener('dragenter',e=>{ if(!hasFiles(e)) return; if(dragN++===0) learnDrag(); if(!curPath&&!draggingOut) document.body.dataset.drop='1'; });
@@ -3062,7 +3084,7 @@ document.addEventListener('drop',async e=>{
   if(t&&(t.kind==='dir'||t.kind==='here')&&dropped.length){
     // pojedynczy folder z zewnątrz upuszczony na siatkę — otwieramy go, jak dotąd
     if(!wasOut&&t.kind==='here'&&dropped.length===1&&await api.exists(dropped[0])){ go(dropped[0]); return; }
-    await doTransfer(dropped,t,e.altKey?'copy':'auto'); return;
+    await doTransfer(dropped,t,e.altKey||dragSrcCopy?'copy':'auto'); return;
   }
   if(wasOut) return;
   if(api.addDropped){ const it=[...e.dataTransfer.items].find(i=>i.kind==='file'); if(it){ const p=await api.addDropped(it); if(p){ await loadRoots(); go(p); } } return; }

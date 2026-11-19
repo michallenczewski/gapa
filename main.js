@@ -1,5 +1,5 @@
 // Podgląd — proces główny: okno, dostęp do dysku, pamięć miniatur, integracja z systemem.
-const { app, BrowserWindow, ipcMain, dialog, shell, protocol, nativeImage, Menu, Tray, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, protocol, nativeImage, Menu, Tray, screen, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const fsp = fs.promises;
@@ -418,7 +418,37 @@ ipcMain.handle('mem', () => {
   return { total, renderer };
 });
 ipcMain.handle('dev-of', (e, paths) => Promise.all((paths || []).map(p => fsp.stat(p).then(s => s.dev).catch(() => null))));
-ipcMain.handle('current-drag', () => lastDrag && Date.now() - lastDrag.t < 120000 ? lastDrag.files : null);
+ipcMain.handle('current-drag', () => lastDrag && Date.now() - lastDrag.t < 120000 ? { files: lastDrag.files, copy: lastDrag.copy } : null);
+// schowek systemowy z plikami: Gapa → Eksplorator / Finder (⌘C / Ctrl+C) i z powrotem (⌘V / Ctrl+V w Gapie)
+const psq = s => "'" + String(s).replace(/'/g, "''") + "'";
+ipcMain.handle('clip-files', async (e, paths) => {
+  paths = (paths || []).filter(Boolean);
+  if (!paths.length) return false;
+  try {
+    if (isWin) {
+      await new Promise(res => execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'Set-Clipboard -LiteralPath ' + paths.map(psq).join(',')], { windowsHide: true }, () => res()));
+    } else if (isMac) {
+      const esc = p => p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const plist = '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><array>' + paths.map(p => '<string>' + esc(p) + '</string>').join('') + '</array></plist>';
+      clipboard.clear();
+      clipboard.writeBuffer('NSFilenamesPboardType', Buffer.from(plist, 'utf8'));
+    } else clipboard.writeText(paths.join('\n'));
+    return true;
+  } catch (err) { return false; }
+});
+ipcMain.handle('clip-read-files', async () => {
+  try {
+    if (isWin) {
+      const out = await new Promise(res => execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', '[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-Clipboard -Format FileDropList | ForEach-Object { $_.FullName }'], { windowsHide: true, encoding: 'utf8' }, (err, so) => res(err ? '' : so)));
+      return out.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+    }
+    if (isMac) {
+      const b = clipboard.readBuffer('NSFilenamesPboardType').toString('utf8');
+      return [...b.matchAll(/<string>([\s\S]*?)<\/string>/g)].map(m => m[1].replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'));
+    }
+  } catch (err) {}
+  return [];
+});
 ipcMain.handle('transfer', async (e, paths, dest, mode) => {
   const done = [], failed = [], dirs = new Set([dest]);
   let dst; try { dst = await fsp.stat(dest); if (!dst.isDirectory()) throw new Error(); } catch (err) { return { done, failed: paths.map(p => ({ path: p, error: 'nie ma folderu docelowego' })) }; }
@@ -468,7 +498,7 @@ ipcMain.handle('undo-transfer', async () => {
 });
 
 let dragIcon = null;
-ipcMain.on('drag-out', (e, files, icon) => {
+ipcMain.on('drag-out', (e, files, icon, copy) => {
   if (!files || !files.length) return;
   // pod kursorem miniatury przeciąganych plików (przygotowane w oknie); ikona programu tylko awaryjnie
   let img = null;
@@ -476,7 +506,7 @@ ipcMain.on('drag-out', (e, files, icon) => {
     try { img = nativeImage.createFromBuffer(Buffer.from(icon.slice(22), 'base64'), { scaleFactor: 2 }); if (img.isEmpty()) img = null; } catch (err) { img = null; }
   }
   if (!img) { if (!dragIcon) dragIcon = nativeImage.createFromPath(path.join(__dirname, 'renderer', 'icon.png')).resize({ width: 48, height: 48 }); img = dragIcon; }
-  lastDrag = { files, t: Date.now() };
+  lastDrag = { files, copy: !!copy, t: Date.now() };
   e.sender.startDrag({ file: files[0], files, icon: img });
 });
 
@@ -607,6 +637,8 @@ function autostartSet(v) {
   try { app.setLoginItemSettings({ openAtLogin: !!v, args: ['--hidden'] }); } catch (e) {}
   trayUpdate();
 }
+// pełny ekran 100% (bez paska zadań i paska okna): Ctrl+spacja na Windows, ⌃⌘F na Macu
+ipcMain.on('fullscreen-toggle', e => { const w = BrowserWindow.fromWebContents(e.sender); if (w) w.setFullScreen(!w.isFullScreen()); });
 ipcMain.handle('peek-get', () => ({ available: isWin, peek: !!settings.peek, autostart: !!settings.autostart }));
 ipcMain.handle('peek-set', (e, v) => { peekSet(v); return true; });
 ipcMain.handle('autostart-set', (e, v) => { autostartSet(v); return true; });

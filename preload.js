@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('api', {
   onMenu: cb => ipcRenderer.on('menu', (e, a) => cb(a)),
   iconGet: () => ipcRenderer.invoke('icon-get'),
   iconSet: n => ipcRenderer.invoke('icon-set', n),
+  fullscreenToggle: () => ipcRenderer.send('fullscreen-toggle'),
   onFullscreen: cb => ipcRenderer.on('fullscreen', (e, v) => cb(v)),
 
   thumbGet: k => ipcRenderer.invoke('thumb-get', k),
@@ -43,6 +44,8 @@ contextBridge.exposeInMainWorld('api', {
   libRoots: (roots, exts, force) => ipcRenderer.invoke('lib-roots', roots, exts, force),
   libSearch: (q, exts, names) => ipcRenderer.invoke('lib-search', q, exts, names),
   onLibStatus: cb => ipcRenderer.on('lib-status', (e, s) => cb(s)),
+  clipFiles: paths => ipcRenderer.invoke('clip-files', paths),
+  clipReadFiles: () => ipcRenderer.invoke('clip-read-files'),
   mem: () => ipcRenderer.invoke('mem'),
   transfer: (paths, dest, mode) => ipcRenderer.invoke('transfer', paths, dest, mode),
   rename: (p, name) => ipcRenderer.invoke('rename', p, name),
@@ -60,7 +63,7 @@ contextBridge.exposeInMainWorld('api', {
   autostartSet: v => ipcRenderer.invoke('autostart-set', v),
   newWindow: p => ipcRenderer.send('new-window', p),
   startPath: (() => { try { return new URLSearchParams(location.search).get('p'); } catch (e) { return null; } })(),
-  dragOut: (files, icon) => ipcRenderer.send('drag-out', files, icon),
+  dragOut: (files, icon, copy) => ipcRenderer.send('drag-out', files, icon, !!copy),
   osThumb: (p, size) => ipcRenderer.invoke('os-thumb', p, size),
   fileHref: p => require('url').pathToFileURL(p).href,
   pathForFile: f => { try { return webUtils.getPathForFile(f); } catch (e) { return null; } }

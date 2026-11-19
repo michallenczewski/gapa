@@ -1,0 +1,18 @@
+name: Sprawdź pomocnika Windows
+
+# Tania kontrola (ok. 1 minuta na Windows): czy helper/GapaSpacja.cs się kompiluje. Uruchamiana ręcznie.
+on:
+  workflow_dispatch:
+
+jobs:
+  compile:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: helper
+      - shell: pwsh
+        run: |
+          & "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /target:winexe /optimize /r:Microsoft.CSharp.dll /r:System.Core.dll /out:helper\GapaSpacja.exe helper\GapaSpacja.cs
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Get-Item helper\GapaSpacja.exe | Select-Object Name, Length

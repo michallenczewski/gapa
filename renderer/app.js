@@ -102,9 +102,17 @@ $('#size').addEventListener('input',sliderFill);
 // ząbek kółka myszy (duży, całkowity krok) zmienia rozmiar o kilka procent
 const pinchLike=e=>e.deltaMode===0&&(!Number.isInteger(e.deltaY)||Math.abs(e.deltaY)<50);
 main.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();hintDone('zoom');
-  if(S.mode!=='list'&&!pinchLike(e)){ const now=performance.now(); if(now-(wheelT||0)>90){ wheelT=now; zstep(e.deltaY<0?1:-1); } return; }
+  // siatka: ruchy kółka i gładzika się sumują; jedna kolumna dopiero po odpowiedniku jednego ząbka (także przy
+  // powiększeniu ekranu w Windows, gdzie ząbek daje ułamkowe wartości), nie częściej niż co 150 ms
+  if(S.mode!=='list'){
+    const now=performance.now(), d=e.deltaMode===1?e.deltaY*33:e.deltaY;
+    if(now-wheelLast>350) wheelAcc=0; wheelLast=now;
+    wheelAcc+=d;
+    if(Math.abs(wheelAcc)>=50&&now-wheelT>150){ wheelT=now; zstep(wheelAcc<0?1:-1); wheelAcc=0; }
+    return;
+  }
   const d=e.deltaMode===1?e.deltaY*33:e.deltaY; setSize(zcur()*Math.exp(-Math.max(-120,Math.min(120,d))/100),true);},{passive:false});
-let wheelT=0;
+let wheelT=0, wheelAcc=0, wheelLast=0;
 
 /* filtry, sortowanie, widoki */
 function typeCounts(){const n={}; const src=virt==='basket'?S.basket.map(b=>({type:EXT[extOf(b.name)]})):items; for(const it of src) n[it.type]=(n[it.type]||0)+1; return n;}

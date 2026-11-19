@@ -97,11 +97,11 @@ body.noside #hspace{display:none}
 .rf{flex:none;margin-left:auto;width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;color:var(--muted2);opacity:0;transition:opacity .12s}
 .nav li:hover .rf,.rf:focus-visible{opacity:1}
 .rf:hover{color:var(--text);background:var(--hover2,rgba(0,0,0,.06))}
-.rf.on{opacity:1;color:#c99a2e}
+.rf.on{opacity:1;color:var(--text2)}
 .tile .tf{position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.9);color:#4a4945;opacity:0;transition:opacity .12s;z-index:3}
 [data-theme=dark] .tile .tf{background:rgba(22,22,22,.8);color:#d0d0cd}
 .tile.dir:hover .tf,.tile .tf.on{opacity:1}
-.tile .tf.on{color:#c99a2e}
+.tile .tf.on{color:var(--text)}
 #deepChip{height:26px;padding:0 10px;border-radius:7px;background:var(--soft);font-size:12px;flex:none;color:var(--text2)}
 #deepChip:hover{background:var(--hover);color:var(--text)}
 .gap{flex:1 1 0;min-width:8px}
@@ -1437,7 +1437,7 @@ const blobOf=it=>fetch(api.fileUrl(it.path)).then(x=>{if(!x.ok)throw new Error('
 /* --- ulubione --- */
 const samePath=(a,b)=>a&&b&&(isMac?a===b:a.toLowerCase()===b.toLowerCase());
 const findFav=p=>S.favs.find(f=>samePath(f.path,p));
-const STAR='<svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="m7 1.8 1.6 3.3 3.6.5-2.6 2.5.6 3.6L7 10l-3.2 1.7.6-3.6-2.6-2.5 3.6-.5z"/></svg>';
+const STAR='<svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="m7 1.8 1.6 3.3 3.6.5-2.6 2.5.6 3.6L7 10l-3.2 1.7.6-3.6-2.6-2.5 3.6-.5z"/></svg>';
 function favBtn(cls,p){
   const b=document.createElement('button'); b.className=cls; b.innerHTML=STAR;
   const sync=()=>{const on=!!findFav(p);b.classList.toggle('on',on);b.querySelector('path').setAttribute('fill',on?'currentColor':'none');b.title=on?'Usuń z ulubionych':'Dodaj do ulubionych';b.setAttribute('aria-label',b.title);};

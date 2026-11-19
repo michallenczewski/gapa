@@ -291,7 +291,7 @@ const blobOf=it=>fetch(api.fileUrl(it.path)).then(x=>{if(!x.ok)throw new Error('
 /* --- ulubione --- */
 const samePath=(a,b)=>a&&b&&(isMac?a===b:a.toLowerCase()===b.toLowerCase());
 const findFav=p=>S.favs.find(f=>samePath(f.path,p));
-const STAR='<svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="m7 1.8 1.6 3.3 3.6.5-2.6 2.5.6 3.6L7 10l-3.2 1.7.6-3.6-2.6-2.5 3.6-.5z"/></svg>';
+const STAR='<svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="m7 1.8 1.6 3.3 3.6.5-2.6 2.5.6 3.6L7 10l-3.2 1.7.6-3.6-2.6-2.5 3.6-.5z"/></svg>';
 function favBtn(cls,p){
   const b=document.createElement('button'); b.className=cls; b.innerHTML=STAR;
   const sync=()=>{const on=!!findFav(p);b.classList.toggle('on',on);b.querySelector('path').setAttribute('fill',on?'currentColor':'none');b.title=on?'Usuń z ulubionych':'Dodaj do ulubionych';b.setAttribute('aria-label',b.title);};

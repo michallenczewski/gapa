@@ -1,10 +1,13 @@
 // GapaSpacja — pomocnik Gapy na Windows: spacja w Eksploratorze otwiera podgląd zaznaczonego pliku w Gapie.
 //
 // Działa w tle jako proces potomny Gapy i rozmawia z nią przez stdin/stdout (po jednej linii JSON / polecenia):
-//   → {"t":"space","path":"C:\\..."}   spacja w liście plików Eksploratora (path = zaznaczony plik)
+//   → {"t":"space","path":"C:\\...","paths":[...]}   spacja w liście plików Eksploratora albo na pulpicie
+//                                       (path = plik z fokusem, paths = wszystkie zaznaczone pliki)
+//   → {"t":"key","k":"ArrowLeft"}     strzałki / Enter / Backspace przy podglądzie kilku plików (zaznaczenie zostaje)
 //   → {"t":"esc"}                       Esc w Eksploratorze, gdy podgląd jest otwarty
 //   → {"t":"sel","path":"C:\\..."}      zmiana zaznaczenia strzałkami, gdy podgląd jest otwarty
 //   ← open 1 / open 0                   Gapa mówi, czy podgląd jest widoczny
+//   ← multi 1 / multi 0                 podgląd kilku plików: klawisze nawigacji idą do Gapy, nie do Eksploratora
 //   ← pass                              Gapa nie obsługuje pliku — oddaj spację Eksploratorowi
 //
 // Spację przechwytujemy tylko wtedy, gdy na wierzchu jest okno Eksploratora, a fokus ma lista plików
@@ -60,6 +63,7 @@ static class GapaSpacja
 
     static HookProc hookProc;                       // trzymamy referencję, żeby GC nie zebrał delegata
     static volatile bool previewOpen = false;
+    static volatile bool previewMulti = false;
     static volatile bool spaceHeld = false;         // spacja przechwycona i jeszcze nie puszczona
     static readonly BlockingCollection<string> jobs = new BlockingCollection<string>();
     static readonly object outLock = new object();
@@ -84,6 +88,8 @@ static class GapaSpacja
                     if (line == "open 1") previewOpen = true;
                     else if (line == "open 0") previewOpen = false;
                     else if (line == "pass") jobs.Add("pass");
+                    else if (line == "multi 1") previewMulti = true;
+                    else if (line == "multi 0") previewMulti = false;
                 }
             }
             catch (Exception) { }
@@ -121,14 +127,18 @@ static class GapaSpacja
         fileList = false;
         if (fg == IntPtr.Zero) return false;
         string cls = ClassOf(fg);
-        if (cls != "CabinetWClass" && cls != "ExploreWClass") return false;
+        bool desk = cls == "Progman" || cls == "WorkerW";                 // pulpit
+        if (cls != "CabinetWClass" && cls != "ExploreWClass" && !desk) return false;
         uint pid;
         uint tid = GetWindowThreadProcessId(fg, out pid);
         var gti = new GUITHREADINFO();
         gti.cbSize = Marshal.SizeOf(typeof(GUITHREADINFO));
         if (GetGUIThreadInfo(tid, ref gti) && gti.hwndFocus != IntPtr.Zero)
-            fileList = ClassOf(gti.hwndFocus) == "DirectUIHWND";
-        return true;
+        {
+            string fc = ClassOf(gti.hwndFocus);
+            fileList = desk ? fc == "SysListView32" : fc == "DirectUIHWND";
+        }
+        return !desk || fileList;
     }
 
     static bool IsNavKey(uint vk)
@@ -165,6 +175,16 @@ static class GapaSpacja
                     IntPtr fg; bool list;
                     if (ExplorerFront(out fg, out list)) { jobs.Add("esc"); return (IntPtr)1; }
                 }
+                else if (previewOpen && previewMulti && down && (IsNavKey(k.vkCode) || k.vkCode == 0x0D || k.vkCode == 0x08))
+                {
+                    IntPtr fg; bool list;
+                    if (ExplorerFront(out fg, out list) && list) { jobs.Add("key|" + KeyName(k.vkCode)); return (IntPtr)1; }
+                }
+                else if (previewOpen && previewMulti && up && (IsNavKey(k.vkCode) || k.vkCode == 0x0D || k.vkCode == 0x08))
+                {
+                    IntPtr fg; bool list;
+                    if (ExplorerFront(out fg, out list) && list) return (IntPtr)1;
+                }
                 else if (previewOpen && up && IsNavKey(k.vkCode))
                 {
                     IntPtr fg; bool list;
@@ -173,6 +193,17 @@ static class GapaSpacja
             }
         }
         return CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);
+    }
+
+    static string KeyName(uint vk)
+    {
+        switch (vk)
+        {
+            case 0x25: return "ArrowLeft"; case 0x26: return "ArrowUp"; case 0x27: return "ArrowRight"; case 0x28: return "ArrowDown";
+            case 0x21: return "PageUp"; case 0x22: return "PageDown"; case 0x23: return "End"; case 0x24: return "Home";
+            case 0x0D: return "Enter"; case 0x08: return "Backspace";
+        }
+        return "";
     }
 
     static void Worker()
@@ -184,21 +215,28 @@ static class GapaSpacja
             {
                 if (job == "pass") { Reinject(); continue; }
                 if (job == "esc") { Send("{\"t\":\"esc\"}"); continue; }
+                if (job.StartsWith("key|")) { Send("{\"t\":\"key\",\"k\":" + Json(job.Substring(4)) + "}"); continue; }
                 var parts = job.Split('|');
                 IntPtr fg = new IntPtr(long.Parse(parts[1]));
                 if (parts[0] == "space")
                 {
-                    string p = previewOpen ? null : FocusedPath(fg);
                     if (previewOpen) { Send("{\"t\":\"space\",\"path\":null}"); continue; }
+                    var sel = new System.Collections.Generic.List<string>();
+                    string p = Selection(fg, sel);
+                    sel.RemoveAll(x => !File.Exists(x));
+                    if ((p == null || !File.Exists(p)) && sel.Count > 0) p = sel[0];
                     if (p == null || !File.Exists(p)) { Reinject(); continue; }   // folder albo nic — spacja wraca do Eksploratora
                     lastSel = p;
                     AllowSetForegroundWindow(-1);
-                    Send("{\"t\":\"space\",\"path\":" + Json(p) + "}");
+                    var arr = new StringBuilder("[");
+                    for (int i = 0; i < sel.Count && i < 200; i++) { if (i > 0) arr.Append(','); arr.Append(Json(sel[i])); }
+                    arr.Append(']');
+                    Send("{\"t\":\"space\",\"path\":" + Json(p) + ",\"paths\":" + arr + "}");
                 }
                 else if (parts[0] == "sel")
                 {
                     Thread.Sleep(30);                                              // Eksplorator musi zdążyć przesunąć zaznaczenie
-                    string p = FocusedPath(fg);
+                    string p = Selection(fg, null);
                     if (p != null && p != lastSel && File.Exists(p)) { lastSel = p; Send("{\"t\":\"sel\",\"path\":" + Json(p) + "}"); }
                 }
             }
@@ -206,12 +244,19 @@ static class GapaSpacja
         }
     }
 
-    // ścieżka pliku, który ma fokus w aktywnej karcie danego okna Eksploratora
-    static string FocusedPath(IntPtr fg)
+    // plik z fokusem (i, gdy all != null, wszystkie zaznaczone) w aktywnej karcie okna Eksploratora albo na pulpicie
+    static string Selection(IntPtr fg, System.Collections.Generic.List<string> all)
     {
         Type t = Type.GetTypeFromProgID("Shell.Application");
         dynamic shell = Activator.CreateInstance(t);
         dynamic windows = shell.Windows();
+        string fcls = ClassOf(fg);
+        if (fcls == "Progman" || fcls == "WorkerW")
+        {
+            object loc = 0, empty = null; int hwnd;
+            dynamic desk = windows.FindWindowSW(ref loc, ref empty, 8, out hwnd, 1);   // SWC_DESKTOP, SWFO_NEEDDISPATCH
+            return Collect(desk.Document, all);
+        }
         IntPtr tab = FindWindowEx(fg, IntPtr.Zero, "ShellTabWindowClass", null);
         string single = null; int count = 0;
         foreach (dynamic w in windows)
@@ -236,15 +281,29 @@ static class GapaSpacja
                     }
                     catch (Exception) { }
                 }
-                dynamic item = w.Document.FocusedItem;
-                if (item == null) continue;
-                string path = (string)item.Path;
-                if (active) return path;
-                if (single == null) single = path;
+                if (active) return Collect(w.Document, all);
+                if (single == null) { var tmp = all == null ? null : new System.Collections.Generic.List<string>(); single = Collect(w.Document, tmp); if (all != null && tmp != null) { all.Clear(); all.AddRange(tmp); } }
             }
             catch (Exception) { }
         }
         return count == 1 ? single : null;
+    }
+
+    static string Collect(dynamic doc, System.Collections.Generic.List<string> all)
+    {
+        string focus = null;
+        try { dynamic item = doc.FocusedItem; if (item != null) focus = (string)item.Path; } catch (Exception) { }
+        if (all != null)
+        {
+            try
+            {
+                dynamic items = doc.SelectedItems();
+                int n = (int)items.Count;
+                for (int i = 0; i < n && i < 500; i++) { try { all.Add((string)items.Item(i).Path); } catch (Exception) { } }
+            }
+            catch (Exception) { }
+        }
+        return focus;
     }
 
     static void Reinject()

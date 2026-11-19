@@ -2090,9 +2090,10 @@ if(PEEK){
 }
 function sheetCols(n){                // tyle kolumn, żeby obrazy 4:3 były jak największe
   // rozmiar sceny bywa chwilowo zerowy (np. tuż po wejściu w pełny ekran) — wtedy liczymy od okna
-  const r=stage.getBoundingClientRect(), W=Math.max(r.width,innerWidth*0.6)-48, H=Math.max(r.height,innerHeight*0.6)-32;
+  const r=stage.getBoundingClientRect(), W=Math.max(r.width,innerWidth*0.6)-48, H=Math.max(r.height,innerHeight*0.6)-32;   // bez marginesów sceny
   let best=1,bs=0;
-  for(let c=1;c<=n;c++){ const rows=Math.ceil(n/c), cw=(W-18*(c-1))/c, ch=(H-18*(rows-1))/rows-22, sz=Math.min(cw,ch*4/3); if(sz>bs){bs=sz;best=c;} }
+  // kolumny dobrane tak, żeby zdjęcia (średnio ok. 4:3) były jak największe
+  for(let c=1;c<=n;c++){ const rows=Math.ceil(n/c), cw=(W-18*(c-1))/c, ch=(H-18*(rows-1))/rows-24, sz=Math.min(cw,ch*4/3); if(sz>bs){bs=sz;best=c;} }
   return best;
 }
 function renderSheet(){
@@ -2100,22 +2101,26 @@ function renderSheet(){
   vTok++; zm=null; vEl=null; stopMedia(); stage.className='sheetmode'; stage.textContent='';
   $('#vname').textContent='Zaznaczone pliki'; $('#vname').title=''; $('#vinfo').textContent=api.dirname(sheet.list[0].path);
   $('#vcount').textContent=sheet.list.length+' '+plural(sheet.list.length,'plik','pliki','plików');
-  const g=document.createElement('div'); g.className='sheet'; g.style.gridTemplateColumns='repeat('+sheetCols(sheet.list.length)+',minmax(0,1fr))';
+  // arkusz zawsze mieści się w oknie: stała siatka kolumn × wierszy, każde zdjęcie wpasowane w swoje pole
+  const nc=sheetCols(sheet.list.length), nr=Math.ceil(sheet.list.length/nc);
+  const g=document.createElement('div'); g.className='sheet'; g.style.gridTemplateColumns='repeat('+nc+',minmax(0,1fr))'; g.style.gridTemplateRows='repeat('+nr+',minmax(0,1fr))';
   sheet.list.forEach((it,i)=>{
     const c=document.createElement('div'); c.className='sc'+(i===sheet.at?' on':''); c.title=it.name;
     const b=document.createElement('div'); b.className='sb'; c.appendChild(b);
     const n=document.createElement('div'); n.className='sn'; n.textContent=it.name; c.appendChild(n);
     c.onclick=e=>{ e.stopPropagation(); sheet.at=i; sheetOpen(); };
     g.appendChild(c);
-    const put=cv=>{ b.textContent=''; cv.className=cv.width/cv.height>=4/3?'w':'h'; b.appendChild(cv); };
+    const put=cv=>{ b.textContent=''; b.appendChild(cv); fitSheet(cv,b); };
     const draw=()=>{ if(!it.thumb) return; const k=document.createElement('canvas'); k.width=it.thumb.width; k.height=it.thumb.height; k.getContext('2d').drawImage(it.thumb,0,0); put(k);
       // większa komórka niż miniatura — ostrzejsza wersja w rozdzielczości komórki
-      requestAnimationFrame(async()=>{ const need=Math.min(2048,Math.ceil(Math.max(b.clientWidth,b.clientHeight*4/3)*devicePixelRatio));
+      requestAnimationFrame(async()=>{ const need=Math.min(2048,Math.ceil(Math.max(b.clientWidth,b.clientHeight)*devicePixelRatio));
         if(need>Math.max(it.thumb.width,it.thumb.height)*1.1&&it.type!=='vid'&&!DOCS.has(it.type)){ try{ const h=(it.hd&&it.hd.size>=need*0.9)?it.hd.c:await hdMake(it,need); if(h&&sheet&&b.isConnected){ const k2=document.createElement('canvas'); k2.width=h.width; k2.height=h.height; k2.getContext('2d').drawImage(h,0,0); put(k2); } }catch(e){} } }); };
     if(it.thumb) draw(); else thumbOf(it).then(()=>{ it.state='done'; draw(); },()=>{ b.textContent=extOf(it.name); });
   });
   stage.appendChild(g);
 }
+function fitSheet(cv,b){ const W=b.clientWidth, H=b.clientHeight; if(!W||!H) return requestAnimationFrame(()=>fitSheet(cv,b)); const k=Math.min(W/cv.width,H/cv.height); cv.style.width=Math.floor(cv.width*k)+'px'; cv.style.height=Math.floor(cv.height*k)+'px'; }
+let sheetRT=0; addEventListener('resize',()=>{ clearTimeout(sheetRT); sheetRT=setTimeout(()=>{ if(inSheet()) renderSheet(); },120); });
 function sheetOpen(){ if(!sheet) return; vList=sheet.list; vi=sheet.at; stage.className='fit'; showV(); }
 function sheetMark(){ stage.querySelectorAll('.sc').forEach((x,i)=>x.classList.toggle('on',i===sheet.at)); }
 const inSheet=()=>!!(sheet&&stage.classList.contains('sheetmode'));

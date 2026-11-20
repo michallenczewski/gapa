@@ -413,11 +413,33 @@ function decoderLib(){
     }
     return best;
   }
-  function decodeEmbedded(u,name){
+  // Rhino (od wersji 5) zapisuje podgląd skompresowany: nagłówek BITMAPINFOHEADER, potem rozmiar obrazu, suma kontrolna,
+  // metoda (1 = zlib) i strumień zlib w anonimowym bloku. Rozpakowujemy go i składamy zwykły plik BMP.
+  async function inflateTo(bytes,max){
+    if(typeof DecompressionStream==='undefined') return null;
+    const ds=new DecompressionStream('deflate'), w=ds.writable.getWriter();
+    w.write(bytes).catch(()=>{}); w.close().catch(()=>{});
+    const r=ds.readable.getReader(), out=new Uint8Array(max); let n=0;
+    try{ for(;;){ const {done,value}=await r.read(); if(done) break; const k=Math.min(value.length,max-n); out.set(value.subarray(0,k),n); n+=k; if(n>=max){ r.cancel().catch(()=>{}); break; } } }catch(e){}   // śmieci za końcem strumienia nie przeszkadzają
+    return n>=max?out:null;
+  }
+  async function rhinoPacked(u,c){
+    const v=dv(u), q=c.q;
+    let s=-1; for(let k=q+9;k<q+40&&k+1<u.length;k++){ if(u[k]===0x78&&((u[k]<<8)|u[k+1])%31===0){ s=k; break; } }
+    if(s<0) return null;
+    let len=v.getUint32(s-8,true); if(v.getUint32(s-4,true)!==0||!len||len>u.length) len=v.getUint32(s-4,true);
+    const bits=await inflateTo(u.subarray(s,Math.min(u.length,s+(len>0&&len<64*1048576?len:u.length-s))),c.size);
+    if(!bits) return null;
+    if(c.bpp===32) for(let i=3;i<bits.length;i+=4) bits[i]=255;      // kanał alfa w podglądzie Rhino jest pusty — obraz ma być nieprzezroczysty
+    const dib=new Uint8Array(40+c.pal*4+bits.length); dib.set(u.subarray(c.p,c.p+40+c.pal*4)); dib.set(bits,40+c.pal*4);
+    dv(dib).setUint32(16,0,true); dv(dib).setUint32(20,bits.length,true);
+    return {img:dibToBmp(dib),mime:'image/bmp',w:c.w,h:c.h};
+  }
+  async function decodeEmbedded(u,name){
     const ext=(name.split('.').pop()||'').toLowerCase(), v=dv(u);
     let best=null; const take=c=>{ if(c&&c.w>0&&c.h>0&&(!best||c.w*c.h>best.w*best.h)) best=c; };
     if(ext==='dwg') take(dwgPreview(u));
-    const dib=ext==='max'||ext==='3dm';
+    const dib=ext==='max'||ext==='3dm', packed=[];
     const lim=u.length-8;
     for(let p=0;p<lim;p++){
       const b=u[p];
@@ -431,11 +453,13 @@ function decoderLib(){
         const w=v.getInt32(p+4,true), h=Math.abs(v.getInt32(p+8,true)), pl=v.getUint16(p+12,true), bpp=v.getUint16(p+14,true), cmp=v.getUint32(p+16,true);
         if(pl===1&&(bpp===24||bpp===32||bpp===8)&&cmp===0&&w>=16&&w<=2048&&h>=16&&h<=2048){
           let pal=v.getUint32(p+32,true); if(!pal&&bpp===8) pal=256; if(pal>256) continue;
-          const size=40+pal*4+(((w*bpp+31)>>5)<<2)*h;
+          const stride=((w*bpp+31)>>5)<<2, size=40+pal*4+stride*h, q=p+40+pal*4;
+          if(ext==='3dm'&&q+9<=u.length&&v.getUint32(q,true)===stride*h&&u[q+8]===1){ packed.push({p,q,w,h,bpp,pal,size:stride*h}); continue; }
           if(p+size<=u.length){ take({img:dibToBmp(u.subarray(p,p+size)),mime:'image/bmp',w,h}); p+=size-1; }
         }
       }
     }
+    for(const c of packed){ if(best&&best.w*best.h>=c.w*c.h) continue; try{ take(await rhinoPacked(u,c)); }catch(e){} }
     if(!best) throw new Error('brak podglądu zapisanego w pliku — otwórz go w programie');
     return {img:best.img,mime:best.mime,meta:{format:ext.toUpperCase(),mode:'podgląd zapisany w pliku'}};
   }

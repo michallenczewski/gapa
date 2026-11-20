@@ -265,6 +265,7 @@ function settingsMenu(){
       ...(peekState.peek?[{label:'Uruchamiaj razem z Windows',box:!!peekState.autostart,keep:true,run:async()=>{ peekState.autostart=!peekState.autostart; await api.autostartSet(peekState.autostart); settingsMenu(); }}]:[])]:[]),
     ...(api.mem?[{label:'Pokaż zużycie pamięci',box:!!S.showMem,keep:true,run:()=>{setShowMem(!S.showMem);settingsMenu();}}]:[]),
     {label:'Pokaż podpowiedzi od nowa',run:resetHints},
+    ...(api.editors?[{label:'Otwieraj w: '+(editorName||'—')+'…',keys:['E'],run:editorMenu}]:[]),
     ...(api.updateCheck?[{label:'Sprawdź aktualizacje'+(updSt&&updSt.current?' (masz '+updSt.current+')':''),run:updManual}]:[]),
     {label:'Dźwięki',box:S.sound!==false,keys:['S'],keep:true,run:()=>{S.sound=!(S.sound!==false);save();if(S.sound)SFX('on');settingsMenu();}},
     ...(api.iconSet?['-',{head:'Ikona programu'},
@@ -1431,7 +1432,7 @@ function renderInsp(){
     const ty={}; for(const x of many) ty[TLABEL(x.type)]=(ty[TLABEL(x.type)]||0)+1;
     row('Typy',Object.entries(ty).map(([k,v])=>v+'× '+k).join(', '));
     const src=many[0].thumb; if(src){const c=document.createElement('canvas');c.width=src.width;c.height=src.height;c.getContext('2d').drawImage(src,0,0);pv.appendChild(c);pv.classList.add('has');}
-    act('Otwórz w '+(editorName||'Photoshopie')+' ('+many.length+')',MOD.replace('+',' ')+'E',()=>openInEditor(many.map(x=>x.path)),true);
+    act('Otwórz w '+edIn()+' ('+many.length+')',MOD.replace('+',' ')+'E',()=>openInEditor(many.map(x=>x.path)),true);
     act('Pokaż zaznaczone',' Enter',()=>openViewer(it&&picked.has(it)?it:many[0]));
     act(bLabel(many)+' ('+many.length+')','B',()=>basketToggle(many));
     act('Kopiuj nazwy','',()=>copyText(many.map(x=>x.name).join('\n')));
@@ -1467,7 +1468,7 @@ function renderInsp(){
   if(it.meta&&it.meta.mode) f+=' · '+it.meta.mode; if(it.meta&&it.meta.depth) f+=' · '+it.meta.depth+'-bit';
   row('Format',f);
   row('Zmieniony',fmtDate(it.mtime));
-  if(!api.web) act('Otwórz w '+(editorName||'Photoshopie'),MOD.replace('+',' ')+'E',()=>openInEditor([it.path]),true);
+  if(!api.web) act('Otwórz w '+edIn(),MOD.replace('+',' ')+'E',()=>openInEditor([it.path]),true);
   else act('Otwórz podgląd','Spacja',()=>openViewer(it),true);
   if(!api.web) act('Pokaż w '+FINDER,'R',()=>api.showInFolder(it.path));
   act(bLabel([it]),'B',()=>basketToggle([it]));
@@ -1789,7 +1790,7 @@ function viewerMenu(){
   const it=vList[vi]; if(!it) return; const r=$('#vmore').getBoundingClientRect();
   showMenu(r.right-230,r.bottom+6,null,[
     {label:'Pokaż w '+FINDER,key:'R',run:()=>api.showInFolder(it.path)},
-    {label:'Otwórz w '+(editorName||'Photoshopie'),key:'E',run:()=>openInEditor([it.path])},
+    {label:'Otwórz w '+edIn(),key:'E',run:()=>openInEditor([it.path])},
     {label:zm?'Dopasuj do okna':'Rozmiar oryginalny (100%)',key:'Z',run:()=>{zm?zoomFit(true):zoomTo(1,null,null,true);}},
     {label:'Kopiuj obraz',key:'C',run:()=>copyImage(it)},
     {label:'Kopiuj ścieżkę',key:'P',run:()=>copyText(it.path)},
@@ -1805,7 +1806,16 @@ function toggleBare(){document.body.classList.toggle('bare');chromeSync();if(vie
 
 /* --- programy zewnętrzne --- */
 let editorName=null;
+const edIn=()=>!editorName?'programie do edycji':editorName==='Photoshop'?'Photoshopie':editorName;   // „Otwórz w Photoshopie / Affinity Photo 2”
 api.editorName().then(n=>{editorName=n;});
+// wybór programu do edycji: wykryte (Photoshop, Affinity) albo dowolny inny
+async function editorMenu(){
+  const r=$('#setBtn').getBoundingClientRect(), {list,current}=await api.editors();
+  showMenu(r.left-4,r.top-8,'Otwieraj pliki (E) w',[
+    ...list.map(x=>({label:x.name,check:x.path===current,run:async()=>{ editorName=await api.editorSet(x.path); zoomTip('E otwiera teraz w: '+editorName); }})),
+    ...(list.length?['-']:[]),
+    {label:'Inny program…',run:async()=>{ const n=await api.openEditor([],true); if(n){ editorName=n; zoomTip('E otwiera teraz w: '+n); } }}],true);
+}
 async function openInEditor(paths,choose){
   const n=await api.openEditor(paths,choose);
   if(n){editorName=n;zoomTip('Otwieram w: '+n);}
@@ -1883,7 +1893,7 @@ document.addEventListener('contextmenu',e=>{
   const many=pickedFiles(it), n=many.length, en=[];
   if(n>1) en.push({label:'Pokaż zaznaczone ('+n+')',key:'Enter',run:()=>openViewer(it)});
   else en.push({label:'Otwórz podgląd',key:'Enter',run:()=>openViewer(it)});
-  en.push({label:'Otwórz w '+(editorName||'Photoshopie')+(n>1?' ('+n+')':''),key:MOD+'E',run:()=>openInEditor(many.map(x=>x.path))});
+  en.push({label:'Otwórz w '+edIn()+(n>1?' ('+n+')':''),key:MOD+'E',run:()=>openInEditor(many.map(x=>x.path))});
   if(n===1) en.push({label:'Otwórz w domyślnym programie',key:MOD+'Enter',run:()=>api.openDefault(it.path)});
   if(n===1&&(heads||virt)) en.push({label:'Przejdź do folderu „'+(api.basename(api.dirname(it.path))||api.dirname(it.path))+'”',run:()=>go(api.dirname(it.path),it.path)});
   en.push({label:'Pokaż w '+FINDER,run:()=>api.showInFolder(it.path)});
@@ -2188,7 +2198,7 @@ function renderKeys(){
   const row=(m,ks)=>'<div class="kr" style="margin-left:'+m+'px">'+ks.join('')+'</div>';
   $('#keys').innerHTML='<div class="kc"><div class="kh"><b>Skróty klawiszowe</b><span>? otwiera tę ściągę · Esc zamyka</span></div>'
     +row(0,[K('1','mniejsze'),K('2','większe')])
-    +row(20,[K('Q','wyżej'),K('W','wszystko w środku'),K('E','Photoshop'),K('R',isMac?'Finder':'Eksplorator'),K('T','jasny / ciemny')])
+    +row(20,[K('Q','wyżej'),K('W','wszystko w środku'),K('E',editorName||'edytor'),K('R',isMac?'Finder':'Eksplorator'),K('T','jasny / ciemny')])
     +row(34,[K('A','poprzedni'),K('S','dźwięki'),K('D','następny'),K('F','szukaj<em>⇧ biblioteka</em>'),K('G','linie siatki')])
     +row(54,[K('Z','100% / dopasuj'),K('X','panel<em>⇧ info</em>'),K('C','kopiuj obraz<em>⇧ ścieżki</em>'),K('V','ikony / lista'),K('B','koszyk<em>⇧ otwórz</em>')])
     +row(0,[K('Tab','ukryj interfejs','w'),K('spacja','podgląd / wróć do siatki','sp')])

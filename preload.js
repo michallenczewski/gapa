@@ -70,6 +70,8 @@ contextBridge.exposeInMainWorld('api', {
   prepNightly: v => ipcRenderer.invoke('prep-nightly', v),
   prepNext: () => ipcRenderer.invoke('prep-next'),
   prepReport: ok => ipcRenderer.invoke('prep-report', ok),
+  editors: () => ipcRenderer.invoke('editors'),
+  editorSet: p => ipcRenderer.invoke('editor-set', p),
   updateGet: () => ipcRenderer.invoke('update-get'),
   updateCheck: () => ipcRenderer.invoke('update-check'),
   updateInstall: () => ipcRenderer.invoke('update-install'),

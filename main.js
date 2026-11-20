@@ -45,6 +45,15 @@ function openCache(dir) {
   fs.mkdirSync(cacheDir, { recursive: true });
   try { idx = JSON.parse(fs.readFileSync(path.join(cacheDir, 'indeks.json'), 'utf8')); } catch (e) { idx = { items: {} }; }
   if (!idx.items) idx.items = {};
+  // 0.9.0 źle odczytywała skompresowane podglądy Rhino: jednorazowo usuwamy miniatury plików .3dm
+  // i większe wersje miniatur zapisane od tamtej wersji, żeby policzyły się od nowa
+  if (idx.fix !== 2) {
+    for (const [h, e] of Object.entries(idx.items)) {
+      const m = e.m || {};
+      if ((m.hd && !m.format) || /3DM|RHINO/i.test(m.format || '')) { try { fs.unlinkSync(path.join(cacheDir, h.slice(0, 2), h + '.webp')); } catch (err) {} delete idx.items[h]; }
+    }
+    idx.fix = 2; idxDirty = true; setTimeout(saveIndexNow, 1000);
+  }
   cacheBytes = Object.values(idx.items).reduce((a, e) => a + (e.s || 0), 0);
 }
 function saveIndexSoon() {
@@ -519,15 +528,52 @@ function findPhotoshop() {
   } catch (e) {}
   return null;
 }
+// Affinity: na Macu zwykła aplikacja w /Applications; na Windows albo klasyczna instalacja w Program Files\Affinity,
+// albo pakiet MSIX — wtedy uruchamiamy go przez alias w %LOCALAPPDATA%\Microsoft\WindowsApps (np. AffinityPhoto2.exe)
+function findAffinity() {
+  try {
+    if (isMac) {
+      const apps = fs.readdirSync('/Applications').filter(n => /^Affinity( Photo)?( \d)?\.app$/.test(n));
+      const pick = apps.find(n => n === 'Affinity.app') || apps.sort().reverse()[0];
+      return pick ? path.join('/Applications', pick) : null;
+    }
+    if (isWin) {
+      const base = path.join(process.env['ProgramFiles'] || 'C:\\Program Files', 'Affinity');
+      if (fs.existsSync(base)) for (const d of fs.readdirSync(base).sort().reverse()) {
+        for (const exe of ['Affinity.exe', 'Photo.exe']) { const p = path.join(base, d, exe); if (fs.existsSync(p)) return p; }
+      }
+      const wa = path.join(process.env.LOCALAPPDATA || '', 'Microsoft', 'WindowsApps');
+      const al = fs.readdirSync(wa).filter(n => /^Affinity.*\.exe$/i.test(n));
+      const pick = al.find(n => /^Affinity\.exe$/i.test(n)) || al.filter(n => /photo/i.test(n)).sort().reverse()[0] || al[0];
+      if (pick) return path.join(wa, pick);
+    }
+  } catch (e) {}
+  return null;
+}
+const editorLabel = p => {
+  let n = path.basename(p).replace(/\.(app|exe)$/i, '');
+  if (/^AffinityPhoto(\d*)$/i.test(n)) n = 'Affinity Photo' + (n.match(/\d+$/) ? ' ' + n.match(/\d+$/)[0] : '');
+  else if (/^Photo$/i.test(n) && /Affinity/i.test(p)) n = 'Affinity Photo';
+  else if (/^Photoshop$/i.test(n)) n = 'Photoshop';
+  return n.replace(/^Adobe Photoshop.*/, 'Photoshop');
+};
+const currentEditor = () => (settings.editor && fs.existsSync(settings.editor) ? settings.editor : findPhotoshop() || findAffinity());
+ipcMain.handle('editors', () => {
+  const list = [], add = p => { if (p && !list.some(x => x.path === p)) list.push({ path: p, name: editorLabel(p) }); };
+  add(findPhotoshop()); add(findAffinity()); if (settings.editor && fs.existsSync(settings.editor)) add(settings.editor);
+  const cur = currentEditor();
+  return { list, current: cur || null };
+});
+ipcMain.handle('editor-set', (e, p) => { settings.editor = p || null; saveSettings(); const c = currentEditor(); return c ? editorLabel(c) : null; });
 function launch(appPath, files) {
   if (isMac) execFile('open', ['-a', appPath, ...files]);
   else spawn(appPath, files, { detached: true, stdio: 'ignore' }).unref();
 }
 ipcMain.handle('open-editor', async (e, files, choose) => {
-  let ed = !choose && (settings.editor && fs.existsSync(settings.editor) ? settings.editor : findPhotoshop());
+  let ed = !choose && currentEditor();
   if (!ed) {
     const r = await dialog.showOpenDialog(BrowserWindow.fromWebContents(e.sender), {
-      title: 'Wskaż program do edycji (np. Photoshop)',
+      title: 'Wskaż program do edycji (np. Photoshop albo Affinity)',
       defaultPath: isMac ? '/Applications' : (process.env['ProgramFiles'] || 'C:\\'),
       properties: isMac ? ['openFile', 'treatPackageAsDirectory'] : ['openFile'],
       filters: isMac ? [{ name: 'Programy', extensions: ['app'] }] : [{ name: 'Programy', extensions: ['exe'] }]
@@ -535,12 +581,12 @@ ipcMain.handle('open-editor', async (e, files, choose) => {
     if (r.canceled || !r.filePaths[0]) return null;
     ed = r.filePaths[0]; settings.editor = ed; saveSettings();
   }
-  launch(ed, files);
-  return path.basename(ed).replace(/\.(app|exe)$/i, '');
+  if (files && files.length) launch(ed, files);   // sama zmiana programu (bez plików) niczego nie uruchamia
+  return editorLabel(ed);
 });
 ipcMain.handle('editor-name', () => {
-  const ed = settings.editor && fs.existsSync(settings.editor) ? settings.editor : findPhotoshop();
-  return ed ? path.basename(ed).replace(/\.(app|exe)$/i, '') : null;
+  const ed = currentEditor();
+  return ed ? editorLabel(ed) : null;
 });
 
 /* ---------- przenoszenie i kopiowanie przeciąganiem (jak w Finderze) ---------- */

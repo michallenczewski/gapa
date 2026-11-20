@@ -63,13 +63,18 @@ if(api.onFullscreen) api.onFullscreen(v=>{
   if(api.onFullscreen) api.onFullscreen(()=>setTimeout(tips,50));
 }
 function fullscreenToggle(){ fsWant=!document.documentElement.classList.contains('fs'); if(api.fullscreenToggle) api.fullscreenToggle(); else if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(()=>{}); }
+const _cc=document.createElement('canvas').getContext('2d');
+function dimHex(c,a){ if(!a) return c; _cc.fillStyle='#000'; _cc.fillStyle=c; const h=_cc.fillStyle; if(h[0]!=='#') return c;
+  const k=1-a, n=i=>Math.round(parseInt(h.slice(i,i+2),16)*k).toString(16).padStart(2,'0'); return '#'+n(1)+n(3)+n(5); }
 function chromeSync(){
   if(api.web||!api.chromeColors) return;
   const cs=getComputedStyle(document.documentElement), v=document.getElementById('viewer');
   const bg=(v&&v.classList.contains('open')?cs.getPropertyValue('--stage'):cs.getPropertyValue('--bg')).trim();
   // bez paska programu (Tab) przyciski okna stoją w cienkim pasku 36 px, żeby nie wchodzić na miniatury
   const slim=document.body.classList.contains('bare');
-  api.chromeColors(bg,cs.getPropertyValue('--text2').trim(),slim?36:52);
+  // gdy otwarte są ustawienia albo okienko potwierdzenia, przyciski okna przyciemniamy tak samo jak resztę programu
+  const dim=$('#dlg')&&$('#dlg').classList.contains('on')?.28:$('#setp')&&$('#setp').classList.contains('on')?.22:0;
+  api.chromeColors(dimHex(bg,dim),dimHex(cs.getPropertyValue('--text2').trim(),dim),slim?36:52);
 }
 applyTheme();
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);
@@ -257,9 +262,9 @@ let setOpen=false, edList=null;
 async function settingsMenu(){
   hideMenu(); setOpen=true;
   if(api.editors) api.editors().then(x=>{ edList=x; if(setOpen) renderSettings(); });
-  renderSettings(); $('#setp').classList.add('on');
+  renderSettings(); $('#setp').classList.add('on'); chromeSync();
 }
-function closeSettings(){ setOpen=false; $('#setp').classList.remove('on'); }
+function closeSettings(){ setOpen=false; $('#setp').classList.remove('on'); chromeSync(); }
 function renderSettings(){
   const o=$('#setp'), t=S.theme||'auto', lim=cacheC?cacheC.limitMB:2048, esc=x=>String(x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
   const acts=[]; const act=fn=>{ acts.push(fn); return acts.length-1; };
@@ -2214,10 +2219,10 @@ function askConfirm(title,body,ok){
   return new Promise(res=>{
     const o=$('#dlg'); o.innerHTML='<div class="dc"><b></b><p></p><div class="db"><button class="no">Anuluj</button><button class="yes"></button></div></div>';
     o.querySelector('b').textContent=title; o.querySelector('p').textContent=body; o.querySelector('.yes').textContent=ok||'OK';
-    const end=v=>{ o.classList.remove('on'); dlgDone=null; res(v); };
+    const end=v=>{ o.classList.remove('on'); dlgDone=null; chromeSync(); res(v); };
     dlgDone=end; o.querySelector('.yes').onclick=()=>end(true); o.querySelector('.no').onclick=()=>end(false);
     o.onclick=e=>{ if(e.target===o) end(false); };
-    o.classList.add('on'); o.querySelector('.yes').focus();
+    o.classList.add('on'); chromeSync(); o.querySelector('.yes').focus();
   });
 }
 /* --- ściąga skrótów (?) i jednorazowe podpowiedzi; opisy zależą od systemu (Mac / Windows) --- */

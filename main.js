@@ -145,7 +145,35 @@ const iconFile = n => path.join(__dirname, 'renderer', (n === 'retro' ? 'icon-re
 function applyIcon() {
   const img = nativeImage.createFromPath(iconFile(settings.icon));
   if (process.platform === 'darwin') app.dock.setIcon(img);
-  else for (const w of BrowserWindow.getAllWindows()) w.setIcon(img);
+  else { for (const w of BrowserWindow.getAllWindows()) w.setIcon(img); winShortcutIcons(); }
+}
+// Windows: pasek zadań i menu Start biorą ikonę ze skrótów (.lnk), nie z okna — podmieniamy ją w skrótach Gapy.
+// Plik .ico kopiujemy z programu do folderu ustawień, bo skrót nie umie wskazać pliku wewnątrz paczki programu.
+function winShortcutIcons() {
+  if (!isWin) return;
+  try {
+    const retro = settings.icon === 'retro';
+    let icon = process.execPath;
+    if (retro) {
+      icon = path.join(app.getPath('userData'), 'gapa-1bit.ico');
+      fs.writeFileSync(icon, fs.readFileSync(path.join(__dirname, 'renderer', 'icon-retro-win.ico')));
+    }
+    const ad = app.getPath('appData'), pd = process.env.ProgramData || 'C:\\ProgramData', pub = path.join(process.env.PUBLIC || 'C:\\Users\\Public', 'Desktop');
+    const links = [
+      path.join(ad, 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Gapa.lnk'),
+      path.join(pd, 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Gapa.lnk'),
+      path.join(app.getPath('desktop'), 'Gapa.lnk'), path.join(pub, 'Gapa.lnk'),
+      path.join(ad, 'Microsoft', 'Internet Explorer', 'Quick Launch', 'User Pinned', 'TaskBar', 'Gapa.lnk'),
+    ];
+    for (const l of links) {
+      if (!fs.existsSync(l)) continue;
+      try {
+        const cur = shell.readShortcutLink(l);
+        if ((cur.icon || '').toLowerCase() === icon.toLowerCase()) continue;
+        shell.writeShortcutLink(l, 'update', { icon, iconIndex: 0 });
+      } catch (e) {}   // skrót w ProgramData bywa tylko do odczytu — wtedy zostaje jak był
+    }
+  } catch (e) {}
 }
 ipcMain.handle('icon-get', () => settings.icon || '3d');
 ipcMain.handle('icon-set', (e, n) => { settings.icon = n === 'retro' ? 'retro' : '3d'; saveSettings(); applyIcon(); return settings.icon; });
@@ -504,6 +532,14 @@ ipcMain.handle('os-thumb', async (e, p, size) => {
 });
 
 /* ---------- system: Finder/Eksplorator, programy, przeciąganie ---------- */
+// własne przyciski okna (Windows)
+ipcMain.on('win-ctl', (e, cmd) => {
+  const w = BrowserWindow.fromWebContents(e.sender); if (!w) return;
+  if (cmd === 'min') w.minimize(); else if (cmd === 'max') (w.isMaximized() ? w.unmaximize() : w.maximize()); else if (cmd === 'close') w.close();
+});
+ipcMain.handle('win-maxed', e => { const w = BrowserWindow.fromWebContents(e.sender); return !!(w && w.isMaximized()); });
+ipcMain.handle('caption-set', (e, v) => { settings.ownCaption = !!v; saveSettings(); return settings.ownCaption; });
+ipcMain.handle('relaunch', () => { app.relaunch(); quitting = true; app.quit(); });
 ipcMain.on('chrome-colors', (e, c) => { try { const w = BrowserWindow.fromWebContents(e.sender); if (w && process.platform !== 'darwin') w.setTitleBarOverlay({ color: c.bg, symbolColor: c.fg, height: c.h || 52 }); } catch (_) {} });
 ipcMain.handle('show-in-folder', (e, p) => shell.showItemInFolder(p));
 ipcMain.handle('open-default', (e, p) => shell.openPath(p));
@@ -734,9 +770,14 @@ function createWindow(startPath) {
     // pasek tytułu schowany — przyciski okna rysuje system w górnym pasku programu
     ...(process.platform === 'darwin'
       ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 18, y: 19 } }
+      // Windows: przyciski okna systemowe (pole rysowane przez Windows) albo własne Gapy (opcja w ustawieniach)
+      : settings.ownCaption ? { titleBarStyle: 'hidden' }
       : { titleBarStyle: 'hidden', titleBarOverlay: { color: '#f7f7f5', symbolColor: '#4a4945', height: 52 } }),
-    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: false, plugins: true }
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: false, plugins: true,
+      additionalArguments: isWin && settings.ownCaption ? ['--gapa-caption=own'] : [] }
   });
+  win.on('maximize', () => win.webContents.send('win-max', true));
+  win.on('unmaximize', () => win.webContents.send('win-max', false));
   if (settings.maximized && !from) win.maximize();
   win.once('ready-to-show', () => win.show());
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'), startPath ? { query: { p: startPath } } : undefined);
@@ -915,6 +956,7 @@ else {
     setTimeout(updCheck, 15000); setInterval(updCheck, 6 * 3600 * 1000);
     if (isWin) { peekStart(); trayUpdate(); }
     if (settings.icon === 'retro') applyIcon();
+    else if (isWin) setTimeout(winShortcutIcons, 3000);   // po powrocie do zwykłej ikony albo po reinstalacji
     app.on('activate', () => { if (!mainWindows().length) createWindow(); });
   });
   app.on('before-quit', () => { quitting = true; saveIndexNow(); saveSettings(); if (peekProc) try { peekProc.kill(); } catch (e) {} });

@@ -533,6 +533,16 @@ body.bare.idle,body.bare.idle *,.fs body.idle,.fs body.idle *{cursor:none!import
 #setp .seg button{flex:1;height:26px;border-radius:7px;font-size:12.5px;color:var(--text2);white-space:nowrap;padding:0 6px}
 #setp .seg button:hover{color:var(--text)}
 #setp .seg button.on{background:var(--card);color:var(--text);box-shadow:0 0 0 1px var(--cardline),0 1px 2px rgba(0,0,0,.06)}
+/* własne przyciski okna (Windows) */
+#capw{display:none}
+.cap-own #capw{position:fixed;top:12px;right:12px;height:28px;display:flex;align-items:center;gap:2px;padding-left:9px;z-index:30;-webkit-app-region:no-drag}
+.cap-own #capw::before{content:"";position:absolute;left:0;top:6px;width:1px;height:16px;background:var(--line)}
+.cap-own #capw button{width:30px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.cap-own #capw button:hover{background:var(--hover);color:var(--text)}
+.cap-own header,.cap-own #viewer .top{padding-right:118px}
+.cap-own body.bare #capw{top:4px}
+.fs #capw{display:none!important}
+.cap-own body.bare #fspill{top:44px}
 </style>
 </head>
 <body>

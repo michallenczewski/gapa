@@ -39,6 +39,20 @@ function applyTheme(){
 }
 // przyciski okna (Windows) w kolorze tła; na Macu „światła” po lewej
 if(!api.web) document.documentElement.classList.add(api.platform==='darwin'?'frame-mac':'frame-win');
+/* własne przyciski okna na Windows (opcja w ustawieniach): cienkie ikony jak reszta paska, bez systemowego pola */
+const CAP_ICO={min:'<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M4 8.5h8"/></svg>',
+  max:'<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><rect x="3.8" y="3.8" width="8.4" height="8.4" rx="1.8"/></svg>',
+  res:'<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><rect x="3.5" y="5.5" width="7" height="7" rx="1.5"/><path d="M6 5.5V4.8A1.3 1.3 0 0 1 7.3 3.5h3.9a1.3 1.3 0 0 1 1.3 1.3v3.9a1.3 1.3 0 0 1-1.3 1.3h-.7"/></svg>',
+  x:'<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="m4.5 4.5 7 7M11.5 4.5l-7 7"/></svg>'};
+if(api.ownCaption||(api.web&&/[?&]cap=own/.test(location.search))){
+  document.documentElement.classList.add('cap-own');
+  const c=document.createElement('div'); c.id='capw';
+  c.innerHTML='<button data-c="min" title="Minimalizuj" aria-label="Minimalizuj">'+CAP_ICO.min+'</button><button data-c="max" class="mx" title="Maksymalizuj" aria-label="Maksymalizuj">'+CAP_ICO.max+'</button><button data-c="close" title="Zamknij" aria-label="Zamknij">'+CAP_ICO.x+'</button>';
+  document.body.appendChild(c);
+  for(const b of c.querySelectorAll('button')) b.onclick=e=>{ e.stopPropagation(); api.winCtl&&api.winCtl(b.dataset.c); };
+  const mx=v=>{ const b=c.querySelector('.mx'); b.innerHTML=v?CAP_ICO.res:CAP_ICO.max; b.title=v?'Przywróć':'Maksymalizuj'; b.setAttribute('aria-label',b.title); };
+  if(api.winMaxed) api.winMaxed().then(mx); if(api.onWinMax) api.onWinMax(mx);
+}
 // pełny ekran ze skrótu: obraz na całym ekranie, bez paska zadań, paska okna i interfejsu; wyjście tym samym skrótem albo Esc
 let fsBare=null, fsWant=false;
 if(api.onFullscreen) api.onFullscreen(v=>{
@@ -264,6 +278,12 @@ async function settingsMenu(){
   if(api.editors) api.editors().then(x=>{ edList=x; if(setOpen) renderSettings(); });
   renderSettings(); $('#setp').classList.add('on'); chromeSync();
 }
+let capNext;
+async function capSet(v){
+  if(!!v===!!(api.ownCaption||capNext)) return;
+  await api.captionSet(v); capNext=v&&!api.ownCaption?true:(!v&&api.ownCaption?false:undefined);
+  if(await askConfirm('Uruchomić Gapę ponownie?','Nowe przyciski okna pojawią się po ponownym uruchomieniu programu.','Uruchom ponownie')) api.relaunch();
+}
 function closeSettings(){ setOpen=false; $('#setp').classList.remove('on'); chromeSync(); }
 function renderSettings(){
   const o=$('#setp'), t=S.theme||'auto', lim=cacheC?cacheC.limitMB:2048, esc=x=>String(x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
@@ -286,7 +306,8 @@ function renderSettings(){
     (edList&&edList.list.length?edList.list.map(x=>chk(x.name,x.path===edList.current,async()=>{ editorName=await api.editorSet(x.path); edList.current=x.path; },null,true)).join(''):line(editorName?editorName:'Nie znalazłem Photoshopa ani Affinity'))
     +link('Inny program…',async()=>{ const n=await api.openEditor([],true); if(n){ editorName=n; edList=await api.editors(); } })));
   if(peekState&&peekState.available) L.push(sec('Windows',
-    chk('Podgląd spacją w Eksploratorze',!!peekState.peek,async()=>{ peekState.peek=!peekState.peek; await api.peekSet(peekState.peek); if(peekState.peek) zoomTip('Zaznacz plik w Eksploratorze i naciśnij spację'); })
+    '<div class="sub" style="margin-top:0">Przyciski okna</div>'+seg([['Windows',!api.ownCaption&&!capNext,()=>capSet(false)],['Gapa',!!(api.ownCaption||capNext),()=>capSet(true)]])
+    +chk('Podgląd spacją w Eksploratorze',!!peekState.peek,async()=>{ peekState.peek=!peekState.peek; await api.peekSet(peekState.peek); if(peekState.peek) zoomTip('Zaznacz plik w Eksploratorze i naciśnij spację'); })
     +(peekState.peek||(prepSt&&prepSt.nightly)?chk('Uruchamiaj razem z Windows',!!peekState.autostart,async()=>{ peekState.autostart=!peekState.autostart; await api.autostartSet(peekState.autostart); }):'')));
   R.push(sec('Pomoc',
     link('Skróty klawiszowe',()=>{ closeSettings(); toggleKeys(true); },'?')

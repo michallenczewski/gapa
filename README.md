@@ -13,6 +13,10 @@ Jak program jest zbudowany i kiedy warto zmienić platformę (Tauri, moduły w R
 
 **Program do edycji (E):** Gapa sama znajduje Photoshopa, a jeśli go nie ma — Affinity (na Windows także wersję ze Sklepu / MSIX). Inny program wybierasz w ustawieniach → „Otwieraj w: …” albo w menu pod prawym przyciskiem → „Zmień program do edycji…”.
 
+**Przyciski okna (Windows):** w ustawieniach → Windows → „Przyciski okna” można wybrać systemowe (Windows) albo własne Gapy — cienkie ikony jak reszta paska. Zmiana działa po ponownym uruchomieniu. Przy własnych przyciskach nie ma menu układów okien po najechaniu na maksymalizację (zostaje Win+Z).
+
+**Ikona programu na Windows:** zmiana ikony podmienia ją też w skrótach Gapy (menu Start, pulpit, przypięta na pasku zadań). Przypięta ikona czasem odświeża się dopiero po ponownym zalogowaniu.
+
 **Aktualizacje:** Gapa sama sprawdza, czy na GitHubie jest nowsza wersja (po starcie i co 6 godzin). Wtedy w stopce pojawia się „Nowa wersja …”; klik pobiera ją i instaluje (Windows: po cichu, z ponownym uruchomieniem; Mac: obraz .dmg w Pobranych — Gapę przeciąga się do Aplikacji). Ręcznie: ustawienia → „Sprawdź aktualizacje”.
 
 **Miniatury całej biblioteki:** w ustawieniach (koło zębate) → „Przygotuj miniatury biblioteki…”. Gapa robi brakujące miniatury wszystkich plików z ulubionych folderów w osobnym, niewidocznym oknie: gdy pracujesz, po jednym pliku, gdy komputer stoi bezczynnie — pełną mocą; komputer nie zasypia do końca. Postęp jest w stopce (klik: wstrzymaj, zatrzymaj). Opcja „Przygotowuj co noc” robi to samo między 2:00 a 6:00, jeśli Gapa działa (na Windows zostaje wtedy w tle z ikoną w zasobniku). Większe wersje miniatur dla dużych kafelków też trafiają na dysk, a przeniesienie lub zmiana nazwy pliku w Gapie zabiera jego miniaturę ze sobą.

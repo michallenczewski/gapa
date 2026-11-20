@@ -4,6 +4,12 @@ const path = require('path');
 
 contextBridge.exposeInMainWorld('api', {
   platform: process.platform,
+  ownCaption: process.argv.includes('--gapa-caption=own'),
+  winCtl: cmd => ipcRenderer.send('win-ctl', cmd),
+  winMaxed: () => ipcRenderer.invoke('win-maxed'),
+  onWinMax: cb => ipcRenderer.on('win-max', (e, v) => cb(v)),
+  captionSet: v => ipcRenderer.invoke('caption-set', v),
+  relaunch: () => ipcRenderer.invoke('relaunch'),
   chromeColors: (bg, fg, h) => ipcRenderer.send('chrome-colors', { bg, fg, h }),
   sep: path.sep,
   dirname: p => path.dirname(p),

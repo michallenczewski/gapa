@@ -7,7 +7,13 @@ function decoderLib(){
     if(type==='psd') return decodePSD(file,max);
     if(type==='psdthumb') return quickPSD(file);
     // bardzo duże pliki projektowe: podgląd jest na początku, czytamy najwyżej 64 MB
-    const u=new Uint8Array(type==='embedded'&&file.size>96*1048576?await file.slice(0,64*1048576).arrayBuffer():await file.arrayBuffer());
+    // w plikach .max podgląd siedzi zwykle pod koniec pliku (strumień SummaryInformation), więc czytamy też ogon
+    let u;
+    if(type==='embedded'&&file.size>96*1048576){
+      const head=new Uint8Array(await file.slice(0,(/\.max$/i.test(file.name||'')?16:64)*1048576).arrayBuffer());
+      if(/\.max$/i.test(file.name||'')){ const tail=new Uint8Array(await file.slice(file.size-64*1048576).arrayBuffer()); u=new Uint8Array(head.length+tail.length); u.set(head); u.set(tail,head.length); }
+      else u=head;
+    } else u=new Uint8Array(await file.arrayBuffer());
     if(type==='tga') return decodeTGA(u,max);
     if(type==='tif') return decodeTIFF(u,max);
     if(type==='exr') return decodeEXR(u,max);

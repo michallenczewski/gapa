@@ -750,7 +750,7 @@ function hdNeed(it){
 }
 var hdT=0;
 function wantHD(it){
-  if(it.kind!=='file'||it.type==='vid'||DOCS.has(it.type)||it.state!=='done'||!it.visible) return;
+  if(it.kind!=='file'||it.type==='vid'||it.type==='pdf'||it.state!=='done'||!it.visible) return;
   const need=hdNeed(it); if(!need) return;
   if(it.hd&&it.hd.size>=need*0.9) return;
   if(it.hdBusy||it.hdFail) return;
@@ -763,7 +763,7 @@ function hdPump(){
     const need=hdNeed(it); if(!need) continue;
     hdRun++; it.hdBusy=true;
     hdMake(it,need).then(c=>{
-      if(!c) return;
+      if(!c){ it.hdFail=true; return; }   // oryginał nie jest większy od miniatury — nie próbujemy ponownie
       if(it.hd){ hdPx-=it.hd.c.width*it.hd.c.height; hdLRU.delete(it); }
       it.hd={c,size:need}; hdPx+=c.width*c.height; hdLRU.add(it);
       for(const x of hdLRU){ if(hdPx<=HD_PX) break; if(x.visible&&x!==it) continue; hdPx-=x.hd.c.width*x.hd.c.height; x.hd=null; hdLRU.delete(x); if(x.tile&&x.tile.isConnected) paint(x); }
@@ -771,8 +771,21 @@ function hdPump(){
     },()=>{ it.hdFail=true; }).finally(()=>{ it.hdBusy=false; hdRun--; hdPump(); });
   }
 }
+// pliki projektowe: podgląd zapisany w pliku (Rhino 3dm bywa 1024 px, Max 512 px) albo systemowy w większym rozmiarze — bierzemy większy
+async function bigDoc(it){
+  if(api.web||it.type==='pdf') return null;
+  const [emb,os]=await Promise.all([
+    decode(ref(it),'embedded',0).then(toBitmap).catch(()=>null),
+    api.osThumb(it.path,1024).then(p=>p?createImageBitmap(new Blob([p],{type:'image/png'})):null).catch(()=>null)]);
+  const L=b=>b?Math.max(b.width,b.height):0;
+  const b=L(emb)>=L(os)*0.7?emb:os, o=b===emb?os:emb; if(o) o.close(); if(!b) return null;
+  const c=document.createElement('canvas'); c.width=b.width; c.height=b.height;
+  const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); g.drawImage(b,0,0); b.close();
+  return c;
+}
 async function hdMake(it,max){
   let bmp;
+  if(DOCS.has(it.type)){ const c=await bigDoc(it); return c&&Math.max(c.width,c.height)>Math.max(it.thumb.width,it.thumb.height)*1.05?c:null; }
   if(it.type==='svg'){ const im=await loadImg(api.fileUrl(it.path)); const w=im.naturalWidth||1024,h=im.naturalHeight||1024,k=max/Math.max(w,h);
     const c=new OffscreenCanvas(Math.round(w*k),Math.round(h*k)); c.getContext('2d').drawImage(im,0,0,c.width,c.height); bmp=c.transferToImageBitmap(); }
   else if(NATIVE.has(it.type)) bmp=await createImageBitmap(await blobOf(it));
@@ -1419,10 +1432,11 @@ function fullOf(it){
     }else if(it.type==='pdf'){ // wersja HTML: wbudowana przeglądarka PDF
       const el=document.createElement('iframe'); el.src=api.fileHref(it.path); el.className='doc'; el.title=it.name;
       v={el,note:'',doc:true};
-    }else if(DOCS.has(it.type)){ // model / rysunek: powiększony podgląd zapisany w pliku
-      await thumbOf(it).catch(()=>{});
-      if(!it.thumb) throw new Error('brak podglądu — otwórz plik w programie');
-      const el=document.createElement('canvas'); el.width=it.thumb.width; el.height=it.thumb.height; el.getContext('2d').drawImage(it.thumb,0,0);
+    }else if(DOCS.has(it.type)){ // model / rysunek: największy dostępny podgląd (zapisany w pliku albo systemowy)
+      let el=await bigDoc(it).catch(()=>null);
+      if(!el){ await thumbOf(it).catch(()=>{});
+        if(!it.thumb) throw new Error('brak podglądu — otwórz plik w programie');
+        el=document.createElement('canvas'); el.width=it.thumb.width; el.height=it.thumb.height; el.getContext('2d').drawImage(it.thumb,0,0); }
       el.className='docthumb'; v={el,note:'pełny plik otworzysz w programie (E)',doc:true};
     }else if(NATIVE.has(it.type)&&it.type!=='jpg'&&it.type!=='gif'&&it.type!=='svg'){
       const bmp=await createImageBitmap(await blobOf(it)); it.dims=[bmp.width,bmp.height];

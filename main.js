@@ -1,5 +1,5 @@
 // Podgląd — proces główny: okno, dostęp do dysku, pamięć miniatur, integracja z systemem.
-const { app, BrowserWindow, ipcMain, dialog, shell, protocol, nativeImage, Menu, Tray, screen, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, protocol, nativeImage, Menu, Tray, screen, clipboard, powerMonitor, powerSaveBlocker } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const fsp = fs.promises;
@@ -315,6 +315,84 @@ ipcMain.handle('lib-search', async (e, q, exts, names) => {
   return { files, total, st: libStatus() };
 });
 
+/* ---------- przygotowanie miniatur całej biblioteki (np. w nocy) ---------- */
+// Lista plików pochodzi z indeksu biblioteki; pomijamy te, które mają już aktualną miniaturę.
+// Miniatury liczy osobne, niewidoczne okno Gapy (ten sam kod co w siatce), więc okna, w których pracujesz, zostają płynne.
+// Gdy używasz komputera, liczy jeden plik naraz; gdy komputer stoi bezczynnie, pełną mocą. Komputer nie zasypia do końca.
+let prep = { on: false, paused: false, queue: [], total: 0, done: 0, failed: 0, busy: 0, auto: false, plan: null, msg: '' };
+let prepWin = null, prepBlock = null, prepTellT = 0;
+const prepRoots = () => (libWant.length ? libWant : Object.keys(lib.roots));
+const today = () => new Date().toISOString().slice(0, 10);
+function prepStatus() { return { on: prep.on, paused: prep.paused, total: prep.total, done: prep.done, failed: prep.failed, auto: prep.auto, msg: prep.msg, nightly: !!settings.prepNightly, last: settings.prepLast || null }; }
+function prepTell(now) {
+  const go = () => { prepTellT = 0; for (const w of mainWindows()) w.webContents.send('prep-status', prepStatus()); };
+  if (now) { clearTimeout(prepTellT); go(); } else if (!prepTellT) prepTellT = setTimeout(go, 600);
+}
+async function prepPlan(refresh) {
+  if (refresh) await Promise.all(prepRoots().map(r => fsp.stat(r).then(s => (s.isDirectory() ? libWalk(r) : null)).catch(() => {})));
+  const paths = [];
+  for (const r of prepRoots()) { const x = lib.roots[r]; if (!x) continue; for (const [di, name] of x.files) paths.push(path.join(r, x.dirs[di] || '', name)); }
+  const st = await statMany(paths), list = [];
+  paths.forEach((p, k) => { const s = st[k]; if (s && !idx.items[keyHash({ path: p, size: s.size, mtime: s.mtime })]) list.push({ path: p, name: path.basename(p), size: s.size, mtime: s.mtime }); });
+  const n = Object.keys(idx.items).length, avg = n > 50 ? cacheBytes / n : 45000;
+  const limit = (settings.cacheLimitMB || 2048) * 1048576;
+  prep.plan = { files: paths.length, missing: list.length, est: Math.round(list.length * avg), used: cacheBytes, limitMB: settings.cacheLimitMB || 2048, list, avg };
+  return { files: paths.length, missing: list.length, est: prep.plan.est, used: cacheBytes, limitMB: prep.plan.limitMB, fits: cacheBytes + prep.plan.est <= limit * 0.9 };
+}
+function prepStart(auto) {
+  if (prep.on || !prep.plan || !prep.plan.list.length) return false;
+  let list = prep.plan.list;
+  // nie więcej, niż zmieści się w limicie pamięci miniatur — inaczej Gapa usuwałaby to, co przed chwilą zrobiła
+  const room = Math.max(0, (settings.cacheLimitMB || 2048) * 1048576 * 0.9 - cacheBytes);
+  if (list.length * prep.plan.avg > room) list = list.slice(0, Math.floor(room / prep.plan.avg));
+  if (!list.length) { prep.msg = 'Limit pamięci miniatur jest pełny'; prepTell(true); return false; }
+  Object.assign(prep, { on: true, paused: false, queue: list, total: list.length, done: 0, failed: 0, busy: 0, auto: !!auto, msg: list.length < prep.plan.list.length ? 'tyle, ile mieści limit' : '', plan: null });
+  try { prepBlock = powerSaveBlocker.start('prevent-app-suspension'); } catch (e) {}
+  prepWin = new BrowserWindow({ show: false, width: 800, height: 600, webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: false, backgroundThrottling: false } });
+  prepWin.loadFile(path.join(__dirname, 'renderer', 'index.html'), { query: { prep: '1' } });
+  prepWin.on('closed', () => { prepWin = null; if (prep.on) prepEnd('przerwane'); });
+  trayUpdate(); prepTell(true);
+  return true;
+}
+function prepEnd(msg) {
+  prep.on = false; prep.queue = []; prep.msg = msg || '';
+  if (msg === 'gotowe') { settings.prepLast = today(); saveSettings(); }
+  if (prepBlock !== null) { try { powerSaveBlocker.stop(prepBlock); } catch (e) {} prepBlock = null; }
+  if (prepWin && !prepWin.isDestroyed()) { const w = prepWin; prepWin = null; w.destroy(); }
+  saveIndexNow(); trayUpdate(); prepTell(true);
+  if (isWin && !quitting && !keepAlive() && !mainWindows().length) app.quit();
+}
+ipcMain.handle('prep-get', () => prepStatus());
+ipcMain.handle('prep-plan', () => prepPlan(true));
+ipcMain.handle('prep-start', (e, raiseMB) => { if (raiseMB) { settings.cacheLimitMB = Math.max(settings.cacheLimitMB || 2048, raiseMB | 0); saveSettings(); } return prepStart(false); });
+ipcMain.handle('prep-pause', (e, v) => { prep.paused = !!v; prepTell(true); });
+ipcMain.handle('prep-stop', () => { if (prep.on) prepEnd('zatrzymane'); });
+ipcMain.handle('prep-nightly', (e, v) => prepNightlySet(v));
+function prepNightlySet(v) { settings.prepNightly = !!v; saveSettings(); trayUpdate(); prepTell(true); return settings.prepNightly; }
+// okno liczące pyta o następny plik; „par” mówi, ile plików naraz wolno mu teraz liczyć
+ipcMain.handle('prep-next', () => {
+  if (!prep.on) return { end: true };
+  let idle = 0; try { idle = powerMonitor.getSystemIdleTime(); } catch (e) {}
+  const par = idle >= 60 ? 6 : 1;
+  if (prep.paused) return { wait: true, par };
+  const it = prep.queue.shift();
+  if (!it) { if (!prep.busy) prepEnd('gotowe'); return { end: !prep.busy, wait: !!prep.busy, par }; }
+  prep.busy++; return { it, par };
+});
+ipcMain.handle('prep-report', (e, ok) => {
+  prep.busy = Math.max(0, prep.busy - 1); if (ok) prep.done++; else { prep.done++; prep.failed++; }
+  prepTell(); if (prep.on && !prep.queue.length && !prep.busy) prepEnd('gotowe');
+});
+// co noc: między 2:00 a 6:00, raz na dobę, jeśli Gapa działa (choćby w tle)
+async function prepNightlyTick() {
+  const h = new Date().getHours();
+  if (!settings.prepNightly || prep.on || h < 2 || h >= 6 || settings.prepLast === today()) return;
+  const p = await prepPlan(true).catch(() => null);
+  if (!p) return;
+  if (!p.missing) { settings.prepLast = today(); saveSettings(); return; }
+  prepStart(true);
+}
+
 ipcMain.handle('exists', async (e, p) => { try { return (await fsp.stat(p)).isDirectory(); } catch (err) { return false; } });
 ipcMain.handle('roots', async () => {
   const r = [];
@@ -575,7 +653,7 @@ function createWindow(startPath) {
   win.on('enter-full-screen', () => win.webContents.send('fullscreen', true));
   win.on('leave-full-screen', () => win.webContents.send('fullscreen', false));
   win.on('close', () => { remember(); saveSettings(); });
-  win.on('closed', () => { if (isWin && !settings.peek && !quitting && !mainWindows().length) app.quit(); });
+  win.on('closed', () => { if (isWin && !keepAlive() && !quitting && !mainWindows().length) app.quit(); });
   // linki zewnętrzne w przeglądarce, nie w oknie programu
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
   return win;
@@ -588,7 +666,9 @@ ipcMain.on('new-window', (e, p) => createWindow(p || null));
 // w Eksploratorze dalej zmieniają zaznaczenie, a podgląd za nim podąża. Spacja albo Esc zamykają podgląd.
 // Gapa zostaje wtedy w tle (ikona w zasobniku), żeby podgląd otwierał się od razu.
 let peekProc = null, peekWin = null, peekVisible = false, peekMulti = false, peekReady = false, peekPending = null, tray = null, quitting = false;
-const mainWindows = () => BrowserWindow.getAllWindows().filter(w => w !== peekWin && !w.isDestroyed());
+const mainWindows = () => BrowserWindow.getAllWindows().filter(w => w !== peekWin && w !== prepWin && !w.isDestroyed());
+// Gapa zostaje w tle bez okien: podgląd spacją, nocne miniatury albo trwające przygotowanie miniatur
+const keepAlive = () => !!(settings.peek || settings.prepNightly || prep.on);
 const PEEK_EXTS_FALLBACK = ['jpg','jpeg','png','webp','avif','gif','bmp','tif','tiff','psd','psb','tga','exr','hdr','svg','pdf','mp4','mov','m4v','webm','mkv','avi','dwg','skp','max','3dm','pln','heic','cr2','cr3','nef','arw','dng','raf','orf','rw2'];
 function peekSupported(p) {
   const ext = path.extname(p || '').slice(1).toLowerCase();
@@ -657,16 +737,17 @@ function peekHide() {
 ipcMain.on('peek-close', () => peekHide());
 function trayUpdate() {
   if (!isWin) return;
-  if (!settings.peek) { if (tray) { tray.destroy(); tray = null; } return; }
+  if (!keepAlive()) { if (tray) { tray.destroy(); tray = null; } return; }
   if (!tray) {
     tray = new Tray(nativeImage.createFromPath(iconFile(settings.icon)).resize({ width: 16, height: 16 }));
-    tray.setToolTip('Gapa — spacja w Eksploratorze otwiera podgląd');
+    tray.setToolTip(settings.peek ? 'Gapa — spacja w Eksploratorze otwiera podgląd' : 'Gapa — działa w tle');
     tray.on('click', () => { const w = mainWindows()[0]; if (w) { w.show(); w.focus(); } else createWindow(); });
   }
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Otwórz Gapę', click: () => { const w = mainWindows()[0]; if (w) { w.show(); w.focus(); } else createWindow(); } },
     { type: 'separator' },
     { label: 'Podgląd spacją w Eksploratorze', type: 'checkbox', checked: !!settings.peek, click: () => peekSet(!settings.peek) },
+    { label: 'Przygotowuj miniatury biblioteki co noc', type: 'checkbox', checked: !!settings.prepNightly, click: () => prepNightlySet(!settings.prepNightly) },
     { label: 'Uruchamiaj razem z Windows', type: 'checkbox', checked: !!settings.autostart, click: () => autostartSet(!settings.autostart) },
     { type: 'separator' },
     { label: 'Zakończ Gapę', click: () => { quitting = true; app.quit(); } }
@@ -736,12 +817,13 @@ else {
     });
     buildMenu();
     // uruchomienie razem z Windows (--hidden): tylko w tle, z ikoną w zasobniku, bez okna
-    if (!(isWin && settings.peek && process.argv.includes('--hidden'))) createWindow();
+    if (!(isWin && (settings.peek || settings.prepNightly) && process.argv.includes('--hidden'))) createWindow();
+    setInterval(prepNightlyTick, 5 * 60 * 1000);
     if (isWin) { peekStart(); trayUpdate(); }
     if (settings.icon === 'retro') applyIcon();
-    app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
+    app.on('activate', () => { if (!mainWindows().length) createWindow(); });
   });
   app.on('before-quit', () => { quitting = true; saveIndexNow(); saveSettings(); if (peekProc) try { peekProc.kill(); } catch (e) {} });
   // na Macu zamknięcie ostatniego okna nie kończy programu (zostaje w Docku, ⌘Q kończy); na Windows kończy
-  app.on('window-all-closed', () => { saveIndexNow(); saveSettings(); if (!isMac && !settings.peek) app.quit(); });
+  app.on('window-all-closed', () => { saveIndexNow(); saveSettings(); if (!isMac && !keepAlive()) app.quit(); });
 }

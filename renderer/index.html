@@ -168,6 +168,8 @@ body.noside aside{display:none}
 #cache{flex:1;font-size:11px;color:var(--muted2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #mem{font-size:11px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
 #prog{font-size:11px;color:var(--muted);white-space:nowrap}
+#prep{font-size:11px;color:var(--muted);white-space:nowrap;cursor:default;overflow:hidden;text-overflow:ellipsis;min-width:0}
+#prep:hover{color:var(--text)}
 
 /* --- siatka --- */
 main{grid-row:2;grid-column:2;overflow:auto;padding:10px 24px 32px 24px;position:relative;outline:none;min-width:0}
@@ -560,6 +562,7 @@ body.bare.idle,body.bare.idle *,.fs body.idle,.fs body.idle *{cursor:none!import
     <span id="cache" class="num"></span>
     <span id="mem" class="num" hidden></span>
     <span id="prog" class="num"></span>
+    <span id="prep" class="num" hidden></span>
     <button id="setBtn" class="ib" aria-label="Ustawienia" title="Ustawienia">
       <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v1.6M8 12.6v1.6M3.6 3.6l1.1 1.1M11.3 11.3l1.1 1.1M1.8 8h1.6M12.6 8h1.6M3.6 12.4l1.1-1.1M11.3 4.7l1.1-1.1"/></svg>
     </button>

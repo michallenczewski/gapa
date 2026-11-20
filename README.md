@@ -11,6 +11,8 @@ Działa na Windows i macOS.
 
 Jak program jest zbudowany i kiedy warto zmienić platformę (Tauri, moduły w Ruście): [ARCHITEKTURA.md](ARCHITEKTURA.md).
 
+**Miniatury całej biblioteki:** w ustawieniach (koło zębate) → „Przygotuj miniatury biblioteki…”. Gapa robi brakujące miniatury wszystkich plików z ulubionych folderów w osobnym, niewidocznym oknie: gdy pracujesz, po jednym pliku, gdy komputer stoi bezczynnie — pełną mocą; komputer nie zasypia do końca. Postęp jest w stopce (klik: wstrzymaj, zatrzymaj). Opcja „Przygotowuj co noc” robi to samo między 2:00 a 6:00, jeśli Gapa działa (na Windows zostaje wtedy w tle z ikoną w zasobniku). Większe wersje miniatur dla dużych kafelków też trafiają na dysk, a przeniesienie lub zmiana nazwy pliku w Gapie zabiera jego miniaturę ze sobą.
+
 ## Pobieranie
 
 Gotowe instalatory są w zakładce **Releases** tego repozytorium:

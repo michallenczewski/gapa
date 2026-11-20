@@ -27,7 +27,8 @@ const S=Object.assign({types:{},sort:'name',dir:1,size:180,lic:28,mode:'icons',n
   (()=>{try{return JSON.parse(localStorage.getItem('podglad')||'{}');}catch(e){return {};}})());
 // okno podglądu ze spacji w Eksploratorze (Windows): korzysta z ustawień, ale niczego w nich nie zmienia
 const PEEK=!!api.peekPath;
-const save=()=>{ if(PEEK) return; try{localStorage.setItem('podglad',JSON.stringify(S));}catch(e){} };
+const PREP=!!api.prepMode;      // niewidoczne okno, które przygotowuje miniatury biblioteki
+const save=()=>{ if(PEEK||PREP) return; try{localStorage.setItem('podglad',JSON.stringify(S));}catch(e){} };
 const press=(b,v)=>b.setAttribute('aria-pressed',v?'true':'false');
 
 function applyTheme(){
@@ -274,6 +275,8 @@ function settingsMenu(){
     ...(api.web?[]:LIM.map(([mb,l])=>({label:'Limit '+l,check:lim===mb,run:async()=>{await api.cacheLimit(mb);cacheInfo();}}))),
     ...(api.web?[]:[{label:'Przenieś do innego folderu…',run:async()=>{const d=await api.cacheChoose();if(d){zoomTip('Miniatury w: '+d);cacheInfo();}}},
       {label:'Pokaż folder z miniaturami',run:()=>api.cacheReveal()}]),
+    ...(api.prepPlan?[{label:'Przygotuj miniatury biblioteki…',run:prepAsk},
+      {label:'Przygotowuj co noc (2:00–6:00)',box:!!(prepSt&&prepSt.nightly),keep:true,run:async()=>{ const v=await api.prepNightly(!(prepSt&&prepSt.nightly)); prepSt=Object.assign(prepSt||{},{nightly:v}); if(v) zoomTip(isWin?'Gapa zostanie w tle (ikona w zasobniku) i w nocy zrobi brakujące miniatury':'Gapa w nocy zrobi brakujące miniatury, jeśli będzie uruchomiona'); settingsMenu(); }}]:[]),
     {label:'Wyczyść miniatury',run:cacheClear}],true);
 }
 $('#setBtn').onclick=e=>{e.stopPropagation();ctx.hidden||ctx.dataset.of!=='set'?(settingsMenu(),ctx.dataset.of='set'):hideMenu();};
@@ -2174,7 +2177,7 @@ function resetHints(){ S.hints={}; S.seenKeys=false; save(); zoomTip('Podpowiedz
 $('#empty-open').onclick=pickFolder;
 markSort(); markModes(); setNames(S.names!==false); setDirNames(S.dirNames!==false); setGridLines(!!S.gridlines); setSide(S.side!==false); setInsp(!!S.insp);
 renderSide(); renderCrumbs(); renderTypes(); cacheInfo(); renderBasketNav(); libSync(); setShowMem(!!S.showMem);
-if(!S.seenKeys&&!api.startPath&&!PEEK) setTimeout(()=>{ if(!S.seenKeys) toggleKeys(true); },1400);
+if(!S.seenKeys&&!api.startPath&&!PEEK&&!PREP) setTimeout(()=>{ if(!S.seenKeys) toggleKeys(true); },1400);
 /* --- tryb podglądu: otwiera wskazany plik, strzałki w Eksploratorze przesuwają podgląd --- */
 // kilka zaznaczonych plików: arkusz ze wszystkimi naraz; klik / Enter otwiera jeden, strzałki chodzą tylko po zaznaczonych
 let sheet=null;                       // {list, at} gdy pokazujemy podgląd kilku plików
@@ -2250,4 +2253,48 @@ function sheetMark(){ stage.querySelectorAll('.sc').forEach((x,i)=>x.classList.t
 const inSheet=()=>!!(sheet&&stage.classList.contains('sheetmode'));
 // ustawienia podglądu spacją (tylko Windows)
 let peekState=null; if(api.peekGet&&!PEEK) api.peekGet().then(r=>{ peekState=r; });
-loadRoots().then(async()=>{ if(PEEK){ if(!api.peekMulti) peekOpen(api.peekPath); return; } const sp=api.startPath; if(sp&&await api.exists(sp)) go(sp); else if(S.last&&await api.exists(S.last)) go(S.last); else { render(); syncTree(); } });
+/* --- miniatury całej biblioteki: polecenie w ustawieniach, postęp w stopce, liczenie w osobnym oknie --- */
+let prepSt=null, prepHideT=0;
+function prepShow(s){
+  prepSt=s; const el=$('#prep'); if(!el) return; clearTimeout(prepHideT);
+  if(s.on){ el.hidden=false; el.textContent='Biblioteka: '+s.done.toLocaleString('pl')+' z '+s.total.toLocaleString('pl')+(s.paused?' · wstrzymane':'');
+    el.title='Gapa przygotowuje miniatury plików z ulubionych folderów'+(s.auto?' (nocne przygotowanie)':'')+'. Kliknij, żeby wstrzymać albo zatrzymać.'+(s.msg?'\nPrzygotowuję '+s.msg+'.':''); }
+  else if(s.msg==='gotowe'||s.msg==='Limit pamięci miniatur jest pełny'){ el.hidden=false; el.textContent=s.msg==='gotowe'?'Miniatury biblioteki gotowe'+(s.failed?' ('+s.failed+' bez podglądu)':''):s.msg; el.title=''; prepHideT=setTimeout(()=>{el.hidden=true;},15000); cacheInfo(); }
+  else el.hidden=true;
+}
+if(api.prepGet&&!PREP&&!PEEK){ api.prepGet().then(prepShow); api.onPrepStatus(prepShow);
+  $('#prep').onclick=e=>{ e.stopPropagation(); if(!prepSt||!prepSt.on) return; const r=$('#prep').getBoundingClientRect();
+    showMenu(r.left-4,r.top-8,'Miniatury biblioteki',[
+      prepSt.paused?{label:'Wznów',run:()=>api.prepPause(false)}:{label:'Wstrzymaj',run:()=>api.prepPause(true)},
+      {label:'Zatrzymaj',run:()=>api.prepStop()}],true); }; }
+async function prepAsk(){
+  zoomTip('Sprawdzam, których miniatur brakuje…');
+  const p=await api.prepPlan();
+  if(!p.files) return askConfirm('Biblioteka jest pusta','Miniatury przygotowuję dla wszystkich plików w ulubionych folderach i ich podfolderach. Dodaj najpierw foldery do Ulubionych.','OK');
+  if(!p.missing) return askConfirm('Wszystko gotowe','Wszystkie pliki w bibliotece ('+p.files.toLocaleString('pl')+') mają już miniatury.','OK');
+  const STEPS=[2048,5120,10240,20480,51200], need=(p.used+p.est)/0.9/1048576, raise=p.fits?0:(STEPS.find(m=>m>=need&&m>p.limitMB)||Math.max(p.limitMB,STEPS[STEPS.length-1]));
+  const gb=mb=>(mb/1024).toLocaleString('pl',{maximumFractionDigits:1})+' GB';
+  const body='W bibliotece jest '+p.files.toLocaleString('pl')+' plików, z czego '+p.missing.toLocaleString('pl')+' nie ma jeszcze miniatur. Zajmą około '+fmtSize(p.est)+'. '
+    +'Gapa zrobi je w tle, w osobnym oknie: gdy pracujesz, liczy po jednym pliku, a gdy komputer stoi bezczynnie, pełną mocą. Do końca nie pozwoli komputerowi zasnąć. Możesz zamknąć okna Gapy — wystarczy, że program działa.'
+    +(raise?' Obecny limit pamięci miniatur ('+gb(p.limitMB)+') jest na to za mały, więc podniosę go do '+gb(raise)+'.':'');
+  if(await askConfirm('Przygotować miniatury biblioteki?',body,raise?'Podnieś limit i zacznij':'Zacznij')){ await api.prepStart(raise); cacheInfo(); }
+}
+async function prepLoop(){
+  let par=1, stop=false;
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  const loop=async k=>{
+    while(!stop){
+      if(k>=par){ await sleep(3000); continue; }
+      const r=await api.prepNext(); if(r.par) par=r.par;
+      if(r.end){ stop=true; break; }
+      if(r.wait||!r.it){ await sleep(2000); continue; }
+      const f=r.it, it={kind:'file',name:f.name,path:f.path,size:f.size,mtime:f.mtime,type:EXT[extOf(f.name)],state:null,gen};
+      let ok=true; try{ if(!it.type) throw 0; await buildThumb(it); }catch(e){ ok=false; }
+      it.thumb=null; it._tp=null;
+      await api.prepReport(ok);
+    }
+  };
+  await Promise.all(Array.from({length:MAXRUN},(_,k)=>loop(k)));
+}
+if(PREP) prepLoop();
+if(!PREP) loadRoots().then(async()=>{ if(PEEK){ if(!api.peekMulti) peekOpen(api.peekPath); return; } const sp=api.startPath; if(sp&&await api.exists(sp)) go(sp); else if(S.last&&await api.exists(S.last)) go(S.last); else { render(); syncTree(); } });

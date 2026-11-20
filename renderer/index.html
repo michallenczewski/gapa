@@ -496,6 +496,9 @@ body.peekmode>header,body.peekmode>aside,body.peekmode>main{visibility:hidden}
 .frame-win body.bare #fspill{top:44px}
 .fs.frame-win body.bare #fspill{top:10px}
 body.bare.moving #fspill,.fs body.moving #fspill{opacity:1;pointer-events:auto}
+/* na Macu pełny ekran jest systemowy (zielony przycisk, ⌃⌘F) — nie dublujemy go; pastylka tylko w trybie bez interfejsu */
+.frame-mac #vfs,.frame-mac #pillFs{display:none}
+.frame-mac.fs body:not(.bare) #fspill{display:none}
 body.bare.idle,body.bare.idle *,.fs body.idle,.fs body.idle *{cursor:none!important}
 </style>
 </head>

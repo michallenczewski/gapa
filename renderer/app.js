@@ -1434,10 +1434,12 @@ function fullOf(it){
       v={el,note:''};
     }else{
       // najpierw w rozdzielczości ekranu (PSD, TIFF, EXR, HDR, TGA) — pełna dopiero po przybliżeniu
-      const r=await decode(ref(it),it.type,screenPx());
+      // PSD/PSB najwyżej w 4K, także po przybliżeniu — większy podgląd nie jest potrzebny, a kosztuje czas i pamięć
+      const cap=capOf(it), r=await decode(ref(it),it.type,cap?Math.min(screenPx(),cap):screenPx());
       it.meta=r.meta; it.dims=[r.meta.width,r.meta.height];
       const el=await viewCanvas(it,r);
-      if(r.meta&&r.width&&r.meta.width>r.width*1.02){ el._fw=r.meta.width; el._fh=r.meta.height; el._reduced=true; }
+      if(r.meta&&r.width){ const k=cap?Math.min(1,cap/Math.max(r.meta.width,r.meta.height)):1, fw=Math.round(r.meta.width*k), fh=Math.round(r.meta.height*k);
+        if(fw>r.width*1.02){ el._fw=fw; el._fh=fh; el._reduced=true; } }
       v={el,note:r.note||''};
     }
     if(v.media) return v; // filmów nie trzymamy w pamięci
@@ -1450,6 +1452,7 @@ function fullOf(it){
 }
 // dłuższy bok ekranu w pikselach urządzenia, z małym zapasem — tyle wystarcza do podglądu „dopasuj”
 const screenPx=()=>Math.round(Math.max(screen.width,screen.height)*devicePixelRatio*1.1);
+const PSDMAX=4096; const capOf=it=>it.type==='psd'?PSDMAX:0;
 async function viewCanvas(it,r){
   const bmp=await toBitmap(r); let el;
   if(OPAQUE.has(it.type)||r.jpeg){el=document.createElement('canvas');el.width=bmp.width;el.height=bmp.height;el.getContext('2d').drawImage(bmp,0,0);}
@@ -1461,7 +1464,7 @@ async function upgradeFull(){
   const el=vEl, it=vList[vi]; if(!el||!el._reduced||el._upg||!it) return;
   el._upg=true; const tok=vTok, t=setTimeout(()=>zoomTip('Wczytuję pełną rozdzielczość…'),250);
   try{
-    const r=await decode(ref(it),it.type,0); if(tok!==vTok||vEl!==el) return;
+    const r=await decode(ref(it),it.type,capOf(it)); if(tok!==vTok||vEl!==el) return;
     const c=await viewCanvas(it,r); if(tok!==vTok||vEl!==el) return;
     c.className=el.className; c.style.cssText=el.style.cssText; c.draggable=false; c.onclick=el.onclick; c.ondragstart=el.ondragstart;
     el.replaceWith(c); vEl=c; if(zm) renderZoom();

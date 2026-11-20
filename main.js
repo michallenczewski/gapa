@@ -421,6 +421,9 @@ ipcMain.handle('dev-of', (e, paths) => Promise.all((paths || []).map(p => fsp.st
 ipcMain.handle('current-drag', () => lastDrag && Date.now() - lastDrag.t < 120000 ? { files: lastDrag.files, copy: lastDrag.copy } : null);
 // schowek systemowy z plikami: Gapa → Eksplorator / Finder (⌘C / Ctrl+C) i z powrotem (⌘V / Ctrl+V w Gapie)
 const psq = s => "'" + String(s).replace(/'/g, "''") + "'";
+// schowek plików na Macu przez AppKit (JavaScript for Automation) — Finder czyta i zapisuje adresy plików (NSURL)
+const MAC_CLIP_WRITE = "ObjC.import('AppKit');function run(a){const pb=$.NSPasteboard.generalPasteboard;pb.clearContents;const arr=$.NSMutableArray.array;for(const p of a)arr.addObject($.NSURL.fileURLWithPath(p));return pb.writeObjects(arr);}";
+const MAC_CLIP_READ = "ObjC.import('AppKit');function run(){const pb=$.NSPasteboard.generalPasteboard;const o=$.NSDictionary.dictionaryWithObjectForKey($.NSNumber.numberWithBool(true),$.NSPasteboardURLReadingFileURLsOnlyKey);const r=pb.readObjectsForClassesOptions($.NSArray.arrayWithObject($.NSURL),o);if(!r||r.isNil())return '';const out=[];for(let i=0;i<r.count;i++)out.push(ObjC.unwrap(r.objectAtIndex(i).path));return out.join('\\n');}";
 ipcMain.handle('clip-files', async (e, paths) => {
   paths = (paths || []).filter(Boolean);
   if (!paths.length) return false;
@@ -428,10 +431,14 @@ ipcMain.handle('clip-files', async (e, paths) => {
     if (isWin) {
       await new Promise(res => execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'Set-Clipboard -LiteralPath ' + paths.map(psq).join(',')], { windowsHide: true }, () => res()));
     } else if (isMac) {
-      const esc = p => p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      const plist = '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><array>' + paths.map(p => '<string>' + esc(p) + '</string>').join('') + '</array></plist>';
-      clipboard.clear();
-      clipboard.writeBuffer('NSFilenamesPboardType', Buffer.from(plist, 'utf8'));
+      // pliki do schowka tak jak robi to Finder: adresy plików przez NSPasteboard (⌘V w Finderze wkleja kopie)
+      const ok = await new Promise(res => execFile('osascript', ['-l', 'JavaScript', '-e', MAC_CLIP_WRITE, ...paths], (err, so) => res(!err && /true/.test(so))));
+      if (!ok) {   // zapas: stary typ schowka
+        const esc = p => p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const plist = '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><array>' + paths.map(p => '<string>' + esc(p) + '</string>').join('') + '</array></plist>';
+        clipboard.clear();
+        clipboard.writeBuffer('NSFilenamesPboardType', Buffer.from(plist, 'utf8'));
+      }
     } else clipboard.writeText(paths.join('\n'));
     return true;
   } catch (err) { return false; }
@@ -443,6 +450,9 @@ ipcMain.handle('clip-read-files', async () => {
       return out.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
     }
     if (isMac) {
+      const out = await new Promise(res => execFile('osascript', ['-l', 'JavaScript', '-e', MAC_CLIP_READ], { encoding: 'utf8' }, (err, so) => res(err ? '' : so)));
+      const list = out.split('\n').map(x => x.trim()).filter(Boolean);
+      if (list.length) return list;
       const b = clipboard.readBuffer('NSFilenamesPboardType').toString('utf8');
       return [...b.matchAll(/<string>([\s\S]*?)<\/string>/g)].map(m => m[1].replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'));
     }

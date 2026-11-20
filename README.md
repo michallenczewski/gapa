@@ -7,7 +7,7 @@ Działa na Windows i macOS.
 
 **Formaty:** JPG, PNG, PSD/PSB, TIFF, TGA, EXR, HDR, pliki RAW z aparatów (podgląd JPEG zapisany w pliku), WebP, AVIF, GIF, BMP, ICO, SVG.
 
-**Pliki projektowe:** PDF (cały dokument w podglądzie), DWG, SKP, MAX, 3DM, Archicad (PLN/PLA/TPL). Program bierze miniatury systemowe (te same co Eksplorator/Finder — działają dla formatów, których program jest zainstalowany), a gdy ich nie ma, wyciąga podgląd zapisany w pliku.
+**Pliki projektowe:** PDF (cały dokument w podglądzie: powiększanie z ostrym przerysowaniem stron, klik w stronę przybliża, przybliżoną stronę przesuwa się myszą, z lewej pasek miniatur stron włączany przyciskiem na dole), DWG, SKP, MAX, 3DM, Archicad (PLN/PLA/TPL). Program bierze miniatury systemowe (te same co Eksplorator/Finder — działają dla formatów, których program jest zainstalowany), a gdy ich nie ma, wyciąga podgląd zapisany w pliku.
 
 Jak program jest zbudowany i kiedy warto zmienić platformę (Tauri, moduły w Ruście): [ARCHITEKTURA.md](ARCHITEKTURA.md).
 
@@ -95,6 +95,7 @@ W pasku podglądu obok „…” jest ikona pełnego ekranu. Gdy interfejs jest 
 | N / ⇧N | nazwy plików / nazwy folderów |
 | K, M | film: odtwórz / pauza, wycisz |
 | ↑ ↓ (PDF) | poprzednia / następna strona |
+| + − albo Ctrl/⌘ + kółko (PDF) | powiększ / pomniejsz strony; 0 wraca do dopasowania |
 
 Pliki można przeciągać z Podglądu prosto do Photoshopa, 3ds Maxa czy Findera/Eksploratora.
 

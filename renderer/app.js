@@ -1152,38 +1152,110 @@ async function loadPdfjs(){
   if(!pdfjsTried){ pdfjsTried=true; try{ pdfjs=await import('../node_modules/pdfjs-dist/build/pdf.min.mjs'); pdfjs.GlobalWorkerOptions.workerSrc='../node_modules/pdfjs-dist/build/pdf.worker.min.mjs'; }catch(e){ pdfjs=null; } }
   return pdfjs;
 }
-// przeglądarka PDF: strony jedna pod drugą na tle podglądu, rysowane dopiero, gdy wjeżdżają w widok
+// przeglądarka PDF: strony jedna pod drugą, rysowane dopiero, gdy wjeżdżają w widok.
+// Przybliżanie (Ctrl/⌘ + kółko, szczypanie, + −, klik w stronę) przerysowuje widoczne strony w wyższej rozdzielczości,
+// więc drobny tekst na planszach zostaje ostry. Z lewej opcjonalny pasek miniatur stron.
 async function pdfViewer(it){
   const data=new Uint8Array(await (await blobOf(it)).arrayBuffer());
   const doc=await pdfjs.getDocument({data,isEvalSupported:false}).promise;
   it.pages=doc.numPages;
   const wrap=document.createElement('div'); wrap.className='pdfwrap'; wrap.isDoc=true; wrap._doc=doc;
+  const side=document.createElement('div'); side.className='pdfside'; wrap.appendChild(side);
   const el=document.createElement('div'); el.className='pdfdoc'; el.tabIndex=-1; wrap.appendChild(el);
-  const pages=[];
-  const io=new IntersectionObserver(es=>{for(const e of es){ if(e.isIntersecting&&!e.target._done){ e.target._done=true; drawPage(e.target); } }},{root:el,rootMargin:'600px 0px'});
-  async function drawPage(box){
-    const page=await doc.getPage(box._n), v1=page.getViewport({scale:1});
-    const w=box.clientWidth*devicePixelRatio, vp=page.getViewport({scale:w/v1.width});
+  if(S.pdfSide&&doc.numPages>1) wrap.classList.add('side');
+  const pages=[], thumbs=[], N=Math.min(doc.numPages,200);
+  let z=1, base=920, pw1=0;   // z — przybliżenie względem „dopasuj do szerokości”; pw1 — szerokość pierwszej strony w punktach PDF
+  const MAXPX=8000;
+  async function draw(box){
+    const target=Math.min(MAXPX,Math.round(box.clientWidth*devicePixelRatio));
+    if(box._rw&&box._rw>=target*0.92&&box._rw<=target*1.6) return;
+    if(box._task){ try{box._task.cancel();}catch(e){} box._task=null; }
+    const page=await doc.getPage(box._n), v1=page.getViewport({scale:1}), vp=page.getViewport({scale:target/v1.width});
     const c=document.createElement('canvas'); c.width=Math.ceil(vp.width); c.height=Math.ceil(vp.height);
-    await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
-    box.appendChild(c);
+    const task=page.render({canvasContext:c.getContext('2d'),viewport:vp}); box._task=task;
+    try{ await task.promise; }catch(e){ return; }
+    if(box._task!==task) return; box._task=null;
+    box.textContent=''; box.appendChild(c); box._rw=c.width;
   }
-  for(let n=1;n<=doc.numPages;n++){
+  const vis=new Set();
+  const io=new IntersectionObserver(es=>{for(const e of es){
+    if(e.isIntersecting){ vis.add(e.target); draw(e.target); }
+    else { vis.delete(e.target); const b=e.target; if(b._rw>2400){ if(b._task){try{b._task.cancel();}catch(_){}} b._task=null; b.textContent=''; b._rw=0; } }   // duże bitmapy daleko poza widokiem zwalniamy
+  }},{root:el,rootMargin:'600px 600px'});
+  for(let n=1;n<=N;n++){
     const p=await doc.getPage(n), v1=p.getViewport({scale:1});
+    if(n===1) pw1=v1.width;
     const box=document.createElement('div'); box.className='pg'; box._n=n; box.style.aspectRatio=v1.width+' / '+v1.height;
     el.appendChild(box); pages.push(box); io.observe(box);
-    if(n>=200) break;
+    if(doc.numPages>1){
+      const t=document.createElement('button'); t.className='pt'; t._n=n; t.title='Strona '+n;
+      const f=document.createElement('div'); f.className='pf'; f.style.aspectRatio=v1.width+' / '+v1.height; t.appendChild(f);
+      const l=document.createElement('span'); l.textContent=n; t.appendChild(l);
+      t.onclick=e=>{e.stopPropagation(); goPage(n,false);};
+      side.appendChild(t); thumbs.push(t);
+    }
   }
-  el.addEventListener('scroll',()=>{const t=$('#vinfo'); const mid=el.scrollTop+el.clientHeight/2; let k=1; for(const b of pages){ if(b.offsetTop<=mid) k=b._n; } t.textContent=info(it)+'  ·  strona '+k+' z '+doc.numPages;},{passive:true});
-  el.addEventListener('wheel',e=>e.stopPropagation(),{passive:true});
-  // strony: przyciski na dole i klawisze ↑ ↓ / PageUp PageDown (← → dalej zmieniają plik)
+  // miniatury stron: małe bitmapy, rysowane po kolei, gdy pasek jest widoczny
+  const tio=new IntersectionObserver(es=>{for(const e of es){ const t=e.target; if(!e.isIntersecting||t._done) continue; t._done=true;
+    doc.getPage(t._n).then(page=>{ const v1=page.getViewport({scale:1}), vp=page.getViewport({scale:Math.round(96*devicePixelRatio)/v1.width});
+      const c=document.createElement('canvas'); c.width=Math.ceil(vp.width); c.height=Math.ceil(vp.height);
+      return page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise.then(()=>t.firstChild.appendChild(c)); }).catch(()=>{}); }},{root:side,rootMargin:'300px 0px'});
+  for(const t of thumbs) tio.observe(t);
+
   const cur=()=>{const mid=el.scrollTop+el.clientHeight/2; let k=1; for(const b of pages){ if(b.offsetTop<=mid) k=b._n; } return k;};
+  function goPage(k,smooth){ k=Math.max(1,Math.min(pages.length,k)); el.scrollTo({top:pages[k-1].offsetTop-12,behavior:smooth===false?'auto':'smooth'}); SFX('tick'); }
+  wrap.pageBy=d=>goPage(cur()+d);
+
+  // szerokość strony: dopasowanie do okna razy przybliżenie
+  const fitW=()=>Math.max(200,Math.min(920,el.clientWidth-128));
+  let redrawT=0;
+  function layout(cx,cy){
+    // punkt pod kursorem (albo środek widoku) zostaje na miejscu
+    const r=el.getBoundingClientRect(); if(cx==null){cx=r.width/2;cy=r.height/2;} else {cx-=r.left;cy-=r.top;}
+    const py=el.scrollTop+cy, px=el.scrollLeft+cx;
+    let b=pages[0]; for(const p of pages){ if(p.offsetTop<=py) b=p; else break; }
+    const fy=(py-b.offsetTop)/b.offsetHeight, fx=(px-b.offsetLeft)/b.offsetWidth;
+    base=fitW(); el.style.setProperty('--pw',Math.round(base*z)+'px');
+    el.classList.toggle('zoomed',z>1.001);
+    el.scrollTop=b.offsetTop+fy*b.offsetHeight-cy; el.scrollLeft=b.offsetLeft+fx*b.offsetWidth-cx;
+    upd(); clearTimeout(redrawT); redrawT=setTimeout(()=>{ for(const p of vis) draw(p); },160);
+  }
+  const pct=()=>Math.round(base*z/(pw1*96/72)*100);
+  function zoomBy(f,cx,cy){ const nz=f===0?1:Math.max(0.35,Math.min(8,z*f)); if(Math.abs(nz-z)<1e-3&&f!==0) return; z=nz; layout(cx,cy); }
+  wrap.zoomBy=zoomBy;
+  new ResizeObserver(()=>layout()).observe(el);
+
+  el.addEventListener('wheel',e=>{
+    e.stopPropagation();
+    if(e.ctrlKey||e.metaKey){ e.preventDefault(); const d=e.deltaMode===1?e.deltaY*33:e.deltaY; zoomBy(Math.exp(-Math.max(-120,Math.min(120,d))/(pinchLike(e)?160:600)),e.clientX,e.clientY); }
+  },{passive:false});
+  side.addEventListener('wheel',e=>e.stopPropagation(),{passive:true});
+  // przybliżoną stronę przesuwa się, ciągnąc myszą; zwykły klik przybliża albo wraca do dopasowania
+  let drag=null, moved=false;
+  el.addEventListener('pointerdown',e=>{ if(e.button!==0||!e.target.closest('.pg')) return; drag={x:e.clientX,y:e.clientY,l:el.scrollLeft,t:el.scrollTop}; moved=false; });
+  addEventListener('pointermove',e=>{ if(!drag) return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y; if(!moved&&Math.hypot(dx,dy)<4) return;
+    if(!moved){ moved=true; el.classList.add('panning'); } el.scrollLeft=drag.l-dx; el.scrollTop=drag.t-dy; });
+  addEventListener('pointerup',()=>{ if(drag){ drag=null; el.classList.remove('panning'); } });
+  el.addEventListener('click',e=>{ e.stopPropagation(); if(moved){moved=false;return;} if(!e.target.closest('.pg')) return; if(z>1.001) zoomBy(0,e.clientX,e.clientY); else zoomBy(2.5,e.clientX,e.clientY); });
+
+  // pasek na dole: miniatury stron · strony · przybliżenie
+  const I=(d,w=14)=>'<svg width="'+w+'" height="'+w+'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+d+'</svg>';
   const nav=document.createElement('div'); nav.className='pgnav';
-  nav.innerHTML='<button aria-label="Poprzednia strona" title="Poprzednia strona (↑)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m4 10 4-4 4 4"/></svg></button><span></span><button aria-label="Następna strona" title="Następna strona (↓)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m4 6 4 4 4-4"/></svg></button>';
-  const lab=nav.querySelector('span'), upd=()=>lab.textContent=cur()+' / '+doc.numPages;
-  wrap.pageBy=d=>{ const k=Math.max(1,Math.min(pages.length,cur()+d)); el.scrollTo({top:pages[k-1].offsetTop-12,behavior:'smooth'}); SFX('tick'); };
-  nav.children[0].onclick=e=>{e.stopPropagation();wrap.pageBy(-1);}; nav.children[2].onclick=e=>{e.stopPropagation();wrap.pageBy(1);};
-  el.addEventListener('scroll',upd,{passive:true}); upd(); wrap.appendChild(nav);
+  const mod=isMac?'⌘':'Ctrl+';
+  nav.innerHTML=(thumbs.length?'<button class="sideb" aria-label="Miniatury stron" title="Miniatury stron">'+I('<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M6 2.5v11M3.6 5.2h.8M3.6 8h.8M3.6 10.8h.8"/>')+'</button><i></i>':'')
+    +'<button class="pup" aria-label="Poprzednia strona" title="Poprzednia strona (↑)">'+I('<path d="m4 10 4-4 4 4"/>')+'</button><span class="pn"></span><button class="pdn" aria-label="Następna strona" title="Następna strona (↓)">'+I('<path d="m4 6 4 4 4-4"/>')+'</button>'
+    +'<i></i><button class="zout" aria-label="Pomniejsz" title="Pomniejsz (−)">'+I('<path d="M4 8h8"/>')+'</button><button class="zl" title="Dopasuj do szerokości (0)"></button><button class="zin" aria-label="Powiększ" title="Powiększ (+ albo '+mod+'kółko)">'+I('<path d="M4 8h8M8 4v8"/>')+'</button>';
+  const q=s=>nav.querySelector(s), pn=q('.pn'), zl=q('.zl');
+  function upd(){ const k=cur(); pn.textContent=k+' / '+doc.numPages; zl.textContent=pct()+'%';
+    $('#vinfo').textContent=info(it)+'  ·  strona '+k+' z '+doc.numPages;
+    if(thumbs.length){ for(const t of thumbs) t.classList.toggle('on',t._n===k);
+      const t=thumbs[k-1]; if(t&&wrap.classList.contains('side')){ const top=t.offsetTop, bot=top+t.offsetHeight; if(top<side.scrollTop+8||bot>side.scrollTop+side.clientHeight-8) side.scrollTo({top:top-side.clientHeight/2+t.offsetHeight/2}); } } }
+  q('.pup').onclick=e=>{e.stopPropagation();wrap.pageBy(-1);}; q('.pdn').onclick=e=>{e.stopPropagation();wrap.pageBy(1);};
+  q('.zout').onclick=e=>{e.stopPropagation();zoomBy(1/1.25);}; q('.zin').onclick=e=>{e.stopPropagation();zoomBy(1.25);}; zl.onclick=e=>{e.stopPropagation();zoomBy(0);};
+  if(thumbs.length) q('.sideb').onclick=e=>{e.stopPropagation(); S.pdfSide=!wrap.classList.contains('side'); save(); wrap.classList.toggle('side',S.pdfSide); q('.sideb').classList.toggle('on',S.pdfSide); };
+  if(thumbs.length) q('.sideb').classList.toggle('on',wrap.classList.contains('side'));
+  el.addEventListener('scroll',upd,{passive:true});
+  wrap.appendChild(nav); layout();
   return wrap;
 }
 async function pdfThumb(it){
@@ -1785,6 +1857,9 @@ document.addEventListener('keydown',e=>{
     else if(vEl&&vEl.pageBy&&(k==='ArrowUp'||k==='PageUp')){e.preventDefault();vEl.pageBy(-1);}
     else if(k==='ArrowRight'||k==='ArrowDown'||e.code==='KeyD'){e.preventDefault();stepV(1);}
     else if(k==='ArrowLeft'||k==='ArrowUp'||e.code==='KeyA'){e.preventDefault();stepV(-1);}
+    else if(vEl&&vEl.zoomBy&&!e.altKey&&((k==='+'||k==='=')||e.code==='Digit2')){e.preventDefault();vEl.zoomBy(1.25);}
+    else if(vEl&&vEl.zoomBy&&!e.altKey&&(k==='-'||e.code==='Digit1')){e.preventDefault();vEl.zoomBy(1/1.25);}
+    else if(vEl&&vEl.zoomBy&&(k==='0'||k==='z')){e.preventDefault();vEl.zoomBy(0);}
     else if(mod&&(k==='='||k==='+')&&isImg()){e.preventDefault();zoomTo((zm||fitScale())*1.25,null,null,true);}
     else if(mod&&k==='-'&&isImg()){e.preventDefault();zoomTo((zm||fitScale())/1.25,null,null,true);}
     else if(mod&&k==='0'){e.preventDefault();zoomFit(true);}

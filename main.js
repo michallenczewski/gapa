@@ -356,7 +356,7 @@ ipcMain.handle('lib-search', async (e, q, exts, names) => {
 // Repozytorium jest publiczne, więc pytamy API GitHuba bez logowania (raz po starcie i co 6 godzin).
 // Windows: instalator pobiera się do folderu tymczasowego i instaluje po cichu, a Gapa uruchamia się ponownie.
 // Mac: obraz .dmg trafia do Pobranych i się otwiera — Gapę przeciąga się do Aplikacji (aplikacja nie jest podpisana u Apple).
-const REPO = 'michallenczewski/podglad';
+const REPO = 'michallenczewski/gapa';   // dawniej podglad — GitHub przekierowuje stary adres
 let upd = { state: 'idle', version: null, url: null, name: null, size: 0, got: 0, notes: '', error: '' };
 const verNum = v => String(v || '').replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
 const newer = (a, b) => { const x = verNum(a), y = verNum(b); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; };

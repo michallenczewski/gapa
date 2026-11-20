@@ -325,7 +325,7 @@ function renderSettings(){
   const ver=updSt&&updSt.current?'Gapa '+updSt.current:'Gapa';
   o.innerHTML='<div class="sc s2" role="dialog" aria-label="Ustawienia"><div class="sh"><b>Ustawienia</b><button class="ib x" aria-label="Zamknij" title="Zamknij (Esc)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="m4 4 8 8M12 4l-8 8"/></svg></button></div>'
     +G.join('')
-    +'<div class="about">'+esc(ver)+' · Michał Lenczewski, 2026 · licencja MIT · <a href="https://github.com/michallenczewski/podglad" target="_blank" rel="noopener">github.com/michallenczewski/podglad</a></div></div>';
+    +'<div class="about">'+esc(ver)+' · Michał Lenczewski, 2026 · licencja MIT · <a href="https://github.com/michallenczewski/gapa" target="_blank" rel="noopener">github.com/michallenczewski/gapa</a></div></div>';
   o.querySelector('.x').onclick=closeSettings;
   for(const b of o.querySelectorAll('[data-a]')) b.onclick=async e=>{ e.stopPropagation(); await acts[+b.dataset.a](); renderSettings(); };
 }

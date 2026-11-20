@@ -73,8 +73,8 @@ function chromeSync(){
 }
 applyTheme();
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);
-function setTheme(t){S.theme=t==='auto'?null:t;save();applyTheme();}
-function cycleTheme(){S.theme=document.documentElement.dataset.theme==='dark'?'light':'dark';save();applyTheme();}
+function setTheme(t){S.theme=t==='auto'?null:t;save();applyTheme();themeBtnSync();}
+function cycleTheme(){S.theme=document.documentElement.dataset.theme==='dark'?'light':'dark';save();applyTheme();themeBtnSync();}
 
 /* rozmiar miniatur: liczony od liczby kolumn — każdy krok to jedna miniatura więcej albo mniej w rzędzie,
    a kafelki zawsze dokładnie wypełniają szerokość. Suwak, 1 i 2, Ctrl/⌘ + − +, kółko i szczypnięcie */
@@ -248,40 +248,64 @@ let curIcon='3d'; if(api.iconGet) api.iconGet().then(v=>curIcon=v);
 let memT=0;
 async function memTick(){ if(!S.showMem||!api.mem) return; const m=await api.mem(); $('#mem').textContent='RAM '+fmtSize(m.total*1024); $('#mem').title='Pamięć RAM wszystkich procesów Gapy: '+fmtSize(m.total*1024)+' (okna: '+fmtSize(m.renderer*1024)+')'; }
 function setShowMem(v){ S.showMem=v; save(); $('#mem').hidden=!v; clearInterval(memT); if(v){ memTick(); memT=setInterval(memTick,2000); } }
-function settingsMenu(){
-  const r=$('#setBtn').getBoundingClientRect(), t=S.theme||'auto', lim=cacheC?cacheC.limitMB:2048;
-  const LIM=[[1024,'1 GB'],[2048,'2 GB'],[5120,'5 GB'],[10240,'10 GB']];
-  showMenu(r.left-4,r.top-8,'Motyw',[
-    {label:'Automatyczny',check:t==='auto',run:()=>setTheme('auto')},
-    {label:'Jasny',check:t==='light',run:()=>setTheme('light')},
-    {label:'Ciemny',check:t==='dark',keys:['T'],run:()=>setTheme('dark')},
-    '-',
-    {label:'Nazwy plików',box:S.names!==false,keys:['N'],keep:true,run:()=>{setNames(!(S.names!==false));settingsMenu();}},
-    {label:'Siatka między miniaturami',box:!!S.gridlines,keys:['G'],keep:true,run:()=>{setGridLines(!S.gridlines);settingsMenu();}},
-    {label:'Nazwy folderów',box:S.dirNames!==false,keys:['⇧','N'],keep:true,run:()=>{setDirNames(!(S.dirNames!==false));settingsMenu();}},
-    {label:'Ukryj interfejs',keys:['Tab'],run:toggleBare},
-    {label:'Skróty klawiszowe',keys:['?'],run:()=>toggleKeys(true)},
-    ...(peekState&&peekState.available?[{label:'Podgląd spacją w Eksploratorze',box:!!peekState.peek,keep:true,run:async()=>{ peekState.peek=!peekState.peek; await api.peekSet(peekState.peek); if(peekState.peek) zoomTip('Zaznacz plik w Eksploratorze i naciśnij spację'); settingsMenu(); }},
-      ...(peekState.peek?[{label:'Uruchamiaj razem z Windows',box:!!peekState.autostart,keep:true,run:async()=>{ peekState.autostart=!peekState.autostart; await api.autostartSet(peekState.autostart); settingsMenu(); }}]:[])]:[]),
-    ...(api.mem?[{label:'Pokaż zużycie pamięci',box:!!S.showMem,keep:true,run:()=>{setShowMem(!S.showMem);settingsMenu();}}]:[]),
-    {label:'Pokaż podpowiedzi od nowa',run:resetHints},
-    ...(api.editors?[{label:'Otwieraj w: '+(editorName||'—')+'…',keys:['E'],run:editorMenu}]:[]),
-    ...(api.updateCheck?[{label:'Sprawdź aktualizacje'+(updSt&&updSt.current?' (masz '+updSt.current+')':''),run:updManual}]:[]),
-    {label:'Dźwięki',box:S.sound!==false,keys:['S'],keep:true,run:()=>{S.sound=!(S.sound!==false);save();if(S.sound)SFX('on');settingsMenu();}},
-    ...(api.iconSet?['-',{head:'Ikona programu'},
-      {label:'Gałka 3D',check:curIcon!=='retro',run:async()=>{curIcon=await api.iconSet('3d');}},
-      {label:'Gałka 1-bit',check:curIcon==='retro',run:async()=>{curIcon=await api.iconSet('retro');}}]:[]),
-    ...(api.libSearch?['-',{head:'Wyszukiwanie w bibliotece'},{label:libLine(),dim:true,run:()=>{}},
-      {label:'Odśwież indeks',run:()=>{libSync(true);zoomTip('Odświeżam indeks biblioteki…');}}]:[]),
-    '-',{head:'Pamięć miniatur'+(api.web?' w przeglądarce':'')},
-    ...(api.web?[]:LIM.map(([mb,l])=>({label:'Limit '+l,check:lim===mb,run:async()=>{await api.cacheLimit(mb);cacheInfo();}}))),
-    ...(api.web?[]:[{label:'Przenieś do innego folderu…',run:async()=>{const d=await api.cacheChoose();if(d){zoomTip('Miniatury w: '+d);cacheInfo();}}},
-      {label:'Pokaż folder z miniaturami',run:()=>api.cacheReveal()}]),
-    ...(api.prepPlan?[{label:'Przygotuj miniatury biblioteki…',run:prepAsk},
-      {label:'Przygotowuj co noc (2:00–6:00)',box:!!(prepSt&&prepSt.nightly),keep:true,run:async()=>{ const v=await api.prepNightly(!(prepSt&&prepSt.nightly)); prepSt=Object.assign(prepSt||{},{nightly:v}); if(v) zoomTip(isWin?'Gapa zostanie w tle (ikona w zasobniku) i w nocy zrobi brakujące miniatury':'Gapa w nocy zrobi brakujące miniatury, jeśli będzie uruchomiona'); settingsMenu(); }}]:[]),
-    {label:'Wyczyść miniatury',run:cacheClear}],true);
+/* --- ustawienia: okno na środku, dwie kolumny sekcji --- */
+const GEAR='<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M6.9 1.8h2.2l.35 1.7 1.2.5 1.45-.96 1.56 1.56-.96 1.45.5 1.2 1.7.35v2.2l-1.7.35-.5 1.2.96 1.45-1.56 1.56-1.45-.96-1.2.5-.35 1.7H6.9l-.35-1.7-1.2-.5-1.45.96-1.56-1.56.96-1.45-.5-1.2-1.7-.35V6.9l1.7-.35.5-1.2-.96-1.45L3.9 2.34l1.45.96 1.2-.5z"/><circle cx="8" cy="8" r="2.1"/></svg>';
+const SUN='<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="2.8"/><path d="M8 1.6v1.5M8 12.9v1.5M3.5 3.5l1 1M11.5 11.5l1 1M1.6 8h1.5M12.9 8h1.5M3.5 12.5l1-1M11.5 4.5l1-1"/></svg>';
+const MOON='<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M13.2 10.1A5.6 5.6 0 0 1 5.9 2.8a5.6 5.6 0 1 0 7.3 7.3z"/></svg>';
+function themeBtnSync(){ const b=$('#themeBtn'); if(!b) return; const dark=document.documentElement.dataset.theme==='dark'; b.innerHTML=dark?SUN:MOON; b.title=(dark?'Tryb jasny':'Tryb ciemny')+' (T)'; b.setAttribute('aria-label',b.title); }
+let setOpen=false, edList=null;
+async function settingsMenu(){
+  hideMenu(); setOpen=true;
+  if(api.editors) api.editors().then(x=>{ edList=x; if(setOpen) renderSettings(); });
+  renderSettings(); $('#setp').classList.add('on');
 }
-$('#setBtn').onclick=e=>{e.stopPropagation();ctx.hidden||ctx.dataset.of!=='set'?(settingsMenu(),ctx.dataset.of='set'):hideMenu();};
+function closeSettings(){ setOpen=false; $('#setp').classList.remove('on'); }
+function renderSettings(){
+  const o=$('#setp'), t=S.theme||'auto', lim=cacheC?cacheC.limitMB:2048, esc=x=>String(x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
+  const acts=[]; const act=fn=>{ acts.push(fn); return acts.length-1; };
+  const seg=(opts)=>'<div class="seg">'+opts.map(([l,on,fn])=>'<button class="'+(on?'on':'')+'" data-a="'+act(fn)+'">'+esc(l)+'</button>').join('')+'</div>';
+  const chk=(l,on,fn,k,radio)=>'<button class="row" data-a="'+act(fn)+'"><span class="box'+(radio?' rad':'')+(on?' on':'')+'">'+(on?'<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m2 5.2 2 2 4-4.4"/></svg>':'')+'</span><span class="l">'+esc(l)+'</span>'+(k?'<kbd>'+k+'</kbd>':'')+'</button>';
+  const link=(l,fn,k)=>'<button class="row lk" data-a="'+act(fn)+'"><span class="l">'+esc(l)+'</span>'+(k?'<kbd>'+k+'</kbd>':'')+'</button>';
+  const line=(l)=>'<div class="ln">'+esc(l)+'</div>';
+  const sec=(h,body)=>'<section><h4>'+h+'</h4>'+body+'</section>';
+  const re=fn=>async()=>{ await fn(); renderSettings(); };
+  const L=[], R=[];
+  L.push(sec('Wygląd',
+    seg([['Automatyczny',t==='auto',()=>setTheme('auto')],['Jasny',t==='light',()=>setTheme('light')],['Ciemny',t==='dark',()=>setTheme('dark')]])
+    +chk('Nazwy plików',S.names!==false,()=>setNames(!(S.names!==false)),'N')
+    +chk('Nazwy folderów',S.dirNames!==false,()=>setDirNames(!(S.dirNames!==false)),'⇧ N')
+    +chk('Siatka między miniaturami',!!S.gridlines,()=>setGridLines(!S.gridlines),'G')
+    +chk('Dźwięki',S.sound!==false,()=>{S.sound=!(S.sound!==false);save();if(S.sound)SFX('on');},'S')
+    +(api.iconSet?'<div class="sub">Ikona programu</div>'+seg([['Gałka 3D',curIcon!=='retro',async()=>{curIcon=await api.iconSet('3d');}],['Gałka 1-bit',curIcon==='retro',async()=>{curIcon=await api.iconSet('retro');}]]):'')));
+  if(api.editors) L.push(sec('Otwieranie plików (E)',
+    (edList&&edList.list.length?edList.list.map(x=>chk(x.name,x.path===edList.current,async()=>{ editorName=await api.editorSet(x.path); edList.current=x.path; },null,true)).join(''):line(editorName?editorName:'Nie znalazłem Photoshopa ani Affinity'))
+    +link('Inny program…',async()=>{ const n=await api.openEditor([],true); if(n){ editorName=n; edList=await api.editors(); } })));
+  if(peekState&&peekState.available) L.push(sec('Windows',
+    chk('Podgląd spacją w Eksploratorze',!!peekState.peek,async()=>{ peekState.peek=!peekState.peek; await api.peekSet(peekState.peek); if(peekState.peek) zoomTip('Zaznacz plik w Eksploratorze i naciśnij spację'); })
+    +(peekState.peek||(prepSt&&prepSt.nightly)?chk('Uruchamiaj razem z Windows',!!peekState.autostart,async()=>{ peekState.autostart=!peekState.autostart; await api.autostartSet(peekState.autostart); }):'')));
+  R.push(sec('Pomoc',
+    link('Skróty klawiszowe',()=>{ closeSettings(); toggleKeys(true); },'?')
+    +link('Pokaż podpowiedzi od nowa',resetHints)
+    +(api.mem?chk('Pokaż zużycie pamięci RAM',!!S.showMem,()=>setShowMem(!S.showMem)):'')
+    +(api.updateCheck?link('Sprawdź aktualizacje'+(updSt&&updSt.current?' · masz '+updSt.current:''),updManual):'')));
+  R.push(sec('Pamięć miniatur'+(api.web?' w przeglądarce':''),
+    line(cacheC?cacheC.count.toLocaleString('pl')+' miniatur · '+fmtSize(cacheC.bytes):'…')
+    +(api.web?'':'<div class="sub">Limit</div>'+seg([[1024,'1 GB'],[2048,'2 GB'],[5120,'5 GB'],[10240,'10 GB'],[20480,'20 GB']].map(([mb,l])=>[l,lim===mb,async()=>{await api.cacheLimit(mb);await cacheInfo();}])))
+    +(api.prepPlan?link('Przygotuj miniatury biblioteki…',()=>{ closeSettings(); prepAsk(); })
+      +chk('Przygotowuj co noc (2:00–6:00)',!!(prepSt&&prepSt.nightly),async()=>{ const v=await api.prepNightly(!(prepSt&&prepSt.nightly)); prepSt=Object.assign(prepSt||{},{nightly:v}); if(v) zoomTip(isWin?'Gapa zostanie w tle (ikona w zasobniku) i w nocy zrobi brakujące miniatury':'Gapa w nocy zrobi brakujące miniatury, jeśli będzie uruchomiona'); }):'')
+    +(api.web?'':link('Przenieś do innego folderu…',async()=>{const d=await api.cacheChoose();if(d){zoomTip('Miniatury w: '+d);await cacheInfo();}})+link('Pokaż folder z miniaturami',()=>api.cacheReveal()))
+    +link('Wyczyść miniatury…',()=>{ closeSettings(); cacheClear(); })));
+  if(api.libSearch) R.push(sec('Wyszukiwanie w bibliotece',
+    line(libLine())+link('Odśwież indeks',()=>{libSync(true);zoomTip('Odświeżam indeks biblioteki…');})));
+  R.push(R.shift());   // Pomoc na dole prawej kolumny
+  o.innerHTML='<div class="sc" role="dialog" aria-label="Ustawienia"><div class="sh"><b>Ustawienia</b><button class="ib x" aria-label="Zamknij" title="Zamknij (Esc)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="m4 4 8 8M12 4l-8 8"/></svg></button></div><div class="cols"><div class="col">'+L.join('')+'</div><div class="col">'+R.join('')+'</div></div></div>';
+  o.querySelector('.x').onclick=closeSettings;
+  for(const b of o.querySelectorAll('[data-a]')) b.onclick=re(acts[+b.dataset.a]);
+}
+$('#setp').addEventListener('click',e=>{ if(e.target.id==='setp') closeSettings(); });
+addEventListener('keydown',e=>{ if(setOpen&&e.key==='Escape'){ e.preventDefault(); e.stopImmediatePropagation(); closeSettings(); } },true);
+$('#setBtn').innerHTML=GEAR; $('#setBtn').onclick=e=>{ e.stopPropagation(); setOpen?closeSettings():settingsMenu(); };
+if($('#themeBtn')){ $('#themeBtn').onclick=e=>{ e.stopPropagation(); cycleTheme(); }; themeBtnSync(); }
 
 /* --- pliki: odczyt przez protokół pgf:// (z zakresami, więc PSD czytamy kawałkami) --- */
 const ref=f=>({name:f.name,size:f.size,url:api.fileUrl(f.path)});

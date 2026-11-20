@@ -543,6 +543,35 @@ body.bare.idle,body.bare.idle *,.fs body.idle,.fs body.idle *{cursor:none!import
 .cap-own body.bare #capw{top:4px}
 .fs #capw{display:none!important}
 .cap-own body.bare #fspill{top:44px}
+/* ustawienia — jedna kolumna, wiersze „nazwa | kontrolka” */
+#setp .sc.s2{width:560px;padding:18px 24px 14px}
+#setp .s2 .sgrp{padding:12px 0 6px;border-top:1px solid var(--line)}
+#setp .s2 .sh+.sgrp{border-top:0;padding-top:4px}
+#setp .s2 .gh{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:2px}
+#setp .s2 .gh h4{margin:0}
+#setp .s2 .gh span{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+#setp .s2 .r{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:36px;width:100%;padding:0;margin:0;text-align:left;color:var(--text);font-size:13px;border-radius:0;background:none}
+#setp .s2 .r:hover{background:none}
+#setp .s2 .n{display:flex;align-items:center;gap:8px}
+#setp .s2 .seg2{display:flex;gap:2px;padding:2px;border-radius:9px;background:var(--soft);flex:none}
+#setp .s2 .seg2 button{height:26px;min-width:56px;padding:0 10px;border-radius:7px;font-size:12.5px;color:var(--text2);white-space:nowrap}
+#setp .s2 .seg2 button:hover{color:var(--text)}
+#setp .s2 .seg2 button.on{background:var(--card);color:var(--text);box-shadow:0 0 0 1px var(--cardline),0 1px 2px rgba(0,0,0,.06)}
+#setp .s2 .sw{width:34px;height:20px;border-radius:10px;background:var(--soft);box-shadow:inset 0 0 0 1px var(--line);position:relative;flex:none;transition:background .15s}
+#setp .s2 .sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.2);transition:left .15s}
+#setp .s2 .sw.on{background:var(--text);box-shadow:none}
+#setp .s2 .sw.on::after{left:16px}
+[data-theme=dark] #setp .s2 .sw:not(.on){box-shadow:inset 0 0 0 1px var(--muted2)}
+[data-theme=dark] #setp .s2 .sw:not(.on)::after{background:var(--muted)}
+#setp .s2 .acts{display:flex;flex-wrap:wrap;gap:6px;padding:6px 0 6px}
+#setp .s2 .acts button{height:26px;padding:0 10px;border-radius:7px;font-size:12px;color:var(--text2);box-shadow:inset 0 0 0 1px var(--line)}
+#setp .s2 .acts button:hover{color:var(--text);background:var(--hover)}
+#setp .s2 .acts button.warn{color:#b3261e}
+[data-theme=dark] #setp .s2 .acts button.warn{color:#f2867e}
+#setp .s2 .acts .k{color:var(--muted)}
+#setp .s2 .about{border-top:1px solid var(--line);padding-top:12px;margin-top:4px;font-size:11px;color:var(--muted)}
+#setp .s2 .about a{color:inherit;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:2px}
+#setp .s2 .about a:hover{color:var(--text)}
 </style>
 </head>
 <body>

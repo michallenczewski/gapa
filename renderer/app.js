@@ -286,47 +286,48 @@ async function capSet(v){
 }
 function closeSettings(){ setOpen=false; $('#setp').classList.remove('on'); chromeSync(); }
 function renderSettings(){
+  // jeden układ dla wszystkiego: nazwa po lewej, kontrolka przy prawej krawędzi; „tak / nie” to przełącznik,
+  // wybór między nazwanymi opcjami to segmenty; czynności to małe przyciski pod sekcją
   const o=$('#setp'), t=S.theme||'auto', lim=cacheC?cacheC.limitMB:2048, esc=x=>String(x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
   const acts=[]; const act=fn=>{ acts.push(fn); return acts.length-1; };
-  const seg=(opts)=>'<div class="seg">'+opts.map(([l,on,fn])=>'<button class="'+(on?'on':'')+'" data-a="'+act(fn)+'">'+esc(l)+'</button>').join('')+'</div>';
-  const chk=(l,on,fn,k,radio)=>'<button class="row" data-a="'+act(fn)+'"><span class="box'+(radio?' rad':'')+(on?' on':'')+'">'+(on?'<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m2 5.2 2 2 4-4.4"/></svg>':'')+'</span><span class="l">'+esc(l)+'</span>'+(k?'<kbd>'+k+'</kbd>':'')+'</button>';
-  const link=(l,fn,k)=>'<button class="row lk" data-a="'+act(fn)+'"><span class="l">'+esc(l)+'</span>'+(k?'<kbd>'+k+'</kbd>':'')+'</button>';
-  const line=(l)=>'<div class="ln">'+esc(l)+'</div>';
-  const sec=(h,body)=>'<section><h4>'+h+'</h4>'+body+'</section>';
-  const re=fn=>async()=>{ await fn(); renderSettings(); };
-  const L=[], R=[];
-  L.push(sec('Wygląd',
-    seg([['Automatyczny',t==='auto',()=>setTheme('auto')],['Jasny',t==='light',()=>setTheme('light')],['Ciemny',t==='dark',()=>setTheme('dark')]])
-    +chk('Nazwy plików',S.names!==false,()=>setNames(!(S.names!==false)),'N')
-    +chk('Nazwy folderów',S.dirNames!==false,()=>setDirNames(!(S.dirNames!==false)),'⇧ N')
-    +chk('Siatka między miniaturami',!!S.gridlines,()=>setGridLines(!S.gridlines),'G')
-    +chk('Dźwięki',S.sound!==false,()=>{S.sound=!(S.sound!==false);save();if(S.sound)SFX('on');},'S')
-    +(api.iconSet?'<div class="sub">Ikona programu</div>'+seg([['Gałka 3D',curIcon!=='retro',async()=>{curIcon=await api.iconSet('3d');}],['Gałka 1-bit',curIcon==='retro',async()=>{curIcon=await api.iconSet('retro');}]]):'')));
-  if(api.editors) L.push(sec('Otwieranie plików (E)',
-    (edList&&edList.list.length?edList.list.map(x=>chk(x.name,x.path===edList.current,async()=>{ editorName=await api.editorSet(x.path); edList.current=x.path; },null,true)).join(''):line(editorName?editorName:'Nie znalazłem Photoshopa ani Affinity'))
-    +link('Inny program…',async()=>{ const n=await api.openEditor([],true); if(n){ editorName=n; edList=await api.editors(); } })));
-  if(peekState&&peekState.available) L.push(sec('Windows',
-    '<div class="sub" style="margin-top:0">Przyciski okna</div>'+seg([['Windows',!api.ownCaption&&!capNext,()=>capSet(false)],['Gapa',!!(api.ownCaption||capNext),()=>capSet(true)]])
-    +chk('Podgląd spacją w Eksploratorze',!!peekState.peek,async()=>{ peekState.peek=!peekState.peek; await api.peekSet(peekState.peek); if(peekState.peek) zoomTip('Zaznacz plik w Eksploratorze i naciśnij spację'); })
-    +(peekState.peek||(prepSt&&prepSt.nightly)?chk('Uruchamiaj razem z Windows',!!peekState.autostart,async()=>{ peekState.autostart=!peekState.autostart; await api.autostartSet(peekState.autostart); }):'')));
-  R.push(sec('Pomoc',
-    link('Skróty klawiszowe',()=>{ closeSettings(); toggleKeys(true); },'?')
-    +link('Pokaż podpowiedzi od nowa',resetHints)
-    +(api.mem?chk('Pokaż zużycie pamięci RAM',!!S.showMem,()=>setShowMem(!S.showMem)):'')
-    +(api.updateCheck?link('Sprawdź aktualizacje'+(updSt&&updSt.current?' · masz '+updSt.current:''),updManual):'')));
-  R.push(sec('Pamięć miniatur'+(api.web?' w przeglądarce':''),
-    line(cacheC?cacheC.count.toLocaleString('pl')+' miniatur · '+fmtSize(cacheC.bytes):'…')
-    +(api.web?'':'<div class="sub">Limit</div>'+seg([[1024,'1 GB'],[2048,'2 GB'],[5120,'5 GB'],[10240,'10 GB'],[20480,'20 GB']].map(([mb,l])=>[l,lim===mb,async()=>{await api.cacheLimit(mb);await cacheInfo();}])))
-    +(api.prepPlan?link('Przygotuj miniatury biblioteki…',()=>{ closeSettings(); prepAsk(); })
-      +chk('Przygotowuj co noc (2:00–6:00)',!!(prepSt&&prepSt.nightly),async()=>{ const v=await api.prepNightly(!(prepSt&&prepSt.nightly)); prepSt=Object.assign(prepSt||{},{nightly:v}); if(v) zoomTip(isWin?'Gapa zostanie w tle (ikona w zasobniku) i w nocy zrobi brakujące miniatury':'Gapa w nocy zrobi brakujące miniatury, jeśli będzie uruchomiona'); }):'')
-    +(api.web?'':link('Przenieś do innego folderu…',async()=>{const d=await api.cacheChoose();if(d){zoomTip('Miniatury w: '+d);await cacheInfo();}})+link('Pokaż folder z miniaturami',()=>api.cacheReveal()))
-    +link('Wyczyść miniatury…',()=>{ closeSettings(); cacheClear(); })));
-  if(api.libSearch) R.push(sec('Wyszukiwanie w bibliotece',
-    line(libLine())+link('Odśwież indeks',()=>{libSync(true);zoomTip('Odświeżam indeks biblioteki…');})));
-  R.push(R.shift());   // Pomoc na dole prawej kolumny
-  o.innerHTML='<div class="sc" role="dialog" aria-label="Ustawienia"><div class="sh"><b>Ustawienia</b><button class="ib x" aria-label="Zamknij" title="Zamknij (Esc)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="m4 4 8 8M12 4l-8 8"/></svg></button></div><div class="cols"><div class="col">'+L.join('')+'</div><div class="col">'+R.join('')+'</div></div></div>';
+  const kb=k=>k?'<kbd>'+k+'</kbd>':'';
+  const row=(name,ctrl,k,tip)=>'<div class="r"'+(tip?' title="'+esc(tip)+'"':'')+'><span class="n">'+esc(name)+kb(k)+'</span>'+ctrl+'</div>';
+  const sw=(name,on,fn,k,tip)=>'<button class="r sw-r" data-a="'+act(fn)+'"'+(tip?' title="'+esc(tip)+'"':'')+' role="switch" aria-checked="'+!!on+'"><span class="n">'+esc(name)+kb(k)+'</span><span class="sw'+(on?' on':'')+'"></span></button>';
+  const seg=(opts)=>'<div class="seg2">'+opts.map(([l,on,fn])=>'<button class="'+(on?'on':'')+'" data-a="'+act(fn)+'">'+esc(l)+'</button>').join('')+'</div>';
+  const btns=list=>'<div class="acts">'+list.filter(Boolean).map(([l,fn,cls,k])=>'<button class="'+(cls||'')+'" data-a="'+act(fn)+'">'+esc(l)+(k?' <span class="k">'+k+'</span>':'')+'</button>').join('')+'</div>';
+  const grp=(h,body,info)=>'<div class="sgrp"><div class="gh"><h4>'+h+'</h4>'+(info?'<span>'+esc(info)+'</span>':'')+'</div>'+body+'</div>';
+  const G=[];
+  G.push(grp('Wygląd',
+    row('Motyw',seg([['Auto',t==='auto',()=>setTheme('auto')],['Jasny',t==='light',()=>setTheme('light')],['Ciemny',t==='dark',()=>setTheme('dark')]]),'T')
+    +sw('Nazwy plików',S.names!==false,()=>setNames(!(S.names!==false)),'N')
+    +sw('Nazwy folderów',S.dirNames!==false,()=>setDirNames(!(S.dirNames!==false)),'⇧ N')
+    +sw('Linie siatki',!!S.gridlines,()=>setGridLines(!S.gridlines),'G','Cienkie linie między miniaturami')
+    +(api.iconSet?row('Ikona programu',seg([['3D',curIcon!=='retro',async()=>{curIcon=await api.iconSet('3d');}],['1-bit',curIcon==='retro',async()=>{curIcon=await api.iconSet('retro');}]])):'')));
+  const edOpts=edList&&edList.list.length?edList.list.map(x=>[x.name.replace(/^Affinity Photo.*/,'Affinity'),x.path===edList.current,async()=>{ editorName=await api.editorSet(x.path); edList.current=x.path; }]):[];
+  G.push(grp('Działanie',
+    (api.editors?row('Otwieraj w',seg([...edOpts,[edOpts.some(x=>x[1])||!editorName?'Inny…':editorName+'…',!edOpts.some(x=>x[1])&&!!editorName,async()=>{ const n=await api.openEditor([],true); if(n){ editorName=n; edList=await api.editors(); } }]]),'E','Program, w którym E otwiera zaznaczone pliki'):'')
+    +sw('Dźwięki',S.sound!==false,()=>{S.sound=!(S.sound!==false);save();if(S.sound)SFX('on');},'S')
+    +(api.mem?sw('Zużycie RAM w stopce',!!S.showMem,()=>setShowMem(!S.showMem)):'')));
+  if(peekState&&peekState.available) G.push(grp('Windows',
+    row('Przyciski okna',seg([['Windows',!(api.ownCaption||capNext),()=>capSet(false)],['Gapa',!!(api.ownCaption||capNext),()=>capSet(true)]]),null,'Zmiana działa po ponownym uruchomieniu')
+    +sw('Spacja w Eksploratorze',!!peekState.peek,async()=>{ peekState.peek=!peekState.peek; await api.peekSet(peekState.peek); if(peekState.peek) zoomTip('Zaznacz plik w Eksploratorze i naciśnij spację'); },null,'Spacja na zaznaczonym pliku w Eksploratorze otwiera podgląd Gapy')
+    +sw('Start z Windows',!!peekState.autostart,async()=>{ peekState.autostart=!peekState.autostart; await api.autostartSet(peekState.autostart); },null,'Gapa uruchamia się w tle razem z Windows')));
+  const stat=(cacheC?cacheC.count.toLocaleString('pl')+' miniatur · '+fmtSize(cacheC.bytes):'')+(api.libSearch&&libSt&&!libSt.busy&&S.favs.length?' · '+(libSt.files||0).toLocaleString('pl')+' plików w bibliotece':'');
+  G.push(grp('Miniatury'+(api.web?' w przeglądarce':''),
+    (api.web?'':row('Limit na dysku',seg([[1024,'1'],[2048,'2'],[5120,'5'],[10240,'10'],[20480,'20 GB']].map(([mb,l])=>[l,lim===mb,async()=>{await api.cacheLimit(mb);await cacheInfo();}]))))
+    +(api.prepPlan?sw('Przygotowuj w nocy',!!(prepSt&&prepSt.nightly),async()=>{ const v=await api.prepNightly(!(prepSt&&prepSt.nightly)); prepSt=Object.assign(prepSt||{},{nightly:v}); if(v) zoomTip(isWin?'Gapa zostanie w tle (ikona w zasobniku) i w nocy zrobi brakujące miniatury':'Gapa w nocy zrobi brakujące miniatury, jeśli będzie uruchomiona'); },null,'Między 2:00 a 6:00 Gapa robi brakujące miniatury plików z ulubionych folderów'):'')
+    +btns([api.prepPlan&&['Przygotuj teraz…',()=>{ closeSettings(); prepAsk(); }],
+      api.libSearch&&['Odśwież indeks',()=>{libSync(true);zoomTip('Odświeżam indeks biblioteki…');}],
+      !api.web&&['Przenieś folder…',async()=>{const d=await api.cacheChoose();if(d){zoomTip('Miniatury w: '+d);await cacheInfo();}}],
+      !api.web&&['Pokaż folder',()=>api.cacheReveal()],
+      ['Wyczyść…',()=>{ closeSettings(); cacheClear(); },'warn']]),stat));
+  G.push('<div class="sgrp">'+btns([['Skróty klawiszowe',()=>{ closeSettings(); toggleKeys(true); },'','?'],['Podpowiedzi od nowa',resetHints],api.updateCheck&&['Sprawdź aktualizacje',updManual]])+'</div>');
+  const ver=updSt&&updSt.current?'Gapa '+updSt.current:'Gapa';
+  o.innerHTML='<div class="sc s2" role="dialog" aria-label="Ustawienia"><div class="sh"><b>Ustawienia</b><button class="ib x" aria-label="Zamknij" title="Zamknij (Esc)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="m4 4 8 8M12 4l-8 8"/></svg></button></div>'
+    +G.join('')
+    +'<div class="about">'+esc(ver)+' · Michał Lenczewski, 2026 · licencja MIT · <a href="https://github.com/michallenczewski/podglad" target="_blank" rel="noopener">github.com/michallenczewski/podglad</a></div></div>';
   o.querySelector('.x').onclick=closeSettings;
-  for(const b of o.querySelectorAll('[data-a]')) b.onclick=re(acts[+b.dataset.a]);
+  for(const b of o.querySelectorAll('[data-a]')) b.onclick=async e=>{ e.stopPropagation(); await acts[+b.dataset.a](); renderSettings(); };
 }
 $('#setp').addEventListener('click',e=>{ if(e.target.id==='setp') closeSettings(); });
 addEventListener('keydown',e=>{ if(setOpen&&e.key==='Escape'){ e.preventDefault(); e.stopImmediatePropagation(); closeSettings(); } },true);

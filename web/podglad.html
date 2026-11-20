@@ -2513,12 +2513,17 @@ async function pdfViewer(it){
   },{passive:false});
   side.addEventListener('wheel',e=>e.stopPropagation(),{passive:true});
   // przybliżoną stronę przesuwa się, ciągnąc myszą; zwykły klik przybliża albo wraca do dopasowania
-  let drag=null, moved=false;
-  el.addEventListener('pointerdown',e=>{ if(e.button!==0||!e.target.closest('.pg')) return; drag={x:e.clientX,y:e.clientY,l:el.scrollLeft,t:el.scrollTop}; moved=false; });
-  addEventListener('pointermove',e=>{ if(!drag) return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y; if(!moved&&Math.hypot(dx,dy)<4) return;
+  let drag=null, moved=false, downPg=false;   // downPg: przycisk wciśnięto na stronie (przy przechwyceniu klik trafia w całą listę)
+  // przeciąganie z przechwyceniem wskaźnika: puszczenie przycisku zawsze kończy przesuwanie (także poza oknem),
+  // a ruch bez wciśniętego przycisku nigdy go nie ciągnie dalej — łapka nie „przykleja się” do strony
+  const endDrag=()=>{ if(!drag) return; const id=drag.id; drag=null; el.classList.remove('panning'); try{ if(el.hasPointerCapture(id)) el.releasePointerCapture(id); }catch(_){} };
+  el.addEventListener('pointerdown',e=>{ if(e.button!==0||!e.target.closest('.pg')) return; e.preventDefault(); drag={x:e.clientX,y:e.clientY,l:el.scrollLeft,t:el.scrollTop,id:e.pointerId}; moved=false; downPg=true; try{ el.setPointerCapture(e.pointerId); }catch(_){} });
+  el.addEventListener('pointermove',e=>{ if(!drag) return; if(!(e.buttons&1)){ endDrag(); return; }
+    const dx=e.clientX-drag.x, dy=e.clientY-drag.y; if(!moved&&Math.hypot(dx,dy)<4) return;
     if(!moved){ moved=true; el.classList.add('panning'); } el.scrollLeft=drag.l-dx; el.scrollTop=drag.t-dy; });
-  addEventListener('pointerup',()=>{ if(drag){ drag=null; el.classList.remove('panning'); } });
-  el.addEventListener('click',e=>{ e.stopPropagation(); if(moved){moved=false;return;} if(!e.target.closest('.pg')) return; if(z>1.001) zoomBy(0,e.clientX,e.clientY); else zoomBy(2.5,e.clientX,e.clientY); });
+  for(const ev of ['pointerup','pointercancel','lostpointercapture']) el.addEventListener(ev,endDrag);
+  el.addEventListener('dragstart',e=>e.preventDefault());
+  el.addEventListener('click',e=>{ e.stopPropagation(); if(moved){moved=false;downPg=false;return;} if(!downPg) return; downPg=false; if(z>1.001) zoomBy(0,e.clientX,e.clientY); else zoomBy(2.5,e.clientX,e.clientY); });
 
   // pasek na dole: miniatury stron · strony · przybliżenie
   const I=(d,w=14)=>'<svg width="'+w+'" height="'+w+'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+d+'</svg>';

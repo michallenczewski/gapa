@@ -265,6 +265,7 @@ function settingsMenu(){
       ...(peekState.peek?[{label:'Uruchamiaj razem z Windows',box:!!peekState.autostart,keep:true,run:async()=>{ peekState.autostart=!peekState.autostart; await api.autostartSet(peekState.autostart); settingsMenu(); }}]:[])]:[]),
     ...(api.mem?[{label:'Pokaż zużycie pamięci',box:!!S.showMem,keep:true,run:()=>{setShowMem(!S.showMem);settingsMenu();}}]:[]),
     {label:'Pokaż podpowiedzi od nowa',run:resetHints},
+    ...(api.updateCheck?[{label:'Sprawdź aktualizacje'+(updSt&&updSt.current?' (masz '+updSt.current+')':''),run:updManual}]:[]),
     {label:'Dźwięki',box:S.sound!==false,keys:['S'],keep:true,run:()=>{S.sound=!(S.sound!==false);save();if(S.sound)SFX('on');settingsMenu();}},
     ...(api.iconSet?['-',{head:'Ikona programu'},
       {label:'Gałka 3D',check:curIcon!=='retro',run:async()=>{curIcon=await api.iconSet('3d');}},
@@ -2296,6 +2297,29 @@ function sheetMark(){ stage.querySelectorAll('.sc').forEach((x,i)=>x.classList.t
 const inSheet=()=>!!(sheet&&stage.classList.contains('sheetmode'));
 // ustawienia podglądu spacją (tylko Windows)
 let peekState=null; if(api.peekGet&&!PEEK) api.peekGet().then(r=>{ peekState=r; });
+/* --- aktualizacje: dyskretna informacja w stopce, klik pobiera i instaluje --- */
+let updSt=null;
+function updShow(s){
+  updSt=s; const el=$('#upd'); if(!el) return;
+  if(s.state==='available'){ el.hidden=false; el.textContent='Nowa wersja '+s.version; el.title='Kliknij, żeby pobrać i zainstalować Gapę '+s.version+(s.error?'\nPoprzednia próba: '+s.error:''); }
+  else if(s.state==='downloading'){ el.hidden=false; el.textContent='Pobieram '+s.version+(s.size?' · '+Math.round(s.got/s.size*100)+'%':''); el.title=''; }
+  else if(s.state==='ready'){ el.hidden=false; el.textContent=isMac?'Gapa '+s.version+' w Pobranych':'Instaluję '+s.version+'…'; el.title=isMac?'Zamknij Gapę (⌘Q) i przeciągnij nową wersję do Aplikacji, zastępując starą.':''; }
+  else el.hidden=true;
+}
+async function updAsk(){
+  if(!updSt||updSt.state!=='available') return;
+  const how=isMac?'Obraz instalacyjny trafi do Pobranych i się otworzy. Potem zamknij Gapę (⌘Q) i przeciągnij nową wersję do Aplikacji, zastępując starą.':'Instalator pobierze się w tle, Gapa zamknie się na chwilę i uruchomi już w nowej wersji.';
+  if(await askConfirm('Zainstalować Gapę '+updSt.version+'?','Masz wersję '+updSt.current+'. '+how,isMac?'Pobierz':'Pobierz i zainstaluj')) api.updateInstall();
+}
+async function updManual(){
+  zoomTip('Sprawdzam aktualizacje…');
+  const s=await api.updateCheck(); updShow(s);
+  if(s.state==='available') updAsk();
+  else if(s.state==='error') zoomTip('Nie udało się sprawdzić: '+s.error);
+  else zoomTip('Masz najnowszą wersję ('+s.current+')');
+}
+if(api.updateGet&&!PREP&&!PEEK){ api.updateGet().then(updShow); api.onUpdateStatus(updShow); $('#upd').onclick=e=>{ e.stopPropagation(); updAsk(); }; }
+
 /* --- miniatury całej biblioteki: polecenie w ustawieniach, postęp w stopce, liczenie w osobnym oknie --- */
 let prepSt=null, prepHideT=0;
 function prepShow(s){

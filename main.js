@@ -1,5 +1,5 @@
 // Podgląd — proces główny: okno, dostęp do dysku, pamięć miniatur, integracja z systemem.
-const { app, BrowserWindow, ipcMain, dialog, shell, protocol, nativeImage, Menu, Tray, screen, clipboard, powerMonitor, powerSaveBlocker } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, protocol, nativeImage, Menu, Tray, screen, clipboard, powerMonitor, powerSaveBlocker, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const fsp = fs.promises;
@@ -314,6 +314,53 @@ ipcMain.handle('lib-search', async (e, q, exts, names) => {
   hits.forEach((h, k) => { if (st[k]) files.push({ name: h.name, path: path.join(h.dir, h.name), size: st[k].size, mtime: st[k].mtime, dir: h.dir, label: [h.name0, ...(h.rel ? h.rel.split(path.sep) : [])].join(' / ') }); });
   return { files, total, st: libStatus() };
 });
+
+/* ---------- aktualizacje: nowa wersja z wydań na GitHubie ---------- */
+// Repozytorium jest publiczne, więc pytamy API GitHuba bez logowania (raz po starcie i co 6 godzin).
+// Windows: instalator pobiera się do folderu tymczasowego i instaluje po cichu, a Gapa uruchamia się ponownie.
+// Mac: obraz .dmg trafia do Pobranych i się otwiera — Gapę przeciąga się do Aplikacji (aplikacja nie jest podpisana u Apple).
+const REPO = 'michallenczewski/podglad';
+let upd = { state: 'idle', version: null, url: null, name: null, size: 0, got: 0, notes: '', error: '' };
+const verNum = v => String(v || '').replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
+const newer = (a, b) => { const x = verNum(a), y = verNum(b); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; };
+function updTell() { const s = { ...upd, current: app.getVersion() }; for (const w of mainWindows()) w.webContents.send('update-status', s); }
+async function updCheck() {
+  if (upd.state === 'downloading') return upd;
+  try {
+    const r = await net.fetch('https://api.github.com/repos/' + REPO + '/releases/latest', { headers: { 'User-Agent': 'Gapa', Accept: 'application/vnd.github+json' } });
+    if (!r.ok) throw new Error('GitHub odpowiedział ' + r.status);
+    const j = await r.json(), v = String(j.tag_name || '').replace(/^v/, '');
+    const want = isWin ? /-win-x64\.exe$/ : isMac ? new RegExp('-mac-' + process.arch + '\\.dmg$') : null;
+    const a = want && (j.assets || []).find(x => want.test(x.name));
+    if (a && newer(v, app.getVersion())) Object.assign(upd, { state: 'available', version: v, url: a.browser_download_url, name: a.name, size: a.size, notes: String(j.body || '').slice(0, 600), error: '' });
+    else Object.assign(upd, { state: 'none', version: v, error: '' });
+  } catch (err) { upd.state = 'error'; upd.error = err.message; }
+  updTell(); return { ...upd, current: app.getVersion() };
+}
+async function updInstall() {
+  if (upd.state !== 'available' || !upd.url) return false;
+  const dir = isMac ? app.getPath('downloads') : app.getPath('temp');
+  const file = path.join(dir, upd.name);
+  upd.state = 'downloading'; upd.got = 0; updTell();
+  try {
+    const r = await net.fetch(upd.url, { headers: { 'User-Agent': 'Gapa' } });
+    if (!r.ok || !r.body) throw new Error('pobieranie nie powiodło się (' + r.status + ')');
+    const out = fs.createWriteStream(file + '.part'); let last = 0;
+    for await (const chunk of r.body) { out.write(chunk); upd.got += chunk.length; if (Date.now() - last > 400) { last = Date.now(); updTell(); } }
+    await new Promise((res, rej) => out.end(err => (err ? rej(err) : res())));
+    await fsp.rename(file + '.part', file);
+  } catch (err) { upd.state = 'available'; upd.error = err.message; updTell(); return false; }
+  upd.state = 'ready'; updTell();
+  if (isWin) {
+    // cicha instalacja w to samo miejsce; --force-run uruchamia nową Gapę po instalacji
+    spawn(file, ['/S', '--force-run'], { detached: true, stdio: 'ignore' }).unref();
+    setTimeout(() => { quitting = true; app.quit(); }, 400);
+  } else if (isMac) shell.openPath(file);
+  return true;
+}
+ipcMain.handle('update-get', () => ({ ...upd, current: app.getVersion() }));
+ipcMain.handle('update-check', () => updCheck());
+ipcMain.handle('update-install', () => updInstall());
 
 /* ---------- przygotowanie miniatur całej biblioteki (np. w nocy) ---------- */
 // Lista plików pochodzi z indeksu biblioteki; pomijamy te, które mają już aktualną miniaturę.
@@ -819,6 +866,7 @@ else {
     // uruchomienie razem z Windows (--hidden): tylko w tle, z ikoną w zasobniku, bez okna
     if (!(isWin && (settings.peek || settings.prepNightly) && process.argv.includes('--hidden'))) createWindow();
     setInterval(prepNightlyTick, 5 * 60 * 1000);
+    setTimeout(updCheck, 15000); setInterval(updCheck, 6 * 3600 * 1000);
     if (isWin) { peekStart(); trayUpdate(); }
     if (settings.icon === 'retro') applyIcon();
     app.on('activate', () => { if (!mainWindows().length) createWindow(); });

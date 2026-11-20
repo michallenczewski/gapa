@@ -6,3 +6,4 @@
 - Interfejs testuj na wersji przeglądarkowej (`node scripts/build-web.js`, potem `web/podglad.html`). Opisy skrótów i podpowiedzi muszą się zgadzać dla Maca (⌘, ⌥, Finder) i Windows (Ctrl, Alt, Eksplorator).
 - Najważniejsze są szybkość i płynność. Podgląd PSD/PSB nie musi być większy niż 4K (także po przybliżeniu).
 - Na Macu nie dublujemy rozwiązań systemowych: szybki podgląd spacją z Findera, pełny ekran i podgląd kilku plików naraz robi macOS. Te funkcje Gapy są tylko dla Windows.
+- Gapa sama sprawdza nowe wersje w wydaniach GitHuba (`releases/latest`) i szuka pliku `Gapa-<wersja>-win-x64.exe` albo `Gapa-<wersja>-mac-<arm64|x64>.dmg`. Nie zmieniaj tych nazw ani nie oznaczaj wydań jako szkic czy wersja wstępna, bo aktualizacje przestaną działać.

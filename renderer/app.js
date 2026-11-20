@@ -762,7 +762,7 @@ function hdPump(){
     const it=hdQ.shift(); if(!it.visible||!it.tile||!it.tile.isConnected) continue;
     const need=hdNeed(it); if(!need) continue;
     hdRun++; it.hdBusy=true;
-    hdMake(it,need).then(c=>{
+    hdGet(it,need).then(c=>{
       if(!c){ it.hdFail=true; return; }   // oryginał nie jest większy od miniatury — nie próbujemy ponownie
       if(it.hd){ hdPx-=it.hd.c.width*it.hd.c.height; hdLRU.delete(it); }
       it.hd={c,size:need}; hdPx+=c.width*c.height; hdLRU.add(it);
@@ -781,6 +781,19 @@ async function bigDoc(it){
   const b=L(emb)>=L(os)*0.7?emb:os, o=b===emb?os:emb; if(o) o.close(); if(!b) return null;
   const c=document.createElement('canvas'); c.width=b.width; c.height=b.height;
   const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); g.drawImage(b,0,0); b.close();
+  return c;
+}
+// większa wersja miniatury też trafia na dysk (osobny wpis „|hd”), więc po ponownym uruchomieniu duże kafelki są od razu ostre
+async function hdGet(it,need){
+  const key={path:it.path+'|hd',size:it.size,mtime:it.mtime};
+  const hit=await api.thumbGet(key).catch(()=>null);
+  if(hit&&hit.meta&&hit.meta.hd>=need*0.9){
+    try{ const b=await fetch(hit.url).then(x=>{if(!x.ok)throw 0;return x.blob();}).finally(()=>{if(hit.url.startsWith('blob:'))URL.revokeObjectURL(hit.url);});
+      const bmp=await createImageBitmap(b); const c=document.createElement('canvas'); c.width=bmp.width; c.height=bmp.height; c.getContext('2d').drawImage(bmp,0,0); bmp.close(); return c; }
+    catch(e){ api.thumbForget(hit.hash); }
+  }
+  const c=await hdMake(it,need);
+  if(c) c.toBlob(b=>{ if(b) b.arrayBuffer().then(buf=>api.thumbPut(key,buf,null,{hd:need})); },'image/webp',0.85);
   return c;
 }
 async function hdMake(it,max){
@@ -1057,17 +1070,23 @@ function enqueue(it,hi,front){
   if(it.state==='queued'){ if(hi&&!it.hi){it.hi=true;front?hiQ.unshift(it):hiQ.push(it);pump();} return; }
   it.state='queued'; it.hi=!!hi; (hi?(front?a=>hiQ.unshift(a):a=>hiQ.push(a)):a=>loQ.push(a))(it); pump();
 }
+// duże TIFF-y, EXR-y, HDR-y i PSD wczytują się w całości albo prawie — najwyżej dwa naraz, żeby nie zapchać pamięci
+const HEAVY=new Set(['tif','exr','hdr','psd']), MAXHEAVY=2; let heavyRun=0;
+const isHeavy=it=>HEAVY.has(it.type)&&it.size>48*1048576;
 function take(){
-  while(hiQ.length){const x=hiQ.shift(); if(x.state==='queued'&&x.gen===gen) return x;}
-  while(loQ.length){const x=loQ.shift(); if(x.state==='queued'&&x.gen===gen) return x;}
+  for(const q of [hiQ,loQ]) for(let i=0;i<q.length;i++){
+    const x=q[i]; if(x.state!=='queued'||x.gen!==gen){ q.splice(i--,1); continue; }
+    if(isHeavy(x)&&heavyRun>=MAXHEAVY) continue;
+    q.splice(i,1); return x;
+  }
   return null;
 }
 function pump(){
   while(running<MAXRUN){
     const it=take(); if(!it) break;
-    running++; it.state='loading';
+    running++; it.state='loading'; const hv=isHeavy(it); if(hv) heavyRun++;
     thumbOf(it).then(()=>{it.state='done';},e=>{it.state='error';it.err=e&&e.message||String(e);})
-      .finally(()=>{running--;
+      .finally(()=>{running--; if(hv) heavyRun--;
         if(it.tile&&it.tile.isConnected) paint(it);
         if(it.cb){const c=it.cb;it.cb=null;c();}
         if(view[sel]===it) status();

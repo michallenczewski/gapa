@@ -732,7 +732,13 @@ function decoderLib(){
     if(type==='psd') return decodePSD(file,max);
     if(type==='psdthumb') return quickPSD(file);
     // bardzo duże pliki projektowe: podgląd jest na początku, czytamy najwyżej 64 MB
-    const u=new Uint8Array(type==='embedded'&&file.size>96*1048576?await file.slice(0,64*1048576).arrayBuffer():await file.arrayBuffer());
+    // w plikach .max podgląd siedzi zwykle pod koniec pliku (strumień SummaryInformation), więc czytamy też ogon
+    let u;
+    if(type==='embedded'&&file.size>96*1048576){
+      const head=new Uint8Array(await file.slice(0,(/\.max$/i.test(file.name||'')?16:64)*1048576).arrayBuffer());
+      if(/\.max$/i.test(file.name||'')){ const tail=new Uint8Array(await file.slice(file.size-64*1048576).arrayBuffer()); u=new Uint8Array(head.length+tail.length); u.set(head); u.set(tail,head.length); }
+      else u=head;
+    } else u=new Uint8Array(await file.arrayBuffer());
     if(type==='tga') return decodeTGA(u,max);
     if(type==='tif') return decodeTIFF(u,max);
     if(type==='exr') return decodeEXR(u,max);
@@ -1915,7 +1921,7 @@ function hdNeed(it){
 }
 var hdT=0;
 function wantHD(it){
-  if(it.kind!=='file'||it.type==='vid'||DOCS.has(it.type)||it.state!=='done'||!it.visible) return;
+  if(it.kind!=='file'||it.type==='vid'||it.type==='pdf'||it.state!=='done'||!it.visible) return;
   const need=hdNeed(it); if(!need) return;
   if(it.hd&&it.hd.size>=need*0.9) return;
   if(it.hdBusy||it.hdFail) return;
@@ -1927,8 +1933,8 @@ function hdPump(){
     const it=hdQ.shift(); if(!it.visible||!it.tile||!it.tile.isConnected) continue;
     const need=hdNeed(it); if(!need) continue;
     hdRun++; it.hdBusy=true;
-    hdMake(it,need).then(c=>{
-      if(!c) return;
+    hdGet(it,need).then(c=>{
+      if(!c){ it.hdFail=true; return; }   // oryginał nie jest większy od miniatury — nie próbujemy ponownie
       if(it.hd){ hdPx-=it.hd.c.width*it.hd.c.height; hdLRU.delete(it); }
       it.hd={c,size:need}; hdPx+=c.width*c.height; hdLRU.add(it);
       for(const x of hdLRU){ if(hdPx<=HD_PX) break; if(x.visible&&x!==it) continue; hdPx-=x.hd.c.width*x.hd.c.height; x.hd=null; hdLRU.delete(x); if(x.tile&&x.tile.isConnected) paint(x); }
@@ -1936,8 +1942,34 @@ function hdPump(){
     },()=>{ it.hdFail=true; }).finally(()=>{ it.hdBusy=false; hdRun--; hdPump(); });
   }
 }
+// pliki projektowe: podgląd zapisany w pliku (Rhino 3dm bywa 1024 px, Max 512 px) albo systemowy w większym rozmiarze — bierzemy większy
+async function bigDoc(it){
+  if(api.web||it.type==='pdf') return null;
+  const [emb,os]=await Promise.all([
+    decode(ref(it),'embedded',0).then(toBitmap).catch(()=>null),
+    api.osThumb(it.path,1024).then(p=>p?createImageBitmap(new Blob([p],{type:'image/png'})):null).catch(()=>null)]);
+  const L=b=>b?Math.max(b.width,b.height):0;
+  const b=L(emb)>=L(os)*0.7?emb:os, o=b===emb?os:emb; if(o) o.close(); if(!b) return null;
+  const c=document.createElement('canvas'); c.width=b.width; c.height=b.height;
+  const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); g.drawImage(b,0,0); b.close();
+  return c;
+}
+// większa wersja miniatury też trafia na dysk (osobny wpis „|hd”), więc po ponownym uruchomieniu duże kafelki są od razu ostre
+async function hdGet(it,need){
+  const key={path:it.path+'|hd',size:it.size,mtime:it.mtime};
+  const hit=await api.thumbGet(key).catch(()=>null);
+  if(hit&&hit.meta&&hit.meta.hd>=need*0.9){
+    try{ const b=await fetch(hit.url).then(x=>{if(!x.ok)throw 0;return x.blob();}).finally(()=>{if(hit.url.startsWith('blob:'))URL.revokeObjectURL(hit.url);});
+      const bmp=await createImageBitmap(b); const c=document.createElement('canvas'); c.width=bmp.width; c.height=bmp.height; c.getContext('2d').drawImage(bmp,0,0); bmp.close(); return c; }
+    catch(e){ api.thumbForget(hit.hash); }
+  }
+  const c=await hdMake(it,need);
+  if(c) c.toBlob(b=>{ if(b) b.arrayBuffer().then(buf=>api.thumbPut(key,buf,null,{hd:need})); },'image/webp',0.85);
+  return c;
+}
 async function hdMake(it,max){
   let bmp;
+  if(DOCS.has(it.type)){ const c=await bigDoc(it); return c&&Math.max(c.width,c.height)>Math.max(it.thumb.width,it.thumb.height)*1.05?c:null; }
   if(it.type==='svg'){ const im=await loadImg(api.fileUrl(it.path)); const w=im.naturalWidth||1024,h=im.naturalHeight||1024,k=max/Math.max(w,h);
     const c=new OffscreenCanvas(Math.round(w*k),Math.round(h*k)); c.getContext('2d').drawImage(im,0,0,c.width,c.height); bmp=c.transferToImageBitmap(); }
   else if(NATIVE.has(it.type)) bmp=await createImageBitmap(await blobOf(it));
@@ -2209,17 +2241,23 @@ function enqueue(it,hi,front){
   if(it.state==='queued'){ if(hi&&!it.hi){it.hi=true;front?hiQ.unshift(it):hiQ.push(it);pump();} return; }
   it.state='queued'; it.hi=!!hi; (hi?(front?a=>hiQ.unshift(a):a=>hiQ.push(a)):a=>loQ.push(a))(it); pump();
 }
+// duże TIFF-y, EXR-y, HDR-y i PSD wczytują się w całości albo prawie — najwyżej dwa naraz, żeby nie zapchać pamięci
+const HEAVY=new Set(['tif','exr','hdr','psd']), MAXHEAVY=2; let heavyRun=0;
+const isHeavy=it=>HEAVY.has(it.type)&&it.size>48*1048576;
 function take(){
-  while(hiQ.length){const x=hiQ.shift(); if(x.state==='queued'&&x.gen===gen) return x;}
-  while(loQ.length){const x=loQ.shift(); if(x.state==='queued'&&x.gen===gen) return x;}
+  for(const q of [hiQ,loQ]) for(let i=0;i<q.length;i++){
+    const x=q[i]; if(x.state!=='queued'||x.gen!==gen){ q.splice(i--,1); continue; }
+    if(isHeavy(x)&&heavyRun>=MAXHEAVY) continue;
+    q.splice(i,1); return x;
+  }
   return null;
 }
 function pump(){
   while(running<MAXRUN){
     const it=take(); if(!it) break;
-    running++; it.state='loading';
+    running++; it.state='loading'; const hv=isHeavy(it); if(hv) heavyRun++;
     thumbOf(it).then(()=>{it.state='done';},e=>{it.state='error';it.err=e&&e.message||String(e);})
-      .finally(()=>{running--;
+      .finally(()=>{running--; if(hv) heavyRun--;
         if(it.tile&&it.tile.isConnected) paint(it);
         if(it.cb){const c=it.cb;it.cb=null;c();}
         if(view[sel]===it) status();
@@ -2584,10 +2622,11 @@ function fullOf(it){
     }else if(it.type==='pdf'){ // wersja HTML: wbudowana przeglądarka PDF
       const el=document.createElement('iframe'); el.src=api.fileHref(it.path); el.className='doc'; el.title=it.name;
       v={el,note:'',doc:true};
-    }else if(DOCS.has(it.type)){ // model / rysunek: powiększony podgląd zapisany w pliku
-      await thumbOf(it).catch(()=>{});
-      if(!it.thumb) throw new Error('brak podglądu — otwórz plik w programie');
-      const el=document.createElement('canvas'); el.width=it.thumb.width; el.height=it.thumb.height; el.getContext('2d').drawImage(it.thumb,0,0);
+    }else if(DOCS.has(it.type)){ // model / rysunek: największy dostępny podgląd (zapisany w pliku albo systemowy)
+      let el=await bigDoc(it).catch(()=>null);
+      if(!el){ await thumbOf(it).catch(()=>{});
+        if(!it.thumb) throw new Error('brak podglądu — otwórz plik w programie');
+        el=document.createElement('canvas'); el.width=it.thumb.width; el.height=it.thumb.height; el.getContext('2d').drawImage(it.thumb,0,0); }
       el.className='docthumb'; v={el,note:'pełny plik otworzysz w programie (E)',doc:true};
     }else if(NATIVE.has(it.type)&&it.type!=='jpg'&&it.type!=='gif'&&it.type!=='svg'){
       const bmp=await createImageBitmap(await blobOf(it)); it.dims=[bmp.width,bmp.height];

@@ -77,6 +77,34 @@ function prune() {
   saveIndexSoon();
 }
 
+// przeniesienie albo kopia pliku w Gapie: miniatury (zwykła i większa „|hd”) idą za plikiem, zamiast liczyć się od nowa
+async function cacheCarry(from, to, copy) {
+  const one = async (a, b, st) => {
+    for (const suf of ['', '|hd']) {
+      const k = { size: st.size, mtime: Math.round(st.mtimeMs) };
+      const h = keyHash({ path: a + suf, ...k }), e = idx.items[h]; if (!e) continue;
+      const nh = keyHash({ path: b + suf, ...k }); if (nh === h || idx.items[nh]) continue;
+      try {
+        await fsp.mkdir(path.dirname(thumbFile(nh)), { recursive: true });
+        if (copy) { await fsp.copyFile(thumbFile(h), thumbFile(nh)); idx.items[nh] = { ...e, t: Date.now() }; cacheBytes += e.s || 0; }
+        else { await fsp.rename(thumbFile(h), thumbFile(nh)); idx.items[nh] = e; delete idx.items[h]; }
+      } catch (err) {}
+    }
+  };
+  try {
+    const st = await fsp.stat(to);
+    if (st.isFile()) await one(from, to, st);
+    else if (st.isDirectory()) {                       // cały folder: idziemy po plikach w środku (najwyżej 20 000)
+      let n = 0; const walk = async rel => {
+        let ents; try { ents = await fsp.readdir(path.join(to, rel), { withFileTypes: true }); } catch (err) { return; }
+        for (const d of ents) { if (n > 20000) return; const r = rel ? path.join(rel, d.name) : d.name;
+          if (d.isDirectory()) await walk(r); else if (d.isFile()) { n++; try { await one(path.join(from, r), path.join(to, r), await fsp.stat(path.join(to, r))); } catch (err) {} } }
+      };
+      await walk('');
+    }
+    saveIndexSoon();
+  } catch (err) {}
+}
 ipcMain.handle('thumb-get', (e, k) => {
   const h = keyHash(k), it = idx.items[h];
   if (!it) return null;
@@ -473,6 +501,7 @@ ipcMain.handle('transfer', async (e, paths, dest, mode) => {
       if (op === 'move') await moveTo(src, to);
       else await fsp.cp(src, to, { recursive: true, errorOnExist: true, force: false, preserveTimestamps: true });
       done.push({ from: src, to, op }); dirs.add(path.dirname(src));
+      cacheCarry(src, to, op === 'copy');
     } catch (err) { failed.push({ path: src, error: err.message }); }
   }
   if (done.length) { transfers.push(done); if (transfers.length > 20) transfers.shift(); }
@@ -487,7 +516,7 @@ ipcMain.handle('rename', async (e, src, name) => {
   if (to === src) return { to };
   try {
     if (lc(to) !== lc(src)) { try { await fsp.access(to); return { error: 'Plik o tej nazwie już tu jest' }; } catch (err) {} }
-    await fsp.rename(src, to);
+    await fsp.rename(src, to); cacheCarry(src, to, false);
     transfers.push([{ from: src, to, op: 'move' }]); if (transfers.length > 20) transfers.shift();
     tellDirs([path.dirname(src)]);
     return { to };
@@ -498,7 +527,7 @@ ipcMain.handle('undo-transfer', async () => {
   const back = [], failed = [], dirs = new Set();
   for (const r of [...last].reverse()) {
     try {
-      if (r.op === 'move') { const to = await freePath(path.dirname(r.from), path.basename(r.from)); await moveTo(r.to, to); back.push({ from: r.to, to, op: 'move' }); }
+      if (r.op === 'move') { const to = await freePath(path.dirname(r.from), path.basename(r.from)); await moveTo(r.to, to); cacheCarry(r.to, to, false); back.push({ from: r.to, to, op: 'move' }); }
       else { await shell.trashItem(r.to); back.push({ from: r.to, to: null, op: 'trash' }); }   // cofnięta kopia trafia do Kosza
       dirs.add(path.dirname(r.from)); dirs.add(path.dirname(r.to));
     } catch (err) { failed.push({ path: r.to, error: err.message }); }

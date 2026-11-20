@@ -1007,6 +1007,49 @@ grid.addEventListener('pointerout',e=>{
   const box=e.target.closest('.tile.dir .box'); if(!box||box.contains(e.relatedTarget)) return;
   const d=box.parentNode._it; if(d&&d.si){d.si=0;paintDir(d);}
 });
+/* --- PDF w siatce: ruch myszy w poziomie po kafelku przewija strony (jak zawartość folderu) --- */
+const pdfPages=it=>it.pages||parseInt(it.meta&&it.meta.mode)||0;
+function pdfMarks(box,i,n){
+  for(const x of box.querySelectorAll('.sk,.cnt')) x.remove();
+  if(n<2) return;
+  if(n<=24){ const sk=document.createElement('div'); sk.className='sk'; for(let k=0;k<n;k++){const b=document.createElement('i'); if(k===i) b.className='on'; sk.appendChild(b);} box.appendChild(sk); }
+  const cn=document.createElement('span'); cn.className='cnt'; cn.textContent=(i+1)+'/'+n; box.appendChild(cn);
+}
+async function pdfSkimTo(it,i){
+  const box=it.tile&&it.tile.firstChild; if(!box) return;
+  if(i===0){ paint(it); pdfMarks(box,0,pdfPages(it)); return; }
+  it._pc=it._pc||new Map();
+  let c=it._pc.get(i);
+  if(!c){
+    try{
+      if(!it._pd) it._pd=loadPdfjs().then(()=>blobOf(it)).then(b=>b.arrayBuffer()).then(d=>{ it._pt=pdfjs.getDocument({data:new Uint8Array(d),isEvalSupported:false}); return it._pt.promise; });
+      const doc=await it._pd, page=await doc.getPage(i+1), v1=page.getViewport({scale:1});
+      const px=Math.min(TH*1.5,Math.max(box.clientWidth,box.clientHeight)*devicePixelRatio), vp=page.getViewport({scale:px/Math.max(v1.width,v1.height)});
+      c=document.createElement('canvas'); c.width=Math.ceil(vp.width); c.height=Math.ceil(vp.height);
+      const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height);
+      await page.render({canvasContext:g,viewport:vp}).promise;
+      it._pc.set(i,c); if(it._pc.size>40) it._pc.delete(it._pc.keys().next().value);
+    }catch(e){ return; }
+  }
+  if(it.pi!==i||!it.tile||it.tile.firstChild!==box) return;
+  box.textContent=''; c.className=c.width/c.height>=4/3?'w':'h'; box.appendChild(c); pdfMarks(box,i,pdfPages(it));
+}
+grid.addEventListener('pointermove',e=>{
+  if(api.web) return;
+  const box=e.target.closest('.tile:not(.dir) .box'); if(!box) return;
+  const it=box.parentNode._it; if(!it||it.type!=='pdf'||!it.thumb) return;
+  const n=pdfPages(it); if(n<2) return;
+  clearTimeout(it._pdT);
+  const r=box.getBoundingClientRect(), i=Math.floor(Math.min(.999,Math.max(0,(e.clientX-r.left)/r.width))*n);
+  if(i===it.pi&&box.querySelector('.cnt')) return;
+  it.pi=i; pdfSkimTo(it,i);
+});
+grid.addEventListener('pointerout',e=>{
+  const box=e.target.closest('.tile:not(.dir) .box'); if(!box||box.contains(e.relatedTarget)) return;
+  const it=box.parentNode._it; if(!it||it.type!=='pdf'||it.pi==null) return;
+  it.pi=null; paint(it);
+  clearTimeout(it._pdT); it._pdT=setTimeout(()=>{ if(it._pt) it._pt.destroy(); it._pt=null; it._pd=null; it._pc=null; },8000);   // dokument i strony zwalniamy chwilę po zjechaniu z kafelka
+});
 
 /* --- zaznaczanie: klik, ⌘/Ctrl+klik, Shift+klik, ⌘/Ctrl+A --- */
 function markSel(){for(const it of view) if(it.tile) it.tile.classList.toggle('sel',picked.has(it));}
@@ -1298,7 +1341,7 @@ async function pdfThumb(it){
   await loadPdfjs();
   if(!pdfjs) throw new Error('brak podglądu PDF');
   const data=new Uint8Array(await (await blobOf(it)).arrayBuffer());
-  const doc=await pdfjs.getDocument({data,isEvalSupported:false}).promise;
+  const task=pdfjs.getDocument({data,isEvalSupported:false}), doc=await task.promise;
   try{
     const page=await doc.getPage(1), v1=page.getViewport({scale:1});
     const vp=page.getViewport({scale:Math.min(4,TH*1.5/Math.max(v1.width,v1.height))});
@@ -1307,7 +1350,7 @@ async function pdfThumb(it){
     await page.render({canvasContext:g,viewport:vp}).promise;
     it.pages=doc.numPages;
     return await createImageBitmap(c);
-  } finally { doc.destroy(); }
+  } finally { task.destroy(); }
 }
 async function loadImg(url){const im=new Image();im.crossOrigin='anonymous';im.src=url;await im.decode();return im;}
 // szachownica pod przezroczystymi pikselami

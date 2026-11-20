@@ -4,7 +4,7 @@
   "version": "0.8.4",
   "description": "Prosta przeglądarka obrazów — zamiennik Adobe Bridge",
   "author": "Michał Lenczewski",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "private": true,
   "main": "main.js",
   "scripts": {

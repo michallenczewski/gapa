@@ -45,6 +45,10 @@ Przy każdej większej zmianie warto sprawdzić, czy nie zachodzi któryś z tyc
 
 Podgląd spacją w Eksploratorze wymagał integracji z systemem (sygnał 2). Zrobiony jest małym programem w C# (`helper/GapaSpacja.cs`, ok. 14 KB), kompilowanym w GitHub Actions kompilatorem wbudowanym w Windows. Pomocnik słucha klawiatury (niskopoziomowy hak), czyta zaznaczenie Eksploratora przez COM (Shell.Application, z rozpoznaniem aktywnej karty w Windows 11) i rozmawia z Gapą przez stdin/stdout. Okno podglądu to zwykłe okno Gapy pokazywane bez odbierania fokusu. Gapa zostaje w tle (zasobnik), co kosztuje stały RAM — tylko gdy funkcja jest włączona.
 
+## Gwiazdki (0.9.4)
+
+Oceny 1–3 trzymamy w ustawieniach interfejsu (localStorage, obok Koszyka i Ulubionych), z kluczem w postaci ścieżki pliku; okna synchronizują się przez zdarzenie `storage`. Gapa niczego nie zapisuje w plikach obrazów. Ocena idzie za plikiem przy przeniesieniu, kopiowaniu i zmianie nazwy w Gapie, ale gubi się, gdy plik zmieni miejsce poza Gapą. Oceny z Adobe Bridge czytamy tylko z plików `.xmp` leżących obok obrazu (przy listowaniu folderu, bez otwierania samych obrazów). Oceny zapisanej przez Bridge wewnątrz JPG, TIFF czy PSD nie czytamy, bo wymagałoby to otwierania każdego pliku przy listowaniu. Zapis oceny do XMP to sygnał 2 (integracja z systemem), więc tylko po świadomej decyzji.
+
 ## Kolejność możliwych kroków
 
 1. **Electron z modułem natywnym w Ruście (napi-rs).** Interfejs zostaje, a tylko ciężkie albo systemowe części powstają jako moduł w Ruście: dekodowanie dużych plików, schowek zgodny z systemem, operacje na plikach z postępem. Rozwiązuje punkty 2–4, można sięgać po kod Staszka. To pierwszy krok, gdy pojawi się któryś sygnał.

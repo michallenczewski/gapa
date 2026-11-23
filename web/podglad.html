@@ -184,6 +184,10 @@ body.gridlines #grid.icons>.grp{border-right:1px solid var(--line);border-bottom
 #grid.list{display:block}
 .tile{position:relative;display:flex;flex-direction:column;gap:8px;min-width:0;cursor:default}
 .tile .box{aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;position:relative}
+.tile .stars{position:absolute;left:6px;bottom:6px;padding:1px 5px;border-radius:4px;background:rgba(0,0,0,.55);color:#fff;font-size:10px;letter-spacing:1px;line-height:15px;pointer-events:none}
+.list .stars{flex:none;margin-left:8px;color:var(--muted);font-size:10px;letter-spacing:1px}
+#starNav li .n{flex:none;margin-left:auto;color:var(--muted2);font-size:11.5px;font-variant-numeric:tabular-nums}
+#starNav{margin-top:2px}
 .tile .dur{position:absolute;right:6px;bottom:6px;display:flex;align-items:center;gap:5px;padding:2px 6px;border-radius:4px;background:rgba(0,0,0,.55);color:#fff;font-size:10.5px;font-variant-numeric:tabular-nums;line-height:15px;pointer-events:none}
 /* odtwarzacz filmów: obraz i pod nim jedna cicha linia sterowania */
 #stage>.vwrap{position:absolute;inset:14px 64px 24px;display:flex;align-items:center;justify-content:center;cursor:default}
@@ -619,6 +623,7 @@ body.bare.idle,body.bare.idle *,.fs body.idle,.fs body.idle *{cursor:none!import
 <aside>
   <div class="sechead"><button class="sec" data-sec="favs"><svg class="gi" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="m8 2.2 1.8 3.7 4 .6-2.9 2.8.7 4L8 11.4l-3.6 1.9.7-4L2.2 6.5l4-.6z"/></svg><span>Ulubione</span><svg class="ch" width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="m1.5 3 2.5 2.5L6.5 3"/></svg></button></div>
   <ul class="nav" id="favs"></ul>
+  <ul class="nav" id="starNav" hidden></ul>
   <button class="sec" data-sec="tree"><svg class="gi" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M2 4.6A1.3 1.3 0 0 1 3.3 3.3h2.9l1.3 1.6h5.2A1.3 1.3 0 0 1 14 6.2v5.5a1.3 1.3 0 0 1-1.3 1.3H3.3A1.3 1.3 0 0 1 2 11.7z"/></svg><span>Foldery</span><svg class="ch" width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="m1.5 3 2.5 2.5L6.5 3"/></svg></button>
   <ul class="nav tree" id="tree"></ul>
   <button class="sec" data-sec="places"><svg class="gi" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><rect x="2" y="4" width="12" height="8" rx="1.6"/><path d="M4.8 9.5h.01M11.5 9.5H8"/></svg><span>Miejsca</span><svg class="ch" width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="m1.5 3 2.5 2.5L6.5 3"/></svg></button>
@@ -1420,7 +1425,7 @@ main.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefa
 let wheelT=0, wheelAcc=0, wheelLast=0;
 
 /* filtry, sortowanie, widoki */
-function typeCounts(){const n={}; const src=virt==='basket'?S.basket.map(b=>({type:EXT[extOf(b.name)]})):items; for(const it of src) n[it.type]=(n[it.type]||0)+1; return n;}
+function typeCounts(){const n={}; const src=virt==='basket'?S.basket.map(b=>({type:EXT[extOf(b.name)]})):virt==='stars'?starsList().map(b=>({type:EXT[extOf(b.n)]})):items; for(const it of src) n[it.type]=(n[it.type]||0)+1; return n;}
 const TLABEL=t=>t==='tif'?'TIFF':t==='pln'?'Archicad':t==='vid'?'Wideo':t.toUpperCase();
 const fmtDur=s=>{if(!isFinite(s))return '';s=Math.round(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0');};
 const ICO_DOWN='<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="m2.5 4 2.5 2.5L7.5 4"/></svg>';
@@ -1428,21 +1433,24 @@ function renderTypes(){
   const n=typeCounts(), present=TYPES.filter(t=>n[t]), shown=present.filter(t=>on(t));
   const b=$('#typesBtn'); let l='Filtr';
   if(shown.length<present.length) l='Filtr: '+(shown.length?shown.slice(0,2).map(TLABEL).join(', ')+(shown.length>2?' +'+(shown.length-2):''):'nic');
-  b.innerHTML='<span></span>'+ICO_DOWN; b.firstChild.textContent=l; b.classList.toggle('on',shown.length<present.length);
+  if(S.minStar) l=(l==='Filtr'?'Filtr: ':l+', ')+STARS(S.minStar)+(S.minStar<3?'+':'');
+  b.innerHTML='<span></span>'+ICO_DOWN; b.firstChild.textContent=l; b.classList.toggle('on',shown.length<present.length||!!S.minStar);
 }
 function refilter(){save();renderTypes();for(const d of dirs)resetDir(d);applyView(keep());}
 function typesMenu(){
   const n=typeCounts(), r=$('#typesBtn').getBoundingClientRect();
   const present=TYPES.filter(t=>n[t]||!on(t));
   $('#typesBtn').classList.add('open');
-  if(!present.length){showMenu(r.left,r.bottom+6,'Brak obrazów w tym folderze',[]);return;}
+  if(!present.length&&!S.minStar){showMenu(r.left,r.bottom+6,'Brak obrazów w tym folderze',[]);return;}
+  const st=v=>({label:v?STARS(v)+(v<3?' i więcej':''):'Każda ocena',check:S.minStar===v,keep:true,run:()=>{S.minStar=v;refilter();typesMenu();}});
   showMenu(r.left,r.bottom+6,null,[
     ...present.map(t=>({label:TLABEL(t),box:on(t),n:n[t]||0,keep:true,run:()=>{S.types[t]=!on(t);refilter();typesMenu();}})),
-    '-',{label:'Pokaż wszystkie',dim:true,run:()=>{S.types={};refilter();}}]);
+    '-',st(0),st(1),st(2),st(3),
+    '-',{label:'Pokaż wszystkie',dim:true,run:()=>{S.types={};S.minStar=0;refilter();}}]);
 }
 $('#typesBtn').onclick=e=>{e.stopPropagation();ctx.hidden||ctx.dataset.of!=='types'?(typesMenu(),ctx.dataset.of='types'):hideMenu();};
-const DEF_DIR={name:1,type:1,date:-1,size:-1,dims:-1};
-const SORTS=[['name','Nazwa','A → Z','Z → A'],['date','Data zmiany','Od najstarszych','Od najnowszych'],['size','Rozmiar pliku','Od najmniejszych','Od największych'],['dims','Wymiary','Od najmniejszych','Od największych'],['type','Rodzaj','A → Z','Z → A']];
+const DEF_DIR={name:1,type:1,date:-1,size:-1,dims:-1,stars:-1};
+const SORTS=[['name','Nazwa','A → Z','Z → A'],['date','Data zmiany','Od najstarszych','Od najnowszych'],['size','Rozmiar pliku','Od najmniejszych','Od największych'],['dims','Wymiary','Od najmniejszych','Od największych'],['type','Rodzaj','A → Z','Z → A'],['stars','Ocena','Od najniższej','Od najwyższej']];
 function setSort(k){ if(S.sort===k) S.dir=-S.dir; else {S.sort=k;S.dir=DEF_DIR[k]||1;} save(); markSort(); applyView(keep()); }
 function markSort(){
   const s=SORTS.find(x=>x[0]===S.sort)||SORTS[0], b=$('#sortBtn');
@@ -1572,7 +1580,7 @@ function renderSettings(){
     +sw('Nazwy plików',S.names!==false,()=>setNames(!(S.names!==false)),'N')
     +sw('Nazwy folderów',S.dirNames!==false,()=>setDirNames(!(S.dirNames!==false)),'⇧ N')
     +sw('Linie siatki',!!S.gridlines,()=>setGridLines(!S.gridlines),'G','Cienkie linie między miniaturami')
-    +(api.iconSet?row('Ikona programu',seg([['3D',curIcon!=='retro',async()=>{curIcon=await api.iconSet('3d');}],['1-bit',curIcon==='retro',async()=>{curIcon=await api.iconSet('retro');}]])):'')));
+    +(api.iconSet?row('Ikona programu',seg([['Kolorowa',curIcon!=='retro',async()=>{curIcon=await api.iconSet('3d');}],['1-bit',curIcon==='retro',async()=>{curIcon=await api.iconSet('retro');}]])):'')));
   const edOpts=edList&&edList.list.length?edList.list.map(x=>[x.name.replace(/^Affinity Photo.*/,'Affinity'),x.path===edList.current,async()=>{ editorName=await api.editorSet(x.path); edList.current=x.path; }]):[];
   G.push(grp('Działanie',
     (api.editors?row('Otwieraj w',seg([...edOpts,[edOpts.some(x=>x[1])||!editorName?'Inny…':editorName+'…',!edOpts.some(x=>x[1])&&!!editorName,async()=>{ const n=await api.openEditor([],true); if(n){ editorName=n; edList=await api.editors(); } }]]),'E','Program, w którym E otwiera zaznaczone pliki'):'')
@@ -1692,10 +1700,76 @@ function renderBasketNav(){
     if(it.thumb) draw(); else thumbOf(it).then(()=>{ it.state='done'; draw(); },()=>{});
   }
 }
+/* --- Gwiazdki: ocena 1–3 trzymana w Gapie, nie w plikach (Gapa niczego w plikach nie zapisuje).
+       Ocenę z Adobe Bridge (plik .xmp obok obrazu) wczytujemy raz: 1–2 → ★, 3 → ★★, 4–5 → ★★★. --- */
+S.stars=S.stars&&typeof S.stars==='object'&&!Array.isArray(S.stars)?S.stars:{};
+S.minStar=S.minStar|0;
+const sItems=new Map();
+const starOf=p=>{ const s=S.stars[bKey(p)]; return s?s.r:0; };
+const STARS=n=>'★'.repeat(n);
+const starsList=()=>Object.values(S.stars).filter(s=>s.r>0&&s.p);
+const starPass=it=>!S.minStar||starOf(it.path)>=S.minStar;
+function starSet(list,r){
+  const fs=list.filter(x=>x&&x.kind==='file'); if(!fs.length) return;
+  const clear=fs.every(x=>starOf(x.path)===r);      // ta sama ocena drugi raz zdejmuje ją
+  for(const it of fs){ const k=bKey(it.path), o=S.stars[k];
+    if(clear){ if(o&&o.b) S.stars[k]={r:0,b:1}; else delete S.stars[k]; }   // przy ocenie z Bridge'a zostaje ślad, żeby nie wróciła
+    else S.stars[k]={r,p:it.path,n:it.name,size:it.size,mtime:it.mtime,...(o&&o.b?{b:1}:{})}; }
+  save(); SFX('tick'); starsChanged();
+  zoomTip((clear?'Bez oceny':STARS(r))+(fs.length>1?'  ·  '+fs.length+' '+plural(fs.length,'plik','pliki','plików'):''));
+}
+function starsImport(files){
+  let n=0;
+  for(const f of files){ if(!f.xr) continue; const k=bKey(f.path); if(k in S.stars) continue;
+    S.stars[k]={r:f.xr>=4?3:f.xr===3?2:1,p:f.path,n:f.name,size:f.size,mtime:f.mtime,b:1}; n++; }
+  if(n){ save(); renderStarsNav(); }
+}
+function starMark(it){
+  const el=it.tile; if(!el||it.kind!=='file') return;
+  const host=el.tagName==='TR'?el.querySelector('.cell'):el.firstChild; if(!host) return;
+  let s=host.querySelector('.stars'); const r=starOf(it.path);
+  if(!r){ if(s) s.remove(); return; }
+  if(!s){ s=document.createElement('span'); s.className='stars'; host.appendChild(s); }
+  s.textContent=STARS(r); s.title='Ocena: '+r+' z 3';
+}
+function starsChanged(){
+  renderStarsNav(); renderTypes();
+  for(const it of view) if(it.tile) starMark(it);
+  if(viewer.classList.contains('open')&&vList[vi]) vNameSet(vList[vi]);
+  if(virt==='stars'||S.minStar) applyView(keep());
+}
+function renderStarsNav(){
+  const u=$('#starNav'); if(!u) return;
+  const n=starsList().length;
+  u.hidden=!n&&virt!=='stars';
+  u.innerHTML='<li'+(virt==='stars'?' class="on"':'')+'><span class="nm">Oznaczone gwiazdkami</span><span class="n">'+(n||'')+'</span></li>';
+  u.firstChild.onclick=openStars;
+}
+async function openStars(){
+  if(virt==='stars') return;
+  SFX('tok'); virt='stars'; deep=false; markDeep(); $('#q').value=''; $('#qClear').hidden=true;
+  gen++; renderBasketNav(); renderStarsNav(); renderSide(); renderTree(); renderCrumbs(); renderTypes(); applyView(null); main.scrollTop=0; prefetch();
+  const list=starsList();
+  if(api.statFiles&&list.length){
+    const st=await api.statFiles(list.map(s=>s.p)); if(virt!=='stars') return;
+    let ch=false;
+    list.forEach((s,k)=>{ const x=st[k], it=sItems.get(s.p);
+      if(!x){ if(it&&it.state!=='error'){ it.state='error'; it.err='Nie ma już tego pliku pod zapisaną ścieżką (przeniesiony poza Gapą, usunięty albo dysk odłączony).'; ch=true; } return; }
+      if(x.size!==s.size||x.mtime!==s.mtime){ s.size=x.size; s.mtime=x.mtime; sItems.delete(s.p); ch=true; } });
+    if(ch){ save(); applyView(keep()); prefetch(); }
+  }
+}
+function starsView(q,keepPath){
+  libInfo=null;
+  const fs=sortFiles(starsList().map(s=>fileObj(sItems,{path:s.p,name:s.n,size:s.size,mtime:s.mtime})).filter(it=>on(it.type)&&starPass(it)&&(!q||matchQ(norm(it.name),q))));
+  setGrouped(fs,it=>api.dirname(it.path),(a,b)=>coll.compare(api.basename(a),api.basename(b))||coll.compare(a,b),
+    k=>({label:crumbsOf(k).filter(x=>x.name).slice(-2).map(x=>x.name).join(' / '),target:k}));
+  finishView(keepPath);
+}
 async function openBasket(){
   if(virt==='basket') return;
   record({basket:true}); SFX('tok'); virt='basket'; deep=false; markDeep(); $('#q').value=''; $('#qClear').hidden=true;
-  gen++; renderBasketNav(); renderSide(); renderTree(); renderCrumbs(); renderTypes(); applyView(null); main.scrollTop=0; prefetch();
+  gen++; renderBasketNav(); renderStarsNav(); renderSide(); renderTree(); renderCrumbs(); renderTypes(); applyView(null); main.scrollTop=0; prefetch();
   // pliki mogły się zmienić albo zniknąć od czasu dodania — sprawdź raz przy wejściu
   if(api.statFiles&&S.basket.length){
     const st=await api.statFiles(S.basket.map(b=>b.path)); if(virt!=='basket') return;
@@ -1706,7 +1780,7 @@ async function openBasket(){
     if(ch){ save(); applyView(keep()); prefetch(); }
   }
 }
-function closeVirt(){ virt=null; if(curPath) record({path:curPath}); renderBasketNav(); renderSide(); renderTree(); renderCrumbs(); renderTypes(); applyView(null); main.scrollTop=0; if(curPath) prefetch(); }
+function closeVirt(){ virt=null; if(curPath) record({path:curPath}); renderBasketNav(); renderStarsNav(); renderSide(); renderTree(); renderCrumbs(); renderTypes(); applyView(null); main.scrollTop=0; if(curPath) prefetch(); }
 async function copyBasketTo(list){
   if(!api.copyTo){ zoomTip('Kopiowanie działa w programie, nie w przeglądarce'); return; }
   const dir=await api.pickFolder(); if(!dir) return;
@@ -1776,7 +1850,7 @@ async function histGo(d){
 $('#backBtn').onclick=()=>histGo(-1); $('#fwdBtn').onclick=()=>histGo(1);
 // boczne przyciski myszy (wstecz / dalej)
 addEventListener('mouseup',e=>{ if(e.button===3||e.button===4){ e.preventDefault(); if(!viewer.classList.contains('open')) histGo(e.button===3?-1:1); } });
-function go(p,selectPath,inside){ record({path:p}); if(!S.favs.length&&!S.hints.fav&&curPath&&p!==curPath) setTimeout(()=>{ const f=$('#favs'); if(S.side!==false&&f.getBoundingClientRect().width) hint('fav',f,'Gwiazdka przy folderze dodaje go do Ulubionych ('+KL.mod+'D). Ulubione tworzą też bibliotekę do wyszukiwania.','right'); },900); SFX('tok'); if(virt){ virt=null; renderBasketNav(); } curPath=p; S.last=p; save(); deep=!!inside; deepItems=null; deepFor=null; $('#q').value='';$('#qClear').hidden=true; syncSearch(); markDeep(); scan(false,selectPath); }
+function go(p,selectPath,inside){ record({path:p}); if(!S.favs.length&&!S.hints.fav&&curPath&&p!==curPath) setTimeout(()=>{ const f=$('#favs'); if(S.side!==false&&f.getBoundingClientRect().width) hint('fav',f,'Gwiazdka przy folderze dodaje go do Ulubionych ('+KL.mod+'D). Ulubione tworzą też bibliotekę do wyszukiwania.','right'); },900); SFX('tok'); if(virt){ virt=null; renderBasketNav(); renderStarsNav(); } curPath=p; S.last=p; save(); deep=!!inside; deepItems=null; deepFor=null; $('#q').value='';$('#qClear').hidden=true; syncSearch(); markDeep(); scan(false,selectPath); }
 function setDeep(v){ if(virt){ virt=null; renderBasketNav(); renderSide(); renderCrumbs(); } deep=v; markDeep(); applyView(keep()); main.scrollTop=0; prefetch(); }
 function markDeep(){ const c=$('#deepChip'); c.hidden=true; for(const b of $('#scope').children) b.setAttribute('aria-pressed',String(b.dataset.v==='1'===!!deep)); }
 for(const b of $('#scope').children) b.onclick=()=>{ if((b.dataset.v==='1')!==!!deep) setDeep(b.dataset.v==='1'); };
@@ -1793,6 +1867,7 @@ async function scan(keepScroll,selectPath){
   const old=new Map(items.map(it=>[it.path+'|'+it.size+'|'+it.mtime,it]));
   const oldDirs=new Map(dirs.map(d=>[d.path,d]));
   gen++;
+  starsImport(r.files);
   items=r.files.map(f=>{
     const o=old.get(f.path+'|'+f.size+'|'+f.mtime);
     if(o&&o.state==='done'){o.gen=gen;o.tile=null;return o;}
@@ -1902,6 +1977,7 @@ document.addEventListener('paste',async e=>{
 function renderCrumbs(){
   const c=$('#crumbs'); c.textContent='';
   if(virt==='basket'){ const s=document.createElement('span'); s.textContent='Koszyk'; c.appendChild(s); document.title='Koszyk — Gapa'; return; }
+  if(virt==='stars'){ const s=document.createElement('span'); s.textContent='Oznaczone gwiazdkami'; c.appendChild(s); document.title='Oznaczone gwiazdkami — Gapa'; return; }
   if(!curPath) return;
   const cs=crumbsOf(curPath);
   cs.forEach((x,i)=>{
@@ -1990,8 +2066,9 @@ function sortFiles(fs){
     date:(a,b)=>(a.mtime-b.mtime)*d||byName(a,b),
     size:(a,b)=>(a.size-b.size)*d||byName(a,b),
     type:(a,b)=>(a.type||'').localeCompare(b.type||'')*d||byName(a,b),
-    dims:(a,b)=>((a.dims?a.dims[0]*a.dims[1]:0)-(b.dims?b.dims[0]*b.dims[1]:0))*d||byName(a,b)
-  }[S.sort];
+    dims:(a,b)=>((a.dims?a.dims[0]*a.dims[1]:0)-(b.dims?b.dims[0]*b.dims[1]:0))*d||byName(a,b),
+    stars:(a,b)=>(starOf(a.path)-starOf(b.path))*d||byName(a,b)
+  }[S.sort]||byName;
   return fs.sort(by);
 }
 // pliki pogrupowane nagłówkami folderów; head(klucz, pierwszy plik) → {label, target}
@@ -2015,6 +2092,7 @@ function fileObj(cache,f){
 function applyView(keepPath){
   const q=norm($('#q').value.trim());
   if(virt==='basket') return basketView(q,keepPath);
+  if(virt==='stars') return starsView(q,keepPath);
   if(libActive()) return libView(q,keepPath);
   libInfo=null;
   const isDeep=deep||(S.qIn==='deep'&&!!q);
@@ -2025,7 +2103,7 @@ function applyView(keepPath){
   }
   heads=null;
   const ds=isDeep?[]:dirs.filter(d=>!q||matchQ(norm(d.name),q));
-  const fs=sortFiles((isDeep?deepItems:items).filter(it=>on(it.type)&&(!q||matchQ(norm(isDeep?(it.rel+'/'+it.name):it.name),q))));
+  const fs=sortFiles((isDeep?deepItems:items).filter(it=>on(it.type)&&starPass(it)&&(!q||matchQ(norm(isDeep?(it.rel+'/'+it.name):it.name),q))));
   if(S.sort==='name'&&S.dir<0) ds.reverse();
   if(isDeep){ // grupy według podfolderów, najpierw sam folder
     const base=curPath.replace(/[\\/]+$/,'');
@@ -2043,7 +2121,7 @@ async function libView(q,keepPath){
   if(tok!==libTok||!libActive()) return;
   libInfo=r; libSt=r.st;
   if(libItems.size>6000) libItems.clear();
-  const fs=sortFiles(r.files.map(f=>{ const it=fileObj(libItems,f); it.rel=f.label; it.dir=f.dir; return it; }));
+  const fs=sortFiles(r.files.map(f=>{ const it=fileObj(libItems,f); it.rel=f.label; it.dir=f.dir; return it; }).filter(starPass));
   setGrouped(fs,it=>it.dir,(a,b)=>0,(k,first)=>({label:first.rel,target:k}));
   // kolejność grup: alfabetycznie po etykiecie (ulubiony folder / podfolder)
   const groups=[]; heads.forEach((h,i)=>groups.push({h,list:view.slice(i,i+h.count)}));
@@ -2053,7 +2131,7 @@ async function libView(q,keepPath){
 }
 function basketView(q,keepPath){
   libInfo=null;
-  const fs=sortFiles(S.basket.map(b=>fileObj(bItems,b)).filter(it=>on(it.type)&&(!q||matchQ(norm(it.name),q))));
+  const fs=sortFiles(S.basket.map(b=>fileObj(bItems,b)).filter(it=>on(it.type)&&starPass(it)&&(!q||matchQ(norm(it.name),q))));
   setGrouped(fs,it=>api.dirname(it.path),(a,b)=>coll.compare(api.basename(a),api.basename(b))||coll.compare(a,b),
     k=>({label:crumbsOf(k).filter(x=>x.name).slice(-2).map(x=>x.name).join(' / '),target:k}));
   finishView(keepPath);
@@ -2158,12 +2236,15 @@ function render(){
   if(has&&(folderEmpty||((virt||lib)&&!view.length))){
     const p=document.createElement('p');p.className='ph';p.style.cssText='font-size:13px;margin:4px;text-transform:none;letter-spacing:0;grid-column:1/-1;max-width:640px;line-height:1.55';
     if(virt==='basket'&&!q&&!S.basket.length){ const d=document.createElement('div'); d.className='bempty'; d.innerHTML='<svg width="30" height="30" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M2.3 6.5h11.4l-1.25 6.2a1.3 1.3 0 0 1-1.27 1H4.82a1.3 1.3 0 0 1-1.27-1z"/><path d="M5.6 6.5 7.6 2.6M10.4 6.5 8.4 2.6"/></svg><b>Koszyk jest pusty</b><p>Zaznacz zdjęcia w dowolnym folderze i naciśnij B albo przeciągnij je na koszyk w panelu bocznym. Pliki zostają na swoich miejscach — koszyk tylko je zbiera, żeby potem przeciągnąć całość do Photoshopa albo Maxa albo skopiować do folderu projektu.</p>'; grid.appendChild(d); status(); return; }
-    p.textContent=virt==='basket'?'Nic w koszyku nie pasuje do „'+q+'”.'
+    p.textContent=virt==='stars'?(q?'Nic z oznaczonych nie pasuje do „'+q+'”.':S.minStar?'Żaden oznaczony plik nie ma tylu gwiazdek.':'Nie ma tu jeszcze plików z gwiazdkami. Zaznacz plik i naciśnij '+MOD+'1, '+MOD+'2 albo '+MOD+'3.')
+      :!q&&S.minStar&&!virt&&!lib&&items.some(it=>on(it.type))?'Żaden plik w tym folderze nie ma oceny '+STARS(S.minStar)+(S.minStar<3?' lub wyższej':'')+'.'
+      :virt==='basket'?'Nic w koszyku nie pasuje do „'+q+'”.'
       :lib?(!S.favs.length?'Biblioteka to foldery z Ulubionych. Dodaj gwiazdką foldery z obrazami, a Gapa zapamięta nazwy plików w nich i we wszystkich podfolderach.'
         :!libInfo?'Szukam…':libSt&&libSt.busy?'Nic jeszcze nie pasuje do „'+q+'” — indeksuję bibliotekę, wyniki dojdą same.':'Nic w bibliotece nie pasuje do „'+q+'”.')
       :q?'Nic nie pasuje do „'+q+'”.':emptyText();
     grid.appendChild(p);
-    if(folderEmpty&&!q&&hiddenByType()){const bt=document.createElement('button');bt.className='ok-show';bt.style.gridColumn='1/-1';bt.style.justifySelf='start';bt.textContent='Pokaż wszystkie typy';bt.onclick=()=>{S.types={};save();renderTypes();applyView(keep());};grid.appendChild(bt);}
+    if(S.minStar&&!q&&!lib&&!view.some(x=>x.kind==='file')){const bt=document.createElement('button');bt.className='ok-show';bt.style.gridColumn='1/-1';bt.style.justifySelf='start';bt.textContent='Pokaż bez względu na ocenę';bt.onclick=()=>{S.minStar=0;refilter();};grid.appendChild(bt);}
+    else if(folderEmpty&&!q&&hiddenByType()){const bt=document.createElement('button');bt.className='ok-show';bt.style.gridColumn='1/-1';bt.style.justifySelf='start';bt.textContent='Pokaż wszystkie typy';bt.onclick=()=>{S.types={};save();renderTypes();applyView(keep());};grid.appendChild(bt);}
   }
   status();
 }
@@ -2239,7 +2320,8 @@ function groupHead(g,tag){
 }
 const dirSub=d=>d.count==null?'folder':d.count?d.count+' '+plural(d.count,'obraz','obrazy','obrazów'):d.sub?d.sub+' '+plural(d.sub,'folder','foldery','folderów'):'brak obrazów';
 
-function paint(it){
+function paint(it){ paint_(it); starMark(it); }
+function paint_(it){
   const el=it.tile; if(!el) return;
   if(el.tagName==='TR'){
     const c=el.cells, ic=el.querySelector('.ic'); ic.textContent='';
@@ -2949,11 +3031,12 @@ function mount(el,low,it){
     if(el.video) el.video.play().catch(()=>{});
   }
 }
+function vNameSet(it){ const r=starOf(it.path); $('#vname').textContent=it.name+(r?'   '+STARS(r):''); }
 async function showV(){
   const it=vList[vi]; if(!it) return; const tok=++vTok;
   const now=performance.now(), fast=now-lastStep<180; lastStep=now;
   const i=view.indexOf(it); if(i>=0&&picked.size<=1) select(i); else if(i>=0){sel=i;}
-  $('#vname').textContent=it.name; $('#vname').title=it.path; $('#vinfo').textContent=info(it); $('#vcount').textContent=(vi+1)+' / '+vList.length;
+  vNameSet(it); $('#vname').title=it.path; $('#vinfo').textContent=info(it); $('#vcount').textContent=(vi+1)+' / '+vList.length;
   zm=null; stage.className='fit';
   if(vCache.has(it)){ const v=await fullOf(it); if(tok!==vTok) return; mount(v.el,false,it); afterShow(it,v,tok); return; }
   // od razu: miniatura z pamięci
@@ -3225,6 +3308,9 @@ document.addEventListener('contextmenu',e=>{
   en.push({label:'Pokaż w '+FINDER,run:()=>api.showInFolder(it.path)});
   en.push('-');
   en.push({label:bLabel(many)+(n>1?' ('+n+')':''),key:'B',run:()=>basketToggle(many)});
+  { const cur=many.every(x=>starOf(x.path)===starOf(many[0].path))?starOf(many[0].path):-1;
+    en.push('-',...[1,2,3].map(v=>({label:STARS(v),check:cur===v,key:MOD+v,run:()=>starSet(many,v)})));
+    if(many.some(x=>starOf(x.path))) en.push({label:'Bez oceny',run:()=>{ const r=many.filter(x=>starOf(x.path)); const by={}; for(const x of r)(by[starOf(x.path)]=by[starOf(x.path)]||[]).push(x); for(const v in by) starSet(by[v],+v); }}); }
   if(n===1&&api.rename&&virt!=='basket') en.push({label:'Zmień nazwę…',key:'F2',run:()=>renameItem(it)});
   if(virt==='basket'&&api.copyTo) en.push({label:'Kopiuj do folderu…'+(n>1?' ('+n+')':''),run:()=>copyBasketTo(many)});
   en.push('-');
@@ -3268,6 +3354,7 @@ document.addEventListener('keydown',e=>{
     else if(k==='Enter'){e.preventDefault();sheetOpen();}
     return;
   }
+  if(open_&&mod&&!e.shiftKey&&!e.altKey&&/^Digit[1-3]$/.test(e.code)){e.preventDefault();if(vList[vi])starSet([vList[vi]],+e.code[5]);return;}
   if(open_){
     if(sheet&&k==='Backspace'){e.preventDefault();renderSheet();return;}
     if(k===' '&&PEEK){e.preventDefault();api.peekClose();}      // spacja w podglądzie z Eksploratora zamyka od razu, jak na Macu
@@ -3335,6 +3422,8 @@ document.addEventListener('keydown',e=>{
     else if(api.trash&&(!isMac||k==='Backspace')) trashSel(s);
     return;
   }
+  // ocena: ⌘1–3 / Ctrl+1–3, ta sama drugi raz zdejmuje (same cyfry zmieniają wielkość miniatur)
+  if(mod&&!e.shiftKey&&!e.altKey&&/^Digit[1-3]$/.test(e.code)){e.preventDefault();const f=pickedFiles();if(f.length)starSet(f,+e.code[5]);else zoomTip('Zaznacz pliki, którym chcesz dać gwiazdki');return;}
   if(mod||e.altKey) return;
   const c=cols(), how=e.shiftKey?'range':undefined;
   const mv=d=>{e.preventDefault();select(sel<0?0:sel+d,how);};
@@ -3384,6 +3473,7 @@ addEventListener('storage',e=>{
   let o; try{ o=JSON.parse(e.newValue); }catch(err){ return; }
   const favCh=JSON.stringify(o.favs||[])!==JSON.stringify(S.favs), bCh=JSON.stringify(o.basket||[])!==JSON.stringify(S.basket);
   if(favCh){ S.favs=o.favs||[]; renderSide(); for(const t of document.querySelectorAll('.tile.dir'))t._sync&&t._sync(); }
+  if(JSON.stringify(o.stars||{})!==JSON.stringify(S.stars)){ S.stars=o.stars||{}; starsChanged(); }
   if(bCh){ S.basket=o.basket||[]; bSet=new Set(S.basket.map(b=>bKey(b.path))); basketChanged(); }
 });
 
@@ -3432,8 +3522,11 @@ function showDrop(t,e){
 document.addEventListener('dragenter',e=>{ if(!hasFiles(e)) return; if(dragN++===0) learnDrag(); if(!curPath&&!draggingOut) document.body.dataset.drop='1'; });
 document.addEventListener('dragleave',e=>{ if(!hasFiles(e)) return; if(--dragN<=0){ dragN=0; delete document.body.dataset.drop; clearDrop(); } });
 document.addEventListener('dragover',e=>{ e.preventDefault(); if(hasFiles(e)) showDrop(dropTarget(e),e); });
-function applyMoves(list){        // przeniesione pliki w koszyku dostają nowe ścieżki
-  let ch=false;
+function applyMoves(list){        // przeniesione pliki w koszyku dostają nowe ścieżki; ocena idzie za plikiem (także do kopii)
+  let ch=false, sc=false;
+  for(const r of list){ const o=S.stars[bKey(r.from)]; if(!o||!o.r) continue;
+    S.stars[bKey(r.to)]={...o,p:r.to,n:api.basename(r.to)}; if(r.op==='move') delete S.stars[bKey(r.from)]; sc=true; }
+  if(sc){ save(); renderStarsNav(); }
   for(const r of list){ if(r.op!=='move'||!inBasket(r.from)) continue; const b=S.basket.find(x=>samePath(x.path,r.from)); if(b){ bItems.delete(b.path); b.path=r.to; b.name=api.basename(r.to); ch=true; } }
   if(ch){ bSet=new Set(S.basket.map(b=>bKey(b.path))); save(); basketChanged(); }
 }
@@ -3528,7 +3621,7 @@ function renderKeys(){
     +row(34,[K('A','poprzedni'),K('S','dźwięki'),K('D','następny'),K('F','szukaj<em>⇧ biblioteka</em>'),K('G','linie siatki')])
     +row(54,[K('Z','100% / dopasuj'),K('X','panel<em>⇧ info</em>'),K('C','kopiuj obraz<em>⇧ ścieżki</em>'),K('V','ikony / lista'),K('B','koszyk<em>⇧ otwórz</em>')])
     +row(0,[K('Tab','ukryj interfejs','w'),K('spacja','podgląd / wróć do siatki','sp')])
-    +'<div class="km">'+[[KL.mod+'N','nowe okno'],[KL.back+' '+KL.fwd,'wstecz / dalej'],[KL.wheel,'wielkość miniatur'],[KL.del,'przenieś do Kosza'],[KL.mod+'L','wpisz ścieżkę'],[KL.mod+'D','dodaj do ulubionych']]
+    +'<div class="km">'+[[KL.mod+'N','nowe okno'],[KL.back+' '+KL.fwd,'wstecz / dalej'],[KL.wheel,'wielkość miniatur'],[KL.del,'przenieś do Kosza'],[KL.mod+'L','wpisz ścieżkę'],[KL.mod+'D','dodaj do ulubionych'],[KL.mod+'1 2 3','gwiazdki (drugi raz zdejmuje)']]
       .map(([k,t])=>'<div><kbd>'+k+'</kbd>'+t+'</div>').join('')+'</div></div>';
 }
 function toggleKeys(v){ const o=$('#keys'); v=v===undefined?!o.classList.contains('on'):v; if(v){ renderKeys(); hideHint(); } o.classList.toggle('on',v); if(v&&!S.seenKeys){ S.seenKeys=true; save(); } }
@@ -3556,7 +3649,7 @@ function resetHints(){ S.hints={}; S.seenKeys=false; save(); zoomTip('Podpowiedz
 /* --- start --- */
 $('#empty-open').onclick=pickFolder;
 markSort(); markModes(); setNames(S.names!==false); setDirNames(S.dirNames!==false); setGridLines(!!S.gridlines); setSide(S.side!==false); setInsp(!!S.insp);
-renderSide(); renderCrumbs(); renderTypes(); cacheInfo(); renderBasketNav(); libSync(); setShowMem(!!S.showMem);
+renderSide(); renderCrumbs(); renderTypes(); cacheInfo(); renderBasketNav(); renderStarsNav(); libSync(); setShowMem(!!S.showMem);
 if(!S.seenKeys&&!api.startPath&&!PEEK&&!PREP) setTimeout(()=>{ if(!S.seenKeys) toggleKeys(true); },1400);
 /* --- tryb podglądu: otwiera wskazany plik, strzałki w Eksploratorze przesuwają podgląd --- */
 // kilka zaznaczonych plików: arkusz ze wszystkimi naraz; klik / Enter otwiera jeden, strzałki chodzą tylko po zaznaczonych

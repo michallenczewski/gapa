@@ -197,6 +197,7 @@ ipcMain.handle('list', async (e, dir, exts) => {
   try {
     const ents = await fsp.readdir(dir, { withFileTypes: true });
     const dirs = [], files = [], other = new Map();
+    const lower = new Map(ents.map(d => [d.name.toLowerCase(), d.name]));   // do szukania plików .xmp z Bridge'a obok obrazów
     await Promise.all(ents.map(async d => {
       if (d.name.startsWith('.') || skip.has(d.name)) return;
       const p = path.join(dir, d.name);
@@ -208,7 +209,13 @@ ipcMain.handle('list', async (e, dir, exts) => {
       const i = d.name.lastIndexOf('.'); if (i < 0) return;
       const ext = d.name.slice(i + 1).toLowerCase();
       if (ok.size && !ok.has(ext)) { other.set(ext, (other.get(ext) || 0) + 1); return; }
-      try { const s = await fsp.stat(p); files.push({ name: d.name, path: p, size: s.size, mtime: Math.round(s.mtimeMs) }); } catch (err) {}
+      try {
+        const s = await fsp.stat(p), f = { name: d.name, path: p, size: s.size, mtime: Math.round(s.mtimeMs) };
+        // ocena z Adobe Bridge zapisana w pliku .xmp obok obrazu (tylko odczyt; czytamy jedynie małe pliki .xmp, gdy są)
+        const xm = lower.get((d.name.slice(0, i) + '.xmp').toLowerCase());
+        if (xm) { try { const t = await fsp.readFile(path.join(dir, xm), 'utf8'); const m = /xmp:Rating(?:\s*=\s*["']|>)\s*(-?\d)/.exec(t); if (m && +m[1] > 0) f.xr = +m[1]; } catch (err) {} }
+        files.push(f);
+      } catch (err) {}
     }));
     return { dirs, files, other: [...other].sort((a, b) => b[1] - a[1]) };
   } catch (err) { return { error: err.code === 'EACCES' || err.code === 'EPERM' ? 'brak dostępu do folderu' : err.message, dirs: [], files: [] }; }

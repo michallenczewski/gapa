@@ -51,6 +51,8 @@ Gapa zostaje wtedy w tle z ikoną w zasobniku obok zegara (menu: otwórz, włąc
 
 **Koszyk** zbiera pliki z różnych folderów podczas przeglądania: zaznacz i naciśnij B, wybierz „Dodaj do koszyka” z menu albo przeciągnij miniatury na „Koszyk” w panelu bocznym. Pliki zostają na swoich miejscach. W koszyku przycisk „Przeciągnij wszystkie” przenosi całość naraz do Photoshopa, 3ds Maxa albo Findera, a „Kopiuj do folderu…” kopiuje pliki do folderu projektu (bez nadpisywania). Delete / ⌘⌫ w koszyku tylko wyjmuje plik z koszyka. Przeciągnięcie z koszyka do folderu (także w drugim oknie Gapy) zawsze kopiuje, nigdy nie przenosi. Filtr typów działa też w koszyku. Koszyk pamięta się między uruchomieniami.
 
+**Gwiazdki** oceniają pliki w skali od jednej do trzech: zaznacz plik (albo kilka) i naciśnij ⌘1, ⌘2 lub ⌘3 na Macu, Ctrl+1, Ctrl+2 lub Ctrl+3 na Windows; ta sama ocena naciśnięta drugi raz ją zdejmuje. Działa to także w podglądzie i z menu pod prawym przyciskiem. Gwiazdki widać tylko na ocenionych plikach. Filtr pozwala pokazać pliki z co najmniej jedną, dwiema albo trzema gwiazdkami, sortowanie „Ocena” stawia najlepsze na początku, a „Oznaczone gwiazdkami” w panelu bocznym zbiera ocenione pliki ze wszystkich folderów. Gapa trzyma oceny u siebie i nie zapisuje niczego w plikach; ocena idzie za plikiem, gdy przenosisz go, kopiujesz albo zmieniasz mu nazwę w Gapie. Oceny z Adobe Bridge zapisane w pliku .xmp obok obrazu Gapa wczytuje sama (1–2 → ★, 3 → ★★, 4–5 → ★★★).
+
 **Biblioteka** to wszystkie foldery z Ulubionych razem z podfolderami. Gapa zapamiętuje nazwy plików w nich (indeks w pliku `biblioteka.json` obok ustawień) i odświeża go w tle po zmianie ulubionych, przy powrocie do okna, jeśli minęło 10 minut, albo na żądanie („Odśwież indeks”). Zakres wyszukiwania wybiera się przyciskiem w polu szukania: tu, podfoldery albo biblioteka. Słowa w zapytaniu muszą wystąpić wszystkie — w nazwie pliku albo folderu, więc „cegły czerwone” znajdzie pliki z folderu „Cegły/czerwone”.
 
 ## Jak działa pamięć miniatur
@@ -85,6 +87,7 @@ Najczęstsze skróty leżą pod lewą ręką, żeby prawa mogła zostać na mysz
 | C / ⇧C | kopiuj obraz / kopiuj ścieżki (także P, ⌥⌘C) |
 | V | ikony ↔ lista (także L) |
 | B / ⇧B | dodaj do koszyka lub wyjmij / otwórz koszyk |
+| ⌘1 ⌘2 ⌘3 (Mac) / Ctrl+1 Ctrl+2 Ctrl+3 (Windows) | gwiazdki; ta sama drugi raz zdejmuje ocenę |
 | 1 / 2 | mniejsze / większe miniatury; w podglądzie oddal / przybliż (także − + oraz ⌘/Ctrl + − +, ⌘/Ctrl+0 przywraca) |
 | Tab | ukryj / pokaż interfejs |
 | Ctrl+spacja (Windows) | pełny ekran 100%: bez paska zadań, paska okna i interfejsu; wyjście tym samym skrótem albo Esc. Na Macu Gapa korzysta z systemowego pełnego ekranu (zielony przycisk, ⌃⌘F) |

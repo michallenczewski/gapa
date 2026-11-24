@@ -11,6 +11,34 @@ const { spawn, execFile } = require('child_process');
 const isMac = process.platform === 'darwin';
 const isWin = process.platform === 'win32';
 
+// Tryb pomocniczy: osobny proces Gapy, który tylko robi miniatury systemowe (Windows).
+// nativeImage.createThumbnailFromPath działa w wątku głównym, a dostawcy miniatur DWG, SKP czy MAX potrafią się
+// zawiesić na długo — w osobnym procesie zawieszenie nie blokuje okien Gapy ani podglądu spacją.
+if (process.argv.includes('--gapa-os-thumb')) {
+  app.setPath('userData', path.join(os.tmpdir(), 'gapa-miniatury-systemowe'));
+  app.disableHardwareAcceleration();
+  app.on('window-all-closed', () => {});
+  app.whenReady().then(() => {
+    let buf = '', chain = Promise.resolve();
+    const out = o => { try { process.stdout.write(JSON.stringify(o) + '\n'); } catch (e) {} };
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', d => {
+      buf += d; let i;
+      while ((i = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, i); buf = buf.slice(i + 1); let m; try { m = JSON.parse(line); } catch (e) { continue; }
+        chain = chain.then(async () => {   // po kolei: dostawcy miniatur nie lubią pracy równoległej
+          try { const img = await nativeImage.createThumbnailFromPath(m.p, { width: m.s, height: m.s });
+            out({ id: m.id, png: img && !img.isEmpty() ? img.toPNG().toString('base64') : null }); }
+          catch (e) { out({ id: m.id, png: null }); }
+        });
+      }
+    });
+    process.stdin.on('end', () => app.exit(0));
+    out({ ready: true });
+  });
+  return;
+}
+
 // pgf://f/<ścieżka>  — pliki z dysku (z obsługą zakresów, żeby PSD czytać kawałkami)
 // pgf://c/<plik>     — miniatury z pamięci
 protocol.registerSchemesAsPrivileged([{
@@ -530,13 +558,50 @@ ipcMain.handle('watch', (e, dir) => {
 });
 
 /* ---------- miniatury systemowe (Eksplorator / Quick Look): PDF, DWG, SKP, MAX, 3DM, Archicad… ---------- */
-ipcMain.handle('os-thumb', async (e, p, size) => {
-  try {
-    const img = await nativeImage.createThumbnailFromPath(p, { width: size, height: size });
-    if (!img || img.isEmpty()) return null;
-    return img.toPNG();
-  } catch (err) { return null; }
-});
+async function osThumbHere(p, size) {
+  try { const img = await nativeImage.createThumbnailFromPath(p, { width: size, height: size }); return img && !img.isEmpty() ? img.toPNG() : null; }
+  catch (err) { return null; }
+}
+// Windows: miniatury systemowe robi osobny proces (patrz „Tryb pomocniczy” na początku pliku). Jeśli plik zawiesi
+// dostawcę miniatur, po 12 s proces jest zabijany, plik dostaje „brak miniatury”, a następny zaczyna od świeżego procesu.
+// Gdyby proces pomocniczy w ogóle nie ruszył, wracamy do miniatur w procesie głównym.
+let ot = null, otBroken = false, otId = 0, otIdle = null;
+const otWait = new Map();
+function otKill() { if (!ot) return; try { ot.kill(); } catch (e) {} ot = null; for (const w of otWait.values()) { clearTimeout(w.t); w.res(null); } otWait.clear(); }
+function otStart() {
+  if (ot) return ot;
+  const c = { proc: null, ready: null };
+  const args = app.isPackaged ? ['--gapa-os-thumb'] : [app.getAppPath(), '--gapa-os-thumb'];
+  try { c.proc = spawn(process.execPath, args, { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true }); } catch (e) { otBroken = true; return null; }
+  c.ready = new Promise(res => {
+    const t = setTimeout(() => { otBroken = true; res(false); }, 15000);
+    let buf = '';
+    c.proc.stdout.setEncoding('utf8');
+    c.proc.stdout.on('data', d => {
+      buf += d; let i;
+      while ((i = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, i); buf = buf.slice(i + 1); let m; try { m = JSON.parse(line); } catch (e) { continue; }
+        if (m.ready) { clearTimeout(t); res(true); continue; }
+        const w = otWait.get(m.id); if (!w) continue;
+        otWait.delete(m.id); clearTimeout(w.t); w.res(m.png ? Buffer.from(m.png, 'base64') : null);
+      }
+    });
+    c.proc.on('exit', () => { clearTimeout(t); res(false); if (ot === c) otKill(); });
+  });
+  ot = c; return c;
+}
+async function osThumbAway(p, size) {
+  const c = otStart(); if (!c || !(await c.ready)) { otKill(); otBroken = true; return osThumbHere(p, size); }
+  clearTimeout(otIdle); otIdle = setTimeout(otKill, 90000);           // bezczynny proces znika po półtorej minuty
+  return new Promise(res => {
+    const id = ++otId;
+    const t = setTimeout(() => { if (otWait.has(id)) { otWait.delete(id); res(null); otKill(); } }, 12000);
+    otWait.set(id, { res, t });
+    try { c.proc.stdin.write(JSON.stringify({ id, p, s: size }) + '\n'); } catch (e) { clearTimeout(t); otWait.delete(id); res(null); }
+  });
+}
+ipcMain.handle('os-thumb', (e, p, size) => (isWin && !otBroken) ? osThumbAway(p, size) : osThumbHere(p, size));
+app.on('will-quit', otKill);
 
 /* ---------- system: Finder/Eksplorator, programy, przeciąganie ---------- */
 // własne przyciski okna (Windows)

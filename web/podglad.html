@@ -2179,10 +2179,10 @@ function hdPump(){
 // pliki projektowe: podgląd zapisany w pliku (Rhino 3dm bywa 1024 px, Max 512 px) albo systemowy w większym rozmiarze — bierzemy większy
 async function bigDoc(it){
   if(api.web||it.type==='pdf') return null;
-  const [emb,os]=await Promise.all([
-    decode(ref(it),'embedded',0).then(toBitmap).catch(()=>null),
-    api.osThumb(it.path,1024).then(p=>p?createImageBitmap(new Blob([p],{type:'image/png'})):null).catch(()=>null)]);
+  // najpierw podgląd zapisany w pliku; po systemowy sięgamy tylko, gdy go brak albo jest mały (dostawcy systemowi bywają powolni)
   const L=b=>b?Math.max(b.width,b.height):0;
+  const emb=await decode(ref(it),'embedded',0).then(toBitmap).catch(()=>null);
+  const os=L(emb)>=800?null:await api.osThumb(it.path,1024).then(p=>p?createImageBitmap(new Blob([p],{type:'image/png'})):null).catch(()=>null);
   const b=L(emb)>=L(os)*0.7?emb:os, o=b===emb?os:emb; if(o) o.close(); if(!b) return null;
   const c=document.createElement('canvas'); c.width=b.width; c.height=b.height;
   const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); g.drawImage(b,0,0); b.close();
@@ -3675,11 +3675,15 @@ async function peekOpen(p){
   }
   sheet=null;
   const d=api.dirname(p);
+  if(viewer.classList.contains('open')&&!(vList[vi]&&samePath(vList[vi].path,p))){
+    vTok++; stopMedia(); vEl=null; stage.innerHTML='<div class="msg">Wczytywanie…</div>'; $('#vname').textContent=api.basename(p); $('#vinfo').textContent=''; }
   if(!samePath(curPath,d)||!items.some(x=>samePath(x.path,p))){
     go(d,p);
     for(let i=0;i<80&&!items.some(x=>samePath(x.path,p));i++) await new Promise(r=>setTimeout(r,40));
   }
-  const it=items.find(x=>samePath(x.path,p)); if(!it) return;
+  const it=items.find(x=>samePath(x.path,p));
+  if(!it){ if(!viewer.classList.contains('open')){ viewer.classList.add('open'); chromeSync(); }
+    stage.innerHTML='<div class="msg"></div>'; stage.firstChild.textContent='Nie udało się wczytać folderu z tym plikiem. Naciśnij spację jeszcze raz.'; return; }
   if(viewer.classList.contains('open')){ const k=vList.indexOf(it); if(k>=0){ if(k!==vi){ vi=k; showV(); } return; } }
   openViewer(it);
 }

@@ -146,52 +146,68 @@ static class GapaSpacja
         return (vk >= 0x21 && vk <= 0x28);           // PageUp, PageDown, End, Home, strzałki
     }
 
+    // Zasada haka: zatrzymujemy WYŁĄCZNIE
+    //   • samą spację (bez Ctrl, Alt, Shift i Win), gdy fokus ma lista plików w Eksploratorze albo na pulpicie — to wywołanie podglądu,
+    //   • Esc oraz strzałki, PageUp/PageDown, Home/End, Enter i Backspace bez modyfikatorów — tylko gdy podgląd jest otwarty.
+    // Każde inne zdarzenie (wszystkie kombinacje z modyfikatorami, klawisze F, cyfry, skróty plików .lnk, PowerToys,
+    // zdarzenia wstrzyknięte przez inne programy) idzie od razu dalej przez CallNextHookEx, bez żadnych wywołań systemowych.
+    static long spaceAt = 0;                        // kiedy widzieliśmy ostatnie zdarzenie przechwyconej spacji
     static IntPtr Hook(int nCode, IntPtr wParam, IntPtr lParam)
     {
-        if (nCode >= 0)
+        if (nCode < 0) return CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);
+        try
         {
             var k = (KBDLLHOOKSTRUCT)Marshal.PtrToStructure(lParam, typeof(KBDLLHOOKSTRUCT));
+            uint vk = k.vkCode;
+            bool space = vk == VK_SPACE, esc = vk == VK_ESCAPE, nav = IsNavKey(vk) || vk == 0x0D || vk == 0x08;
+            if ((k.flags & LLKHF_INJECTED) != 0 || !(space || esc || nav))
+                return CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);
+
             int msg = wParam.ToInt32();
             bool down = msg == 0x100 || msg == 0x104;
             bool up = msg == 0x101 || msg == 0x105;
-            bool injected = (k.flags & LLKHF_INJECTED) != 0;
+            IntPtr fg; bool list;
 
-            if (!injected)
+            if (space)
             {
-                if (k.vkCode == VK_SPACE)
+                long now = Environment.TickCount;
+                if (spaceHeld && now - spaceAt > 1500) spaceHeld = false;     // zgubione puszczenie spacji nie może jej zablokować na zawsze
+                if (spaceHeld)
                 {
-                    if (up && spaceHeld) { spaceHeld = false; return (IntPtr)1; }
-                    if (down && spaceHeld) return (IntPtr)1;                      // powtórzenia przy trzymaniu spacji
-                    IntPtr fg; bool list;
-                    if (down && !AnyModifier() && ExplorerFront(out fg, out list) && list)
-                    {
-                        spaceHeld = true;
-                        jobs.Add("space|" + fg.ToInt64());
-                        return (IntPtr)1;
-                    }
+                    // puszczenie albo powtórzenia spacji, którą już przechwyciliśmy — Eksplorator nie powinien ich dostać osobno
+                    spaceAt = now;
+                    if (up) spaceHeld = false;
+                    return (IntPtr)1;
                 }
-                else if (k.vkCode == VK_ESCAPE && previewOpen && down)
+                if (down && !AnyModifier() && ExplorerFront(out fg, out list) && list)
                 {
-                    IntPtr fg; bool list;
-                    if (ExplorerFront(out fg, out list)) { jobs.Add("esc"); return (IntPtr)1; }
+                    spaceHeld = true; spaceAt = now;
+                    jobs.Add("space|" + fg.ToInt64());
+                    return (IntPtr)1;
                 }
-                else if (previewOpen && previewMulti && down && (IsNavKey(k.vkCode) || k.vkCode == 0x0D || k.vkCode == 0x08))
+                return CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);
+            }
+
+            // Esc i klawisze nawigacji: tylko przy otwartym podglądzie i tylko bez modyfikatorów
+            if (!previewOpen || AnyModifier()) return CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);
+            if (esc)
+            {
+                if (down && ExplorerFront(out fg, out list)) { jobs.Add("esc"); return (IntPtr)1; }
+            }
+            else if (previewMulti)
+            {
+                if (ExplorerFront(out fg, out list) && list)
                 {
-                    IntPtr fg; bool list;
-                    if (ExplorerFront(out fg, out list) && list) { jobs.Add("key|" + KeyName(k.vkCode)); return (IntPtr)1; }
-                }
-                else if (previewOpen && previewMulti && up && (IsNavKey(k.vkCode) || k.vkCode == 0x0D || k.vkCode == 0x08))
-                {
-                    IntPtr fg; bool list;
-                    if (ExplorerFront(out fg, out list) && list) return (IntPtr)1;
-                }
-                else if (previewOpen && up && IsNavKey(k.vkCode))
-                {
-                    IntPtr fg; bool list;
-                    if (ExplorerFront(out fg, out list) && list) jobs.Add("sel|" + fg.ToInt64());
+                    if (down) jobs.Add("key|" + KeyName(vk));
+                    if (down || up) return (IntPtr)1;
                 }
             }
+            else if (up && IsNavKey(vk))
+            {
+                if (ExplorerFront(out fg, out list) && list) jobs.Add("sel|" + fg.ToInt64());   // zdarzenie idzie dalej, tylko podgląd podąża za zaznaczeniem
+            }
         }
+        catch (Exception) { }
         return CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);
     }
 

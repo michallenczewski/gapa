@@ -334,7 +334,7 @@ function renderSettings(){
 }
 $('#setp').addEventListener('click',e=>{ if(e.target.id==='setp') closeSettings(); });
 addEventListener('keydown',e=>{ if(setOpen&&e.key==='Escape'){ e.preventDefault(); e.stopImmediatePropagation(); closeSettings(); } },true);
-$('#setBtn').innerHTML=GEAR; $('#setBtn').onclick=e=>{ e.stopPropagation(); setOpen?closeSettings():settingsMenu(); };
+$('#setBtn').innerHTML=GEAR; $('#setBtn').title='Ustawienia ('+(isMac?'⌘,':'Ctrl+,')+')'; $('#setBtn').onclick=e=>{ e.stopPropagation(); setOpen?closeSettings():settingsMenu(); };
 if($('#themeBtn')){ $('#themeBtn').onclick=e=>{ e.stopPropagation(); cycleTheme(); }; themeBtnSync(); }
 
 /* --- pliki: odczyt przez protokół pgf:// (z zakresami, więc PSD czytamy kawałkami) --- */
@@ -2055,6 +2055,7 @@ document.addEventListener('keydown',e=>{
   if(!isMac&&e.ctrlKey&&!e.shiftKey&&!e.altKey&&k===' '){ e.preventDefault(); fullscreenToggle(); return; }
   if(k==='Escape'&&document.documentElement.classList.contains('fs')&&fsBare!==null&&!dlgDone&&ctx.hidden){ e.preventDefault(); fullscreenToggle(); return; }
   if(dlgDone){ if(k==='Escape'){e.preventDefault();dlgDone(false);} else if(k==='Enter'){e.preventDefault();dlgDone(true);} return; }
+  if((e.metaKey||e.ctrlKey)&&!e.shiftKey&&!e.altKey&&e.code==='Comma'){e.preventDefault();setOpen?closeSettings():settingsMenu();return;}   // ⌘, / Ctrl+, — ustawienia (otwiera i zamyka)
   if(!ctx.hidden&&k==='Escape'){hideMenu();return;}
   if($('#keys').classList.contains('on')){ if(k==='Escape'||k==='?'){e.preventDefault();toggleKeys(false);} return; }
   if(k==='?'&&!e.target.matches('input,textarea')){e.preventDefault();toggleKeys(true);return;}
@@ -2346,7 +2347,7 @@ function renderKeys(){
     +row(34,[K('A','poprzedni'),K('S','dźwięki'),K('D','następny'),K('F','szukaj<em>⇧ biblioteka</em>'),K('G','linie siatki')])
     +row(54,[K('Z','100% / dopasuj'),K('X','panel<em>⇧ info</em>'),K('C','kopiuj obraz<em>⇧ ścieżki</em>'),K('V','ikony / lista'),K('B','koszyk<em>⇧ otwórz</em>')])
     +row(0,[K('Tab','ukryj interfejs','w'),K('spacja','podgląd / wróć do siatki','sp')])
-    +'<div class="km">'+[[KL.mod+'N','nowe okno'],[KL.back+' '+KL.fwd,'wstecz / dalej'],[KL.wheel,'wielkość miniatur'],[KL.del,'przenieś do Kosza'],[KL.mod+'L','wpisz ścieżkę'],[KL.mod+'D','dodaj do ulubionych'],[KL.mod+'1 2 3','gwiazdki (drugi raz zdejmuje)']]
+    +'<div class="km">'+[[KL.mod+'N','nowe okno'],[KL.back+' '+KL.fwd,'wstecz / dalej'],[KL.wheel,'wielkość miniatur'],[KL.del,'przenieś do Kosza'],[KL.mod+'L','wpisz ścieżkę'],[KL.mod+'D','dodaj do ulubionych'],[KL.mod+'1 2 3','gwiazdki (drugi raz zdejmuje)'],[KL.mod+',','ustawienia']]
       .map(([k,t])=>'<div><kbd>'+k+'</kbd>'+t+'</div>').join('')+'</div></div>';
 }
 function toggleKeys(v){ const o=$('#keys'); v=v===undefined?!o.classList.contains('on'):v; if(v){ renderKeys(); hideHint(); } o.classList.toggle('on',v); if(v&&!S.seenKeys){ S.seenKeys=true; save(); } }

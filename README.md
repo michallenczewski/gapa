@@ -88,6 +88,7 @@ Najczęstsze skróty leżą pod lewą ręką, żeby prawa mogła zostać na mysz
 | V | ikony ↔ lista (także L) |
 | B / ⇧B | dodaj do koszyka lub wyjmij / otwórz koszyk |
 | ⌘1 ⌘2 ⌘3 (Mac) / Ctrl+1 Ctrl+2 Ctrl+3 (Windows) | gwiazdki; ta sama drugi raz zdejmuje ocenę |
+| ⌘, (Mac) / Ctrl+, (Windows) | otwórz lub zamknij ustawienia (także zębatka na dole panelu) |
 | 1 / 2 | mniejsze / większe miniatury; w podglądzie oddal / przybliż (także − + oraz ⌘/Ctrl + − +, ⌘/Ctrl+0 przywraca) |
 | Tab | ukryj / pokaż interfejs |
 | Ctrl+spacja (Windows) | pełny ekran 100%: bez paska zadań, paska okna i interfejsu; wyjście tym samym skrótem albo Esc. Na Macu Gapa korzysta z systemowego pełnego ekranu (zielony przycisk, ⌃⌘F) |

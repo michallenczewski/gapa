@@ -2563,7 +2563,7 @@ document.addEventListener('pointerover',e=>{
   const el=e.target.closest&&e.target.closest(BTSEL); if(!el||el===btEl) return;
   if(el.title){ el.dataset.tip=el.title; el.removeAttribute('title'); }   // także gdy program zmieni title później
   btHide(); btEl=el;
-  btT=setTimeout(()=>{ if(btEl===el) btShow(el); }, Date.now()-btLast<400?0:1000);
+  btT=setTimeout(()=>{ if(btEl===el) btShow(el); }, Date.now()-btLast<400?0:2500);
 });
 document.addEventListener('pointerout',e=>{ const el=e.target.closest&&e.target.closest(BTSEL); if(el&&el===btEl&&!el.contains(e.relatedTarget)) btHide(); });
 addEventListener('pointerdown',btHide,true); addEventListener('wheel',btHide,{passive:true}); addEventListener('keydown',btHide,true);

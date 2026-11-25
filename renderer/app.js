@@ -671,7 +671,7 @@ pathIn.addEventListener('keydown',async e=>{
   else if(e.key==='Escape'){ e.preventDefault(); endEditPath(); }
 });
 pathIn.addEventListener('blur',()=>setTimeout(()=>{ if(document.activeElement!==pathIn) endEditPath(); },120));
-$('#pathCopy').onclick=e=>{ e.stopPropagation(); copyText(curPath); };
+$('#pathCopy').onclick=e=>{ e.stopPropagation(); copyText(curPath); btnAnim(e.currentTarget,'tak'); };
 // wklejenie ścieżki gdziekolwiek w oknie (poza polami tekstowymi) przenosi do niej
 // schowek plików wspólny dla wszystkich okien Gapy; dodatkowo pliki trafiają do schowka systemowego (wklejanie w Eksploratorze / Finderze)
 let fileClip=null;
@@ -2523,3 +2523,48 @@ async function prepLoop(){
 }
 if(PREP) prepLoop();
 if(!PREP) loadRoots().then(async()=>{ if(PEEK){ if(!api.peekMulti) peekOpen(api.peekPath); return; } const sp=api.startPath; if(sp&&await api.exists(sp)) go(sp); else if(S.last&&await api.exists(S.last)) go(S.last); else { render(); syncTree(); } });
+
+/* --- Język interakcji (projekt/WYTYCZNE_INTERAKCJE.md): reakcje przycisków, wskaźnik w segmentach, podpowiedzi --- */
+function btnAnim(b,cls){ if(!b) return; b.classList.remove('tak','nie'); void b.offsetWidth; b.classList.add(cls); }
+// segmenty: jeden wskaźnik przeskakuje pod wciśnięty przycisk (zamiast osobnego tła na każdym przycisku)
+function segSync(seg,instant){
+  let ind=seg.querySelector(':scope>.ind'); if(!ind){ ind=document.createElement('span'); ind.className='ind'; seg.prepend(ind); seg.classList.add('hasind'); instant=true; }
+  const on=seg.querySelector('button[aria-pressed=true]'); ind.style.opacity=on?'1':'0'; if(!on) return;
+  if(instant) ind.classList.add('nomove');
+  ind.style.width=on.offsetWidth+'px'; ind.style.transform='translateX('+on.offsetLeft+'px)';
+  if(instant){ void ind.offsetWidth; ind.classList.remove('nomove'); }
+}
+document.querySelectorAll('.seg').forEach(seg=>{
+  segSync(seg,true);
+  new MutationObserver(()=>segSync(seg)).observe(seg,{subtree:true,attributes:true,attributeFilter:['aria-pressed']});
+  new ResizeObserver(()=>segSync(seg,true)).observe(seg);   // segment pokazany później albo zmieniona szerokość przycisków
+});
+addEventListener('resize',()=>document.querySelectorAll('.seg').forEach(s=>segSync(s,true)));
+// podpowiedź po zatrzymaniu kursora: nazwa i przygaszony skrót, zamiast systemowego dymka
+let btT=0, btEl=null, btLast=0;
+const BTSEL='.ib,.tb,.seg button,#tray';
+function btKey(k){ // „⌘L / Ctrl+L” → skrót tylko dla tego systemu
+  const p=k.split(' / '); if(p.length!==2) return k;
+  const mac=p.find(x=>/[⌘⌥⇧]/.test(x)), win=p.find(x=>/Ctrl|Alt|Shift/.test(x));
+  return (isMac?mac:win)||k;
+}
+function btShow(el){
+  const h=$('#btip'), t=el.dataset.tip||''; if(!t) return;
+  const m=t.match(/^(.*?)\s*\(([^()]+)\)$/);
+  h.innerHTML=''; const n=document.createElement('span'); n.textContent=m?m[1]:t; h.appendChild(n);
+  if(m){ const k=document.createElement('kbd'); k.textContent=btKey(m[2]); h.appendChild(k); }
+  h.classList.add('on'); const r=el.getBoundingClientRect(), w=h.offsetWidth, hh=h.offsetHeight;
+  const below=r.bottom+8+hh<innerHeight;
+  h.style.left=Math.max(6,Math.min(innerWidth-w-6,r.left+r.width/2-w/2))+'px';
+  h.style.top=(below?r.bottom+6:r.top-hh-6)+'px';
+}
+function btHide(){ clearTimeout(btT); if(btEl) btLast=Date.now(); btEl=null; $('#btip').classList.remove('on'); }
+document.addEventListener('pointerover',e=>{
+  const el=e.target.closest&&e.target.closest(BTSEL); if(!el||el===btEl) return;
+  if(el.title){ el.dataset.tip=el.title; el.removeAttribute('title'); }   // także gdy program zmieni title później
+  btHide(); btEl=el;
+  btT=setTimeout(()=>{ if(btEl===el) btShow(el); }, Date.now()-btLast<400?0:450);
+});
+document.addEventListener('pointerout',e=>{ const el=e.target.closest&&e.target.closest(BTSEL); if(el&&el===btEl&&!el.contains(e.relatedTarget)) btHide(); });
+addEventListener('pointerdown',btHide,true); addEventListener('wheel',btHide,{passive:true}); addEventListener('keydown',btHide,true);
+

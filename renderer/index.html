@@ -10,6 +10,7 @@
   --bg:#f7f7f5; --text:#1a1a19; --text2:#4a4945; --muted:#8a8984; --muted2:#a3a29d;
   --folder:#dcd8cd; --folder2:#d0cbbf; --selbg:#e3e1da;
   --soft:#efeeea; --hover:#ecebe7; --line:#e6e5e1; --card:#ffffff; --cardline:#ecebe7;
+  --spring:cubic-bezier(.34,1.56,.64,1); --toolon:#ffffff;
   --ring:#1a1a19; --pill:#ffffff; --pillsh:0 1px 2px rgba(0,0,0,.08); --tip:#1a1a19; --tiptext:#f7f7f5;
   --menu:#ffffff; --menush:0 0 0 1px rgba(0,0,0,.06),0 10px 30px rgba(0,0,0,.10); --kbd:#f3f2ef;
   --stage:#f7f7f5; --tile-w:180px; --lic:28px; color-scheme:light; --scroll:rgba(0,0,0,.16); --scroll2:rgba(0,0,0,.32);
@@ -18,6 +19,7 @@
   --bg:#161616; --text:#e9e9e7; --text2:#c4c4c1; --muted:#8d8d89; --muted2:#6f6f6c;
   --folder:#3a3934; --folder2:#45443e; --selbg:#2e2e2c;
   --soft:#222221; --hover:#242423; --line:#2a2a29; --card:#1d1d1c; --cardline:#2a2a29;
+  --toolon:#3a3a38;
   --ring:#e9e9e7; --pill:#363635; --pillsh:0 1px 2px rgba(0,0,0,.4); --tip:#e9e9e7; --tiptext:#161616;
   --menu:#232322; --menush:0 0 0 1px rgba(255,255,255,.07),0 12px 36px rgba(0,0,0,.5); --kbd:#2e2e2d;
   --stage:#161616; color-scheme:dark; --scroll:rgba(255,255,255,.16); --scroll2:rgba(255,255,255,.3);
@@ -36,7 +38,20 @@ svg{display:block}
 /* --- pasek górny --- */
 header{grid-column:1/4;display:flex;align-items:center;gap:6px;padding:0 12px;min-width:0;overflow:hidden}
 
-.ib{width:30px;height:30px;border-radius:7px;color:var(--muted);display:flex;align-items:center;justify-content:center;flex:none}
+.ib{width:30px;height:30px;border-radius:7px;color:var(--muted);display:flex;align-items:center;justify-content:center;flex:none;transition:background-color .15s,color .15s}
+/* wytyczne interakcji (projekt/WYTYCZNE_INTERAKCJE.md): ikona unosi się przy najechaniu i ugina przy wciśnięciu */
+.ib svg,.tb svg,.seg button svg{transition:transform .35s var(--spring)}
+.ib:hover:not(:disabled) svg,.tb:hover svg,.seg button:hover svg{transform:translateY(-1px)}
+.ib:active:not(:disabled) svg,.tb:active svg,.seg button:active svg{transform:scale(.86)}
+.ib.tak{animation:tak .55s ease-out}
+@keyframes tak{0%{background:var(--hover)}100%{background:transparent}}
+.ib.nie{animation:nie .38s ease-out}
+@keyframes nie{20%{transform:translateX(-3px)}45%{transform:translateX(3px)}70%{transform:translateX(-2px)}}
+#btip{position:fixed;z-index:95;display:flex;gap:7px;align-items:center;left:-999px;top:0;background:var(--text);color:var(--bg);font-size:11.5px;line-height:1;padding:5px 8px;border-radius:6px;opacity:0;transform:translateY(-2px);transition:opacity .12s,transform .2s var(--spring);pointer-events:none;white-space:nowrap;max-width:360px}
+#btip.on{opacity:.94;transform:none}
+#btip span{overflow:hidden;text-overflow:ellipsis}
+#btip kbd{font:inherit;font-size:10.5px;opacity:.6}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 .ib:hover:not(:disabled){background:var(--hover);color:var(--text)}
 .ib[aria-pressed=true]{background:var(--soft);color:var(--text)}
 /* ścieżka: okruszki do klikania, a klik w wolne miejsce zamienia je w pole do wpisania lub wklejenia ścieżki */
@@ -122,7 +137,7 @@ body.noside #hspace{display:none}
 #qScope:hover{color:var(--text)}
 #qScope[aria-pressed=true]{background:var(--pill);box-shadow:var(--pillsh);color:var(--text)}
 .sep{width:1px;height:16px;background:var(--line);margin:0 6px;flex:none}
-.tb{height:30px;padding:0 8px;border-radius:7px;color:var(--text2);display:flex;align-items:center;gap:6px;white-space:nowrap;flex:none}
+.tb{height:30px;padding:0 8px;border-radius:7px;color:var(--text2);display:flex;align-items:center;gap:6px;white-space:nowrap;flex:none;transition:background-color .15s,color .15s}
 .tb:hover,.tb.open{background:var(--hover);color:var(--text)}
 .tb.on{color:var(--text);background:var(--soft)}
 .tb svg{color:var(--muted)}
@@ -130,11 +145,14 @@ body.noside #hspace{display:none}
 .zoom input{-webkit-appearance:none;appearance:none;width:100%;height:20px;background:transparent;margin:0;cursor:pointer}
 .zoom input::-webkit-slider-runnable-track{height:2px;border-radius:1px;background:linear-gradient(90deg,var(--text) var(--p,40%),var(--line) var(--p,40%))}
 .zoom input::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;margin-top:-5px;border-radius:50%;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.14),0 1px 3px rgba(0,0,0,.14)}
-.seg{display:flex;gap:2px;padding:2px;border-radius:8px;background:var(--soft);flex:none;margin-left:6px}
-.seg button{width:28px;height:26px;border-radius:6px;color:var(--muted);display:flex;align-items:center;justify-content:center}
+.seg{position:relative;display:flex;gap:2px;padding:2px;border-radius:8px;background:var(--soft);flex:none;margin-left:6px}
+.seg .ind{position:absolute;top:2px;left:0;height:26px;border-radius:6px;background:var(--toolon);box-shadow:0 0 0 1px var(--cardline),0 1px 2px rgba(0,0,0,.06);transition:transform .42s var(--spring),width .42s var(--spring);pointer-events:none}
+.seg .ind.nomove{transition:none}
+.seg button{position:relative;z-index:1;width:28px;height:26px;border-radius:6px;color:var(--muted);display:flex;align-items:center;justify-content:center;transition:color .15s}
 .seg button:hover{color:var(--text)}
 #scope button{width:auto;padding:0 10px;font-size:12px}
-.seg button[aria-pressed=true]{background:var(--pill);box-shadow:var(--pillsh);color:var(--text)}
+.seg button[aria-pressed=true]{color:var(--text)}
+.seg:not(.hasind) button[aria-pressed=true]{background:var(--pill);box-shadow:var(--pillsh)}
 
 /* --- pasek boczny --- */
 aside{grid-row:2;grid-column:1;width:220px;padding:6px 10px 12px 12px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
@@ -687,5 +705,6 @@ body.bare.idle,body.bare.idle *,.fs body.idle,.fs body.idle *{cursor:none!import
 
 <script src="decoders.js"></script>
 <script src="app.js"></script>
+<div id="btip" role="tooltip"></div>
 </body>
 </html>

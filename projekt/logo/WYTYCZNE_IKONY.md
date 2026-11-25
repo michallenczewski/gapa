@@ -50,4 +50,4 @@ tła wychodzą różnej wielkości (zmierzone: od 21 do 25 px przy tej samej iko
 8. **Po instalacji nowej wersji na Windows** odepnij program od paska zadań i przypnij go ponownie
    (Windows trzyma starą ikonę w pamięci). Jeśli to nie pomoże: `ie4uinit.exe -show` w terminalu.
 
-Po zmianie ikony zbuduj i wydaj nową wersję zgodnie z zasadami danego repozytorium.
+Po zmianie ikony zmiany commitujemy i wypychamy, ale nowej wersji nie budujemy ani nie wydajemy bez wyraźnej prośby Michała (tak jak przy każdej innej zmianie).

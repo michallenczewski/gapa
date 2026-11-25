@@ -167,25 +167,14 @@ ipcMain.handle('cache-clear', async () => {
   }
   idx = { items: {} }; cacheBytes = 0; idxDirty = true; saveIndexNow();
 });
-// ikona programu: „3d” (domyślna) albo „retro”; na Macu podmieniamy ikonę w Docku na czas działania programu
-// na Windows ikona bez marginesów macOS — inaczej na pasku zadań wychodzi za mała
-const iconFile = n => path.join(__dirname, 'renderer', (n === 'retro' ? 'icon-retro' : 'icon') + (process.platform === 'win32' ? '-win' : '') + '.png');
-function applyIcon() {
-  const img = nativeImage.createFromPath(iconFile(settings.icon));
-  if (process.platform === 'darwin') app.dock.setIcon(img);
-  else { for (const w of BrowserWindow.getAllWindows()) w.setIcon(img); winShortcutIcons(); }
-}
-// Windows: pasek zadań i menu Start biorą ikonę ze skrótów (.lnk), nie z okna — podmieniamy ją w skrótach Gapy.
-// Plik .ico kopiujemy z programu do folderu ustawień, bo skrót nie umie wskazać pliku wewnątrz paczki programu.
+// ikona programu (do 0.9.5 był też wariant 1-bitowy; usunięty). Na Windows ikona bez marginesów macOS — inaczej na pasku zadań wychodzi za mała
+const iconFile = () => path.join(__dirname, 'renderer', 'icon' + (process.platform === 'win32' ? '-win' : '') + '.png');
+// Windows: skróty Gapy (.lnk), którym wcześniej podmieniliśmy ikonę na 1-bitową, wracają do ikony z programu
 function winShortcutIcons() {
   if (!isWin) return;
   try {
-    const retro = settings.icon === 'retro';
-    let icon = process.execPath;
-    if (retro) {
-      icon = path.join(app.getPath('userData'), 'gapa-1bit.ico');
-      fs.writeFileSync(icon, fs.readFileSync(path.join(__dirname, 'renderer', 'icon-retro-win.ico')));
-    }
+    const icon = process.execPath;
+    try { fs.unlinkSync(path.join(app.getPath('userData'), 'gapa-1bit.ico')); } catch (e) {}
     const ad = app.getPath('appData'), pd = process.env.ProgramData || 'C:\\ProgramData', pub = path.join(process.env.PUBLIC || 'C:\\Users\\Public', 'Desktop');
     const links = [
       path.join(ad, 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Gapa.lnk'),
@@ -203,8 +192,6 @@ function winShortcutIcons() {
     }
   } catch (e) {}
 }
-ipcMain.handle('icon-get', () => settings.icon || '3d');
-ipcMain.handle('icon-set', (e, n) => { settings.icon = n === 'retro' ? 'retro' : '3d'; saveSettings(); applyIcon(); return settings.icon; });
 ipcMain.handle('cache-limit', (e, mb) => { settings.cacheLimitMB = Math.max(100, mb | 0); saveSettings(); prune(); });
 ipcMain.handle('cache-choose', async e => {
   const r = await dialog.showOpenDialog(BrowserWindow.fromWebContents(e.sender), {
@@ -837,7 +824,7 @@ function createWindow(startPath) {
   const win = new BrowserWindow({
     ...b, minWidth: 720, minHeight: 480, show: false,
     title: 'Gapa', backgroundColor: '#1b1b1b',
-    icon: iconFile(settings.icon),
+    icon: iconFile(),
     autoHideMenuBar: true,
     // pasek tytułu schowany — przyciski okna rysuje system w górnym pasku programu
     ...(process.platform === 'darwin'
@@ -913,7 +900,7 @@ function peekCreate(first) {
   const w = Math.round(d.width * 0.72), h = Math.round(d.height * 0.8);
   peekWin = new BrowserWindow({
     x: d.x + Math.round((d.width - w) / 2), y: d.y + Math.round((d.height - h) / 2), width: w, height: h,
-    show: false, title: 'Gapa — podgląd', backgroundColor: '#1b1b1b', icon: iconFile(settings.icon), autoHideMenuBar: true,
+    show: false, title: 'Gapa — podgląd', backgroundColor: '#1b1b1b', icon: iconFile(), autoHideMenuBar: true,
     alwaysOnTop: true, skipTaskbar: false, minimizable: false, fullscreenable: true,
     titleBarStyle: 'hidden', titleBarOverlay: { color: '#f7f7f5', symbolColor: '#4a4945', height: 52 },
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: false, plugins: true }
@@ -945,7 +932,7 @@ function trayUpdate() {
   if (!isWin) return;
   if (!keepAlive()) { if (tray) { tray.destroy(); tray = null; } return; }
   if (!tray) {
-    tray = new Tray(nativeImage.createFromPath(iconFile(settings.icon)).resize({ width: 16, height: 16 }));
+    tray = new Tray(nativeImage.createFromPath(iconFile()).resize({ width: 16, height: 16 }));
     tray.setToolTip(settings.peek ? 'Gapa — spacja w Eksploratorze otwiera podgląd' : 'Gapa — działa w tle');
     tray.on('click', () => { const w = mainWindows()[0]; if (w) { w.show(); w.focus(); } else createWindow(); });
   }
@@ -1027,8 +1014,7 @@ else {
     setInterval(prepNightlyTick, 5 * 60 * 1000);
     setTimeout(updCheck, 15000); setInterval(updCheck, 6 * 3600 * 1000);
     if (isWin) { peekStart(); trayUpdate(); }
-    if (settings.icon === 'retro') applyIcon();
-    else if (isWin) setTimeout(winShortcutIcons, 3000);   // po powrocie do zwykłej ikony albo po reinstalacji
+    if (settings.icon === 'retro') { delete settings.icon; saveSettings(); if (isWin) setTimeout(winShortcutIcons, 3000); }   // po wariancie 1-bitowym
     app.on('activate', () => { if (!mainWindows().length) createWindow(); });
   });
   app.on('before-quit', () => { quitting = true; saveIndexNow(); saveSettings(); if (peekProc) try { peekProc.kill(); } catch (e) {} });

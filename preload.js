@@ -27,8 +27,6 @@ contextBridge.exposeInMainWorld('api', {
   watch: dir => ipcRenderer.invoke('watch', dir),
   onDirChanged: cb => ipcRenderer.on('dir-changed', (e, d) => cb(d)),
   onMenu: cb => ipcRenderer.on('menu', (e, a) => cb(a)),
-  iconGet: () => ipcRenderer.invoke('icon-get'),
-  iconSet: n => ipcRenderer.invoke('icon-set', n),
   fullscreenToggle: () => ipcRenderer.send('fullscreen-toggle'),
   onFullscreen: cb => ipcRenderer.on('fullscreen', (e, v) => cb(v)),
 

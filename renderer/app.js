@@ -265,7 +265,6 @@ async function cacheClear(){
   for(const d of dirs) resetDir(d);
   render(); prefetch(); cacheInfo();
 }
-let curIcon='3d'; if(api.iconGet) api.iconGet().then(v=>curIcon=v);
 /* --- zużycie pamięci RAM przez wszystkie procesy Gapy (włączane w ustawieniach) --- */
 let memT=0;
 async function memTick(){ if(!S.showMem||!api.mem) return; const m=await api.mem(); $('#mem').textContent='RAM '+fmtSize(m.total*1024); $('#mem').title='Pamięć RAM wszystkich procesów Gapy: '+fmtSize(m.total*1024)+' (okna: '+fmtSize(m.renderer*1024)+')'; }
@@ -305,7 +304,7 @@ function renderSettings(){
     +sw('Nazwy plików',S.names!==false,()=>setNames(!(S.names!==false)),'N')
     +sw('Nazwy folderów',S.dirNames!==false,()=>setDirNames(!(S.dirNames!==false)),'⇧ N')
     +sw('Linie siatki',!!S.gridlines,()=>setGridLines(!S.gridlines),'G','Cienkie linie między miniaturami')
-    +(api.iconSet?row('Ikona programu',seg([['Kolorowa',curIcon!=='retro',async()=>{curIcon=await api.iconSet('3d');}],['1-bit',curIcon==='retro',async()=>{curIcon=await api.iconSet('retro');}]])):'')));
+));
   const edOpts=edList&&edList.list.length?edList.list.map(x=>[x.name.replace(/^Affinity Photo.*/,'Affinity'),x.path===edList.current,async()=>{ editorName=await api.editorSet(x.path); edList.current=x.path; }]):[];
   G.push(grp('Działanie',
     (api.editors?row('Otwieraj w',seg([...edOpts,[edOpts.some(x=>x[1])||!editorName?'Inny…':editorName+'…',!edOpts.some(x=>x[1])&&!!editorName,async()=>{ const n=await api.openEditor([],true); if(n){ editorName=n; edList=await api.editors(); } }]]),'E','Program, w którym E otwiera zaznaczone pliki'):'')

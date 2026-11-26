@@ -50,6 +50,9 @@ header{grid-column:1/4;display:flex;align-items:center;gap:6px;padding:0 12px;mi
 @keyframes wskocz{from{transform:translate(-2px,1.5px) rotate(-10deg) scale(.6)}}
 .ib.nie{animation:nie .38s ease-out}
 @keyframes nie{20%{transform:translateX(-3px)}45%{transform:translateX(3px)}70%{transform:translateX(-2px)}100%{transform:none}}
+/* przycisk z samym tekstem (wzorzec, punkt 2b): nie ma ikony, więc ugina się cały — do 0,97 w 0,09 s, powrót sprężyną */
+.act:not(:has(>svg)),.nav li,.ctx button,.btn,#dlg .db button,#setp .acts button,#setp .s2 .seg2 button{transition:background-color .15s,color .15s,opacity .15s,transform .35s var(--spring)}
+.act:not(:has(>svg)).wcis,.nav li.wcis,.ctx button.wcis,.btn.wcis,#dlg .db button.wcis,#setp .acts button.wcis,#setp .s2 .seg2 button.wcis{transform:scale(.97);transition:transform .09s ease-out}
 /* przyciski z napisem i pozycje paneli: tło przenika (0,15 s), po kliknięciu błyska kolorem najechania i gaśnie („tak”, 0,55 s) */
 .act,.nav li,.ctx button,#setp .acts button,#setp .s2 .seg2 button{transition:background-color .15s,color .15s,opacity .15s}
 .tb.tak,.act.tak,.nav li.tak,#setp .acts button.tak{animation:tak .55s ease-out}
@@ -3870,7 +3873,7 @@ document.addEventListener('click',e=>{ const el=e.target.closest&&e.target.close
 // wzorzec przycisków (projekt/wzorzec_przyciskow.html, KOPIUJ: JS): wciśnięcie to klasa .wcis zamiast :active,
 // bo :active trwa tyle co kliknięcie (~0,1 s) i ugięcia prawie nie widać; zdejmujemy ją nie wcześniej niż po 90 ms
 document.addEventListener('pointerdown',e=>{
-  const b=e.target.closest&&e.target.closest('.ib,.tb,.seg button,.act,.sec'); if(!b||e.button) return;
+  const b=e.target.closest&&e.target.closest('.ib,.tb,.seg button,.act,.sec,.nav li,.ctx button,.btn,#dlg .db button,#setp .acts button,#setp .s2 .seg2 button'); if(!b||e.button) return;
   b.classList.add('wcis'); const t0=performance.now();
   const up=()=>{ removeEventListener('pointerup',up); removeEventListener('pointercancel',up);
     setTimeout(()=>b.classList.remove('wcis'),Math.max(0,90-(performance.now()-t0))); };

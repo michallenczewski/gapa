@@ -2556,7 +2556,7 @@ document.addEventListener('click',e=>{ const el=e.target.closest&&e.target.close
 // wzorzec przycisków (projekt/wzorzec_przyciskow.html, KOPIUJ: JS): wciśnięcie to klasa .wcis zamiast :active,
 // bo :active trwa tyle co kliknięcie (~0,1 s) i ugięcia prawie nie widać; zdejmujemy ją nie wcześniej niż po 90 ms
 document.addEventListener('pointerdown',e=>{
-  const b=e.target.closest&&e.target.closest('.ib,.tb,.seg button,.act,.sec'); if(!b||e.button) return;
+  const b=e.target.closest&&e.target.closest('.ib,.tb,.seg button,.act,.sec,.nav li,.ctx button,.btn,#dlg .db button,#setp .acts button,#setp .s2 .seg2 button'); if(!b||e.button) return;
   b.classList.add('wcis'); const t0=performance.now();
   const up=()=>{ removeEventListener('pointerup',up); removeEventListener('pointercancel',up);
     setTimeout(()=>b.classList.remove('wcis'),Math.max(0,90-(performance.now()-t0))); };

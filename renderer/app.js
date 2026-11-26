@@ -328,7 +328,7 @@ function renderSettings(){
     +G.join('')
     +'<div class="about">'+esc(ver)+' · Michał Lenczewski, 2026 · licencja MIT · <a href="https://github.com/michallenczewski/gapa" target="_blank" rel="noopener">github.com/michallenczewski/gapa</a></div></div>';
   o.querySelector('.x').onclick=closeSettings;
-  // po zmianie przez użytkownika przełącznik i segment dostają krótki ruch (wytyczne interakcji, punkty 1 i 4)
+  // po zmianie przez użytkownika przełącznik dostaje krótki ruch (wytyczne interakcji, punkt 4)
   for(const b of o.querySelectorAll('[data-a]')) b.onclick=async e=>{ e.stopPropagation(); const i=b.dataset.a; await acts[+i](); renderSettings();
     const nb=$('#setp').querySelector('[data-a="'+i+'"]'); if(nb) nb.classList.add('hit'); };
 }
@@ -1996,7 +1996,7 @@ function showMenu(x,y,title,entries,up){
     if(anyCheck){const c=document.createElement('span');c.className='c';if(en.check)c.innerHTML=CHECK;b.appendChild(c);}
     const keys=en.keys||(en.key?String(en.key).replace(/^(⌘|Ctrl\+)(.)$/,'$1 $2').split(' '):null);
     if(keys){const k=document.createElement('span');k.className='keys';for(const t of keys){const kb=document.createElement('kbd');kb.textContent=t.replace(/\+$/,'');k.appendChild(kb);}b.appendChild(k);}
-    // wybór w menu: pozycja krótko mignie, a przycisk, który otworzył menu, potwierdza wybór („tak”)
+    // wybór w menu: pozycja zostaje podświetlona do zamknięcia menu, a przycisk, który je otworzył, potwierdza wybór („tak”)
     b.onclick=e=>{e.stopPropagation(); if(en.keep){ en.run(); return; }
       const tok=ctx._tok, trig=document.querySelector('.tb.open'); b.classList.add('hit'); en.run();
       setTimeout(()=>{ if(ctx._tok===tok&&!ctx.hidden) hideMenu(); btnAnim(trig,'tak'); },130);};

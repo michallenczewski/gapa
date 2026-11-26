@@ -2553,7 +2553,17 @@ if(!PREP) loadRoots().then(async()=>{ if(PEEK){ if(!api.peekMulti) peekOpen(api.
 /* --- Język interakcji (projekt/WYTYCZNE_INTERAKCJE.md): reakcje przycisków, wskaźnik w segmentach, podpowiedzi --- */
 // reakcja na kliknięcie w panelu informacji, panelu bocznym i przyciskach w ustawieniach
 document.addEventListener('click',e=>{ const el=e.target.closest&&e.target.closest('.act,.nav li:not(.none),#setp .acts button'); if(el) btnAnim(el,'tak'); },true);
-function btnAnim(b,cls){ if(!b) return; b.classList.remove('tak','nie'); void b.offsetWidth; b.classList.add(cls); }
+// wzorzec przycisków (projekt/wzorzec_przyciskow.html, KOPIUJ: JS): wciśnięcie to klasa .wcis zamiast :active,
+// bo :active trwa tyle co kliknięcie (~0,1 s) i ugięcia prawie nie widać; zdejmujemy ją nie wcześniej niż po 90 ms
+document.addEventListener('pointerdown',e=>{
+  const b=e.target.closest&&e.target.closest('.ib,.tb,.seg button,.act,.sec'); if(!b||e.button) return;
+  b.classList.add('wcis'); const t0=performance.now();
+  const up=()=>{ removeEventListener('pointerup',up); removeEventListener('pointercancel',up);
+    setTimeout(()=>b.classList.remove('wcis'),Math.max(0,90-(performance.now()-t0))); };
+  addEventListener('pointerup',up); addEventListener('pointercancel',up);
+});
+// jednorazowa animacja (tak / nie / wlacz / wylacz) — także przy kolejnych kliknięciach pod rząd
+function btnAnim(b,cls){ if(!b) return; b.classList.remove('tak','nie','wlacz','wylacz'); void b.offsetWidth; b.classList.add(cls); }
 // segmenty: jeden wskaźnik przeskakuje pod wciśnięty przycisk (zamiast osobnego tła na każdym przycisku)
 function segSync(seg,instant){
   let ind=seg.querySelector(':scope>.ind'); if(!ind){ ind=document.createElement('span'); ind.className='ind'; seg.prepend(ind); seg.classList.add('hasind'); instant=true; }

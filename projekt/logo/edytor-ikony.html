@@ -117,6 +117,10 @@ const LAYS={
  zakladka:{n:'Folder z zakładką',items:[[26,36,48,26,'back',0,0.7,0],[26,50,108,70,'front',0,1.08,0]],eye:[80,85,34,13]},
  dwaFoldery:{n:'Dwa foldery',items:[[44,24,40,20,'third',0,0.7,0],[44,34,96,60,'back',0,1,0],[20,52,42,24,'third',0,0.7,1],[20,64,104,64,'front',0,1,1]],eye:[72,96,30,11],dir:[0.75,-0.66]},
  obecne:{n:'Obecne logo',ball:true,items:[]},
+ piramida:{n:'Oko w trójkącie',items:[[24,26,112,98,'front',0,1,0,'tri']],eye:[80,92,27,10.5]},
+ dwiePiramidy:{n:'Dwa trójkąty',items:[[20,22,100,88,'back',0,1,0,'tri'],[40,40,100,88,'front',0,1,1,'tri']],eye:[90,100,24,9.5]},
+ piramidaKarta:{n:'Trójkąt na karcie',items:[[26,34,96,62,'back'],[44,40,96,84,'front',0,1,1,'tri']],eye:[92,98,24,9.5]},
+ piramidaSzczyt:{n:'Unoszący się szczyt',items:[[22,96,116,32,'back',0,1,0,'trap'],[38,22,84,66,'front',0,1,1,'tri']],eye:[80,66,20,8],dir:[0,1]},
  przechyl:{n:'Folder przechylony',items:[[26,36,48,26,'back',0,0.7,0],[26,50,108,70,'front',0,1.08,0]],eye:[80,85,34,13],rot:-7}
 };
 
@@ -139,14 +143,24 @@ let S;try{S=Object.assign({},DEF,JSON.parse(localStorage.getItem('gapaIkona')||'
 let saved=[];try{saved=JSON.parse(localStorage.getItem('gapaIkonaZapis')||'[]')}catch(e){}
 let UID=0;
 
+function polyR(P,r){   // wielokąt z zaokrąglonymi narożnikami
+ const n=P.length,pt=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t],len=(a,b)=>Math.hypot(b[0]-a[0],b[1]-a[1]);
+ let d='';for(let i=0;i<n;i++){const v=P[i],a=P[(i+n-1)%n],b=P[(i+1)%n],p1=pt(v,a,Math.min(.45,r/len(v,a))),p2=pt(v,b,Math.min(.45,r/len(v,b)));
+  d+=(i?'L':'M')+p1[0].toFixed(2)+' '+p1[1].toFixed(2)+'Q'+v[0]+' '+v[1]+' '+p2[0].toFixed(2)+' '+p2[1].toFixed(2);}
+ return d+'Z';}
 function svg(st,px,forExport){
  const L=LAYS[st.lay],D=+st.depth,SW=+st.stroke,HW=SW+2*(+st.h),k=st.eye/100,sx=+st.shift,sp=+st.spread||0,cs=+st.cs||0,co=(+st.co||0)/100;
  const dir=L.dir||[-0.6,-0.8];
  const gs=L.items.map((it,i)=>it[7]??i),gMax=Math.max(...gs),gMin=Math.min(...gs);
  let halo='',body='';const lower=[];
- L.items.forEach((it,i)=>{const [x0,y0,w,h,key,rot,rm]=it,g=gs[i],off=(gMax-g)*sp;
+ L.items.forEach((it,i)=>{const [x0,y0,w,h,key,rot,rm,,shape]=it,g=gs[i],off=(gMax-g)*sp;
   const x=x0+sx+dir[0]*off,y=y0+dir[1]*off,r=Math.min(st.cardR*(rm||1),h/2),tr=rot?` transform="rotate(${rot} ${x+w/2} ${y+h/2})"`:'',f=st[key];
-  const rect=(dx,dy,fill,s,sw,extra='')=>`<rect x="${x+dx}" y="${y+dy}" width="${w}" height="${h}" rx="${r}" fill="${fill}"${sw>0?` stroke="${s}" stroke-width="${sw}" stroke-linejoin="round"`:''}${extra}/>`;
+  const strk=(s,sw)=>sw>0?` stroke="${s}" stroke-width="${sw}" stroke-linejoin="round"`:'';
+  const rect=shape==='trap'
+   ?(dx,dy,fill,s,sw,extra='')=>`<path d="${polyR([[x+dx+w*0.2,y+dy],[x+dx+w*0.8,y+dy],[x+dx+w,y+dy+h],[x+dx,y+dy+h]],r*0.6)}" fill="${fill}"${strk(s,sw)}${extra}/>`
+   :shape==='tri'
+   ?(dx,dy,fill,s,sw,extra='')=>`<path d="${polyR([[x+dx+w/2,y+dy],[x+dx+w,y+dy+h],[x+dx,y+dy+h]],r*0.9)}" fill="${fill}"${strk(s,sw)}${extra}/>`
+   :(dx,dy,fill,s,sw,extra='')=>`<rect x="${x+dx}" y="${y+dy}" width="${w}" height="${h}" rx="${r}" fill="${fill}"${strk(s,sw)}${extra}/>`;
   if(+st.h>0){let s='';for(const d of [D,D/2,0])s+=rect(0,d,st.halo,st.halo,HW);halo+=`<g${tr}>${s}</g>`;}
   let s='';
   if(cs>0&&co>0&&g>gMin){const lw=lower.filter(l=>l.g<g);if(lw.length){const id='cp'+(++UID);

@@ -78,6 +78,7 @@ contextBridge.exposeInMainWorld('api', {
   editorSet: p => ipcRenderer.invoke('editor-set', p),
   dataGet: () => ipcRenderer.invoke('data-get'),
   dataSet: d => ipcRenderer.invoke('data-set', d),
+  dataSetSync: d => ipcRenderer.sendSync('data-set-sync', d),
   onDataChanged: cb => ipcRenderer.on('data-changed', (e, d) => cb(d)),
   updateGet: () => ipcRenderer.invoke('update-get'),
   updateCheck: () => ipcRenderer.invoke('update-check'),

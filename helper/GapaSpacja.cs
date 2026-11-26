@@ -154,6 +154,7 @@ static class GapaSpacja
     static long spaceAt = 0;                        // kiedy widzieliśmy ostatnie zdarzenie przechwyconej spacji
     static readonly System.Diagnostics.Stopwatch clk = System.Diagnostics.Stopwatch.StartNew();   // zegar bez przepełnienia (TickCount zawija się po 25 dniach)
     static long typedAt = -100000;                  // kiedy ostatnio wpisano literę albo cyfrę (szukanie po nazwie w liście), ms zegara clk
+    static bool chordDown = false;                  // trzymany Ctrl, Alt albo Win (śledzony z ich własnych zdarzeń, bez wywołań systemowych)
     static long busySince = 0;                      // od kiedy wątek roboczy czyta zaznaczenie (ms zegara clk; 0 = nie czyta)
     static IntPtr Hook(int nCode, IntPtr wParam, IntPtr lParam)
     {
@@ -167,7 +168,14 @@ static class GapaSpacja
             {
                 // litera albo cyfra: tylko zapamiętujemy czas (bez wywołań systemowych) — spacja zaraz po niej to część
                 // wpisywanej nazwy w szukaniu po liście Eksploratora („moj plik”), a nie podgląd
-                if ((k.flags & LLKHF_INJECTED) == 0 && ((vk >= 0x30 && vk <= 0x5A) || (vk >= 0x60 && vk <= 0x69))) typedAt = clk.ElapsedMilliseconds;
+                if ((k.flags & LLKHF_INJECTED) == 0)
+                {
+                    int m = wParam.ToInt32();
+                    bool isChord = vk == 0x11 || vk == 0x12 || (vk >= 0xA2 && vk <= 0xA5) || vk == 0x5B || vk == 0x5C;
+                    if (isChord) chordDown = m == 0x100 || m == 0x104;
+                    // Ctrl+A, Ctrl+C itp. to nie wpisywanie nazwy — po nich spacja dalej otwiera podgląd
+                    else if (!chordDown && ((vk >= 0x30 && vk <= 0x5A) || (vk >= 0x60 && vk <= 0x69))) typedAt = clk.ElapsedMilliseconds;
+                }
                 return CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);
             }
 

@@ -64,28 +64,47 @@ function saveSettings() {
 // przestawał działać po cichu. Plik nie ma tego limitu, zapisuje go też okno podglądu spacją,
 // a zmiany z jednego okna trafiają od razu do pozostałych (zdarzenie data-changed).
 const dataFile = () => path.join(app.getPath('userData'), 'oceny-i-koszyk.json');
-let userData = null, dataDirty = false, dataTimer = null, dataWriting = false;
-function dataLoad() { try { const d = JSON.parse(fs.readFileSync(dataFile(), 'utf8')); userData = { stars: d.stars || {}, basket: Array.isArray(d.basket) ? d.basket : [] }; } catch (e) { userData = null; } }
+// dataState: 'ok' (plik wczytany), 'missing' (nie ma go jeszcze — okno przeniesie oceny z localStorage),
+// 'error' (nie da się przeczytać, np. plik zablokowany) — wtedy niczego nie nadpisujemy, tylko próbujemy znowu
+let userData = null, dataState = 'missing', dataDirty = false, dataTimer = null, dataWriting = false, dataSync = 0;
+function dataLoad() {
+  let txt;
+  try { txt = fs.readFileSync(dataFile(), 'utf8'); }
+  catch (e) { userData = null; dataState = e.code === 'ENOENT' ? 'missing' : 'error'; return; }
+  try { const d = JSON.parse(txt); userData = { stars: d.stars && typeof d.stars === 'object' ? d.stars : {}, basket: Array.isArray(d.basket) ? d.basket : [] }; dataState = 'ok'; }
+  catch (e) {   // uszkodzony plik: zostawiamy jego kopię i zaczynamy od zera (nic nie ginie bez śladu)
+    try { fs.renameSync(dataFile(), dataFile() + '.uszkodzony-' + Date.now()); } catch (err) {}
+    userData = null; dataState = 'missing';
+  }
+}
 async function dataWrite() {
   clearTimeout(dataTimer); dataTimer = null;
   if (!dataDirty || !userData) return;
   if (dataWriting) { dataTimer = setTimeout(dataWrite, 500); return; }
-  dataDirty = false; dataWriting = true;
-  try { const tmp = dataFile() + '.tmp'; await fsp.writeFile(tmp, JSON.stringify(userData)); await fsp.rename(tmp, dataFile()); } catch (e) { dataDirty = true; }
+  dataDirty = false; dataWriting = true; const gen = dataSync;
+  try { const tmp = dataFile() + '.tmp'; await fsp.writeFile(tmp, JSON.stringify(userData)); if (gen === dataSync) await fsp.rename(tmp, dataFile()); }
+  catch (e) { dataDirty = true; if (!dataTimer) dataTimer = setTimeout(dataWrite, 5000); }   // ponowna próba
   dataWriting = false;
 }
 function dataWriteNow() {
-  if (!dataDirty || !userData) return; dataDirty = false;
+  if (!dataDirty || !userData) return; dataDirty = false; dataSync++;
   try { const tmp = dataFile() + '.tmp2'; fs.writeFileSync(tmp, JSON.stringify(userData)); fs.renameSync(tmp, dataFile()); } catch (e) {}
 }
-ipcMain.handle('data-get', () => userData);
-ipcMain.handle('data-set', (e, d) => {
-  if (!d || typeof d !== 'object') return false;
+ipcMain.handle('data-get', () => {
+  if (dataState === 'error') dataLoad();
+  return dataState === 'ok' ? userData : { missing: dataState === 'missing', error: dataState === 'error' };
+});
+function dataApply(e, d) {
+  if (!d || typeof d !== 'object' || dataState === 'error') return false;
+  dataState = 'ok';
   userData = { stars: d.stars && typeof d.stars === 'object' && !Array.isArray(d.stars) ? d.stars : {}, basket: Array.isArray(d.basket) ? d.basket : [] };
   for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed() && w.webContents !== e.sender) w.webContents.send('data-changed', userData);
   dataDirty = true; if (!dataTimer) dataTimer = setTimeout(dataWrite, 400);
   return true;
-});
+}
+ipcMain.handle('data-set', dataApply);
+// przy zamykaniu okna: zmiana sprzed chwili musi dojść, zanim okno zniknie
+ipcMain.on('data-set-sync', (e, d) => { e.returnValue = dataApply(e, d); });
 
 /* ---------- pamięć miniatur na dysku ---------- */
 // Każda miniatura to plik .webp w podfolderze cacheDir/ab/, nazwany skrótem ścieżki, rozmiaru i daty zmiany.
@@ -114,28 +133,29 @@ function openCache(dir) {
 }
 // Zapis indeksu: w trakcie pracy asynchronicznie (proces główny nie staje przy dużym indeksie),
 // synchronicznie tylko przy zamykaniu i czyszczeniu. Sam odczyt miniatury nie wymusza zapisu (patrz thumb-get).
-let idxWriting = false;
+let idxWriting = false, idxDue = 0, idxSync = 0;
 function saveIndexSoon(ms) {
-  idxDirty = true;
-  if (idxTimer) return;
-  idxTimer = setTimeout(saveIndexAsync, ms || 3000);
+  idxDirty = true; ms = ms || 3000;
+  const due = Date.now() + ms;
+  if (idxTimer && idxDue <= due) return;           // krótszy termin (nowa miniatura) skraca dłuższy (sam odczyt)
+  clearTimeout(idxTimer); idxDue = due; idxTimer = setTimeout(saveIndexAsync, ms);
 }
 async function saveIndexAsync() {
   clearTimeout(idxTimer); idxTimer = null;
   if (!idxDirty) return;
   if (idxWriting) { saveIndexSoon(); return; }
-  idxDirty = false; idxWriting = true;
+  idxDirty = false; idxWriting = true; const gen = idxSync;
   try {
     const tmp = path.join(cacheDir, 'indeks.json.tmp');
     await fsp.writeFile(tmp, JSON.stringify(idx));
-    await fsp.rename(tmp, path.join(cacheDir, 'indeks.json'));
+    if (gen === idxSync) await fsp.rename(tmp, path.join(cacheDir, 'indeks.json'));   // zapis przy zamykaniu był nowszy
   } catch (e) { idxDirty = true; }
   idxWriting = false;
 }
 function saveIndexNow() {
   clearTimeout(idxTimer); idxTimer = null;
-  if (!idxDirty || idxWriting) { if (idxWriting) idxDirty = true; if (!idxDirty) return; }
-  idxDirty = false;
+  if (!idxDirty && !idxWriting) return;
+  idxDirty = false; idxSync++;
   try {
     const tmp = path.join(cacheDir, 'indeks.json.tmp2');
     fs.writeFileSync(tmp, JSON.stringify(idx));
@@ -721,7 +741,7 @@ ipcMain.handle('editors', () => {
   return { list, current: cur || null };
 });
 // program do edycji: tylko istniejąca aplikacja (.app na Macu, .exe na Windows) — okno nie może ustawić dowolnego pliku do uruchomienia
-const editorOk = p => { try { return isMac ? /\.app$/i.test(p) && fs.statSync(p).isDirectory() : /\.exe$/i.test(p) && fs.statSync(p).isFile(); } catch (e) { return false; } };
+const editorOk = p => { if ([findPhotoshop(), findAffinity(), settings.editor].some(x => x && x === p)) return true; try { return isMac ? /\.app$/i.test(p) && fs.statSync(p).isDirectory() : /\.exe$/i.test(p) && fs.statSync(p).isFile(); } catch (e) { return false; } };
 ipcMain.handle('editor-set', (e, p) => { if (p && !editorOk(String(p))) return null; settings.editor = p || null; saveSettings(); const c = currentEditor(); return c ? editorLabel(c) : null; });
 function launch(appPath, files) {
   if (isMac) execFile('open', ['-a', appPath, ...files]);
@@ -791,7 +811,7 @@ ipcMain.handle('clip-files', async (e, paths) => {
         const ps = execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
           '[Console]::InputEncoding=[Text.Encoding]::UTF8; $p=@([Console]::In.ReadToEnd() -split "`n" | Where-Object { $_ }); Set-Clipboard -LiteralPath $p'],
           { windowsHide: true }, err => res(!err));
-        ps.stdin.end(paths.join('\n'), 'utf8');
+        ps.stdin.on('error', () => {}); ps.stdin.end(paths.join('\n'), 'utf8');
       });
       if (!ok) return false;
     } else if (isMac) {
@@ -853,8 +873,15 @@ ipcMain.handle('rename', async (e, src, name) => {
   try {
     // ten sam plik pod nazwą różniącą się tylko wielkością liter (APFS i NTFS nie rozróżniają) — wolno;
     // inny istniejący plik o tej nazwie — nie nadpisujemy
-    let same = false;
-    try { const a = await fsp.stat(src), b = await fsp.stat(to); same = a.ino === b.ino && a.dev === b.dev; if (!same) return { error: 'Plik o tej nazwie już tu jest' }; } catch (err) {}
+    // „ten sam plik” tylko wtedy, gdy nazwy różnią się samą wielkością liter — ino potrafi być 0 na dyskach sieciowych
+    const fold = x => x.toLowerCase().normalize('NFC');
+    let same = false, exists = false;
+    try { await fsp.access(to); exists = true; } catch (err) {}
+    if (exists) {
+      if (fold(to) !== fold(src)) return { error: 'Plik o tej nazwie już tu jest' };
+      try { const a = await fsp.stat(src, { bigint: true }), b = await fsp.stat(to, { bigint: true }); same = a.ino === b.ino && a.dev === b.dev && a.ino !== 0n; } catch (err) {}
+      if (!same) return { error: 'Plik o tej nazwie już tu jest' };
+    }
     if (same) { const tmp = src + '.gapa-zmiana-' + Date.now(); await fsp.rename(src, tmp); await fsp.rename(tmp, to); }
     else await fsp.rename(src, to);
     cacheCarry(src, to, false);
@@ -868,7 +895,12 @@ ipcMain.handle('undo-transfer', async () => {
   const back = [], failed = [], dirs = new Set();
   for (const r of [...last].reverse()) {
     try {
-      if (r.op === 'move') { const to = await freePath(path.dirname(r.from), path.basename(r.from)); await moveTo(r.to, to); cacheCarry(r.to, to, false); back.push({ from: r.to, to, op: 'move' }); }
+      if (r.op === 'move' && path.dirname(r.from) === path.dirname(r.to) && r.from.toLowerCase().normalize('NFC') === r.to.toLowerCase().normalize('NFC')) {
+        // cofnięcie zmiany samej wielkości liter: z powrotem przez plik tymczasowy (bez dopisku „(2)”)
+        const tmp = r.to + '.gapa-zmiana-' + Date.now(); await fsp.rename(r.to, tmp); await fsp.rename(tmp, r.from);
+        cacheCarry(r.to, r.from, false); back.push({ from: r.to, to: r.from, op: 'move' });
+      }
+      else if (r.op === 'move') { const to = await freePath(path.dirname(r.from), path.basename(r.from)); await moveTo(r.to, to); cacheCarry(r.to, to, false); back.push({ from: r.to, to, op: 'move' }); }
       else { await shell.trashItem(r.to); back.push({ from: r.to, to: null, op: 'trash' }); }   // cofnięta kopia trafia do Kosza
       dirs.add(path.dirname(r.from)); dirs.add(path.dirname(r.to));
     } catch (err) { failed.push({ path: r.to, error: err.message }); }

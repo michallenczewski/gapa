@@ -14,9 +14,10 @@ on:
 permissions:
   contents: read
 
-# osobna kolejka dla każdego systemu: dobudowanie drugiego systemu nie anuluje trwającej budowy pierwszego
+# jedna kolejka bez anulowania: dobudowanie drugiego systemu czeka, aż skończy się trwająca budowa,
+# więc dwa przebiegi nigdy nie wgrywają plików do tego samego wydania naraz
 concurrency:
-  group: build-${{ github.ref }}-${{ inputs.os }}
+  group: build-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:

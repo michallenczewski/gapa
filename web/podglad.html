@@ -1357,8 +1357,11 @@ const PREP=!!api.prepMode;      // niewidoczne okno, które przygotowuje miniatu
 // Oceny i koszyk zapisujemy w osobnym pliku (api.dataSet) — także z okna podglądu spacją; reszta ustawień
 // zostaje w localStorage. W wersji przeglądarkowej (bez api.dataGet) wszystko idzie do localStorage jak dawniej.
 const DATA=!!api.dataGet;
-let dataLast='', dataT=0, saveWarned=false;
-function dataSoon(){ if(!DATA||PREP) return; clearTimeout(dataT); dataT=setTimeout(()=>{ const d={stars:S.stars||{},basket:S.basket||[]}, j=JSON.stringify(d); if(j===dataLast) return; dataLast=j; api.dataSet(d); },300); }
+// dataReady: nic nie wysyłamy, zanim okno dostanie oceny z pliku — inaczej puste S.stars z początku startu
+// mogłoby nadpisać plik i pozostałe okna
+let dataLast='', dataT=0, saveWarned=false, dataReady=false;
+function dataFlush(sync){ clearTimeout(dataT); dataT=0; if(!dataReady) return; const d={stars:S.stars||{},basket:S.basket||[]}, j=JSON.stringify(d); if(j===dataLast) return; dataLast=j; sync&&api.dataSetSync?api.dataSetSync(d):api.dataSet(d); }
+function dataSoon(){ if(!DATA||PREP) return; clearTimeout(dataT); dataT=setTimeout(()=>dataFlush(false),300); }
 const save=()=>{ dataSoon(); if(PEEK||PREP) return;
   try{localStorage.setItem('podglad',JSON.stringify(DATA?{...S,stars:undefined,basket:undefined}:S));}
   catch(e){ if(!saveWarned){ saveWarned=true; setTimeout(()=>zoomTip('Nie udało się zapisać ustawień programu'),0); } } };
@@ -1953,7 +1956,7 @@ async function scan(keepScroll,selectPath){
   starsImport(r.files);
   items=r.files.map(f=>{
     const o=old.get(f.path+'|'+f.size+'|'+f.mtime);
-    if(o&&o.state==='done'){o.gen=gen;o.tile=null;return o;}
+    if(o&&(o.state==='done'||o.state==='dropped')){o.gen=gen;o.tile=null;return o;}
     return {kind:'file',name:f.name,path:f.path,size:f.size,mtime:f.mtime,type:EXT[extOf(f.name)],gen,state:null};
   });
   dirs=r.dirs.map(d=>oldDirs.get(d.path)&&keepScroll?Object.assign(oldDirs.get(d.path),{tile:null}):{kind:'dir',name:d.name,path:d.path,files:null,count:null,state:null})
@@ -2113,11 +2116,13 @@ async function kidsOf(n){
   if(n.kids&&!n.stale) return n.kids;
   // jedno wczytanie naraz dla węzła; przy odświeżaniu zachowujemy rozwinięcia podfolderów, które dalej istnieją
   if(!n._kp) n._kp=(async()=>{
+    const ver=n.ver||0;
     try{
       const r=await api.list(n.path,['__brak__']), old=new Map((n.kids||[]).map(k=>[bKey(k.path),k]));
       n.kids=r.dirs.sort((a,b)=>coll.compare(a.name,b.name)).map(d=>{ const o=old.get(bKey(d.path)); if(o){ o.name=d.name; o.path=d.path; return o; } return {path:d.path,name:d.name,kids:null,open:false,up:n}; });
     }catch(e){ n.kids=n.kids||[]; }
-    n.stale=false; n._kp=null; return n.kids;
+    n._kp=null; n.stale=(n.ver||0)!==ver;   // zmiana na dysku w trakcie wczytywania: przy następnym razie wczytamy znowu
+    return n.kids;
   })();
   return n._kp;
 }
@@ -2128,7 +2133,7 @@ function treeNode(p){
 }
 async function treeStale(paths){
   let any=false;
-  for(const p of paths){ const n=p&&treeNode(p); if(n&&n.kids){ n.stale=true; any=true; if(n.open) await kidsOf(n); } }
+  for(const p of paths){ const n=p&&treeNode(p); if(n&&n.kids){ n.stale=true; n.ver=(n.ver||0)+1; any=true; if(n.open){ await n._kp; await kidsOf(n); } } }
   if(any) renderTree();
 }
 // dyski i miejsca: odświeżane po powrocie do okna (np. podłączony dysk USB), bez gubienia rozwinięć
@@ -2292,7 +2297,8 @@ function basketView(q,keepPath){
        Wracają same z pamięci na dysku (pgf://c), gdy kafelek znów wjedzie w widok. --- */
 const thLRU=new Map(); let thPx=0; const TH_PX=100e6;
 function thTrack(it){
-  if(!it||it.kind!=='file'||!it.thumb) return;
+  // tylko kafelki siatki: pliki-okładki folderów (bez własnego kafelka) zostają w pamięci, żeby okładki nie znikały
+  if(!it||it.kind!=='file'||!it.thumb||!it.tile) return;
   if(it._thc!==it.thumb){ thPx-=it._thpx||0; it._thc=it.thumb; it._thpx=it.thumb.width*it.thumb.height; thPx+=it._thpx; }
   thLRU.delete(it); thLRU.set(it,1); thTrim();
 }
@@ -2301,13 +2307,15 @@ function thTrim(){
   if(thPx<=TH_PX) return;
   for(const it of [...thLRU.keys()]){
     if(thPx<=TH_PX*0.85) break;
-    if((it.visible&&it.tile&&it.tile.isConnected)||it===vList[vi]||it.state==='loading') continue;
+    if((it.visible&&it.tile&&it.tile.isConnected)||it===vList[vi]||it.state!=='done'||it.hdBusy) continue;
     thDrop(it);
   }
 }
 function thDrop(it){
   thLRU.delete(it); thPx-=it._thpx||0; it._thpx=0; it._thc=null;
-  const c=it.thumb; it.thumb=null; it._tp=null; if(it.state==='done') it.state=null;
+  // stan „dropped”: miniatura jest na dysku i wróci, gdy kafelek wjedzie w widok; licznik postępu liczy ją jako gotową,
+  // a przygotowanie folderu (prefetch) jej nie przelicza
+  const c=it.thumb; it.thumb=null; it._tp=null; it.state='dropped';
   if(c){ if(c.parentNode) c.remove(); c.width=c.height=0; }   // zwalnia pamięć płótna od razu
 }
 function thReset(){ thLRU.clear(); thPx=0; }
@@ -2377,13 +2385,13 @@ async function hdGet(it,need){
 }
 async function hdMake(it,max){
   let bmp;
-  if(DOCS.has(it.type)){ const c=await bigDoc(it); return c&&Math.max(c.width,c.height)>Math.max(it.thumb.width,it.thumb.height)*1.05?c:null; }
+  if(DOCS.has(it.type)){ const c=await bigDoc(it); return c&&it.thumb&&Math.max(c.width,c.height)>Math.max(it.thumb.width,it.thumb.height)*1.05?c:null; }
   if(it.type==='svg'){ const im=await loadImg(api.fileUrl(it.path)); const w=im.naturalWidth||1024,h=im.naturalHeight||1024,k=max/Math.max(w,h);
     const c=new OffscreenCanvas(Math.round(w*k),Math.round(h*k)); c.getContext('2d').drawImage(im,0,0,c.width,c.height); bmp=c.transferToImageBitmap(); }
   else if(NATIVE.has(it.type)) bmp=await createImageBitmap(await blobOf(it));
   else { const r=await decode(ref(it),it.type,max); bmp=await toBitmap(r); }
   const s=Math.min(1,max/Math.max(bmp.width,bmp.height)), w=Math.max(1,Math.round(bmp.width*s)), h=Math.max(1,Math.round(bmp.height*s));
-  if(Math.max(w,h)<=Math.max(it.thumb.width,it.thumb.height)*1.05){ bmp.close(); return null; }
+  if(!it.thumb||Math.max(w,h)<=Math.max(it.thumb.width,it.thumb.height)*1.05){ bmp.close(); return null; }
   const small=s<1?await createImageBitmap(bmp,{resizeWidth:w,resizeHeight:h,resizeQuality:'high'}):bmp;
   let c; if(OPAQUE.has(it.type)){ c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(small,0,0); }
   else c=paintOn(small,w,h,Math.max(4,Math.round(Math.max(w,h)/48)));
@@ -2692,6 +2700,7 @@ addEventListener('keydown',e=>{ if(e.key==='Escape'&&draggingOut) dragDone(); })
 const hiQ=[], loQ=[]; let running=0;
 const MAXRUN=Math.min(6,Math.max(2,(navigator.hardwareConcurrency||4)-1));
 function enqueue(it,hi,front){
+  if(it.state==='dropped'){ if(!hi) return; it.state=null; }
   if(it.state==='done'||it.state==='loading'||it.state==='error'){ if(it.state==='done'&&it.cb){const c=it.cb;it.cb=null;c();} return; }
   if(it.state==='queued'){ if(hi&&!it.hi){it.hi=true;front?hiQ.unshift(it):hiQ.push(it);pump();} return; }
   it.state='queued'; it.hi=!!hi; (hi?(front?a=>hiQ.unshift(a):a=>hiQ.push(a)):a=>loQ.push(a))(it); pump();
@@ -2701,7 +2710,7 @@ const HEAVY=new Set(['tif','exr','hdr','psd']), MAXHEAVY=2; let heavyRun=0;
 const isHeavy=it=>HEAVY.has(it.type)&&it.size>48*1048576;
 function take(){
   for(const q of [hiQ,loQ]) for(let i=0;i<q.length;i++){
-    const x=q[i]; if(x.state!=='queued'||x.gen!==gen){ q.splice(i--,1); continue; }
+    const x=q[i]; if(x.state!=='queued'||x.gen!==gen){ if(x.state==='queued') x.state=null; q.splice(i--,1); continue; }   // z innego folderu: można zakolejkować na nowo
     if(isHeavy(x)&&heavyRun>=MAXHEAVY) continue;
     q.splice(i,1); return x;
   }
@@ -2729,7 +2738,7 @@ let progT=0;
 function progress(){
   if(progT) return;
   progT=requestAnimationFrame(()=>{progT=0;
-    const total=items.length, done=items.filter(x=>x.state==='done'||x.state==='error').length;
+    const total=items.length, done=items.filter(x=>x.state==='done'||x.state==='error'||x.state==='dropped').length;
     $('#prog').textContent=total&&done<total?'Miniatury: '+done+' / '+total:'';
   });
 }
@@ -3665,8 +3674,15 @@ addEventListener('storage',e=>{
 if(DATA){
   const take=d=>{ S.stars=d&&d.stars&&typeof d.stars==='object'?d.stars:{}; S.basket=d&&Array.isArray(d.basket)?d.basket:[];
     dataLast=JSON.stringify({stars:S.stars,basket:S.basket}); bSet=new Set(S.basket.map(b=>bKey(b.path))); starsChanged(); basketChanged(); };
-  api.dataGet().then(d=>{ if(d) take(d); else { dataLast=''; dataSoon(); save(); } });
-  api.onDataChanged(take);
+  let tries=0;
+  const load=()=>api.dataGet().then(d=>{
+    if(d&&d.error){ if(++tries<=20) setTimeout(load,3000); else zoomTip('Nie udało się wczytać ocen i koszyka — zmiany nie są zapisywane'); return; }
+    if(d&&!d.missing){ dataReady=true; take(d); return; }
+    dataReady=true; dataLast=''; dataFlush(false); save();     // pierwszy raz: oceny i koszyk z localStorage trafiają do pliku
+  });
+  if(!PREP) load();
+  api.onDataChanged(d=>{ if(dataReady) take(d); });
+  addEventListener('beforeunload',()=>{ if(dataT) dataFlush(true); });
 }
 /* --- Koszyk w panelu bocznym: klik otwiera, upuszczenie plików z siatki dodaje --- */
 { const r=$('#tray');
@@ -3718,13 +3734,19 @@ document.addEventListener('dragover',e=>{ e.preventDefault(); if(hasFiles(e)) sh
 // na Windows daje ten sam klucz — wtedy tylko poprawiamy zapisaną ścieżkę, niczego nie kasując.
 function applyMoves(list){
   let ch=false, sc=false;
-  const under=(p,from)=>{ const k=bKey(p), f=bKey(from); if(k===f) return ''; const pre=f.replace(/[\\/]+$/,'')+bKey(api.sep); return k.startsWith(pre)?p.slice(from.replace(/[\\/]+$/,'').length):null; };
-  for(const r of list){ if(!r.to) continue;
-    for(const [k,o] of Object.entries(S.stars)){ if(!o||!o.r||!o.p) continue; const rest=under(o.p,r.from); if(rest==null) continue;
-      const np=r.to+rest, nk=bKey(np); S.stars[nk]={...o,p:np,n:api.basename(np)}; if(r.op==='move'&&nk!==k) delete S.stars[k]; sc=true; } }
+  // mapa „stara ścieżka → operacja”; dla każdej oceny sprawdzamy ją samą i jej foldery nadrzędne (kilka odczytów z mapy),
+  // zamiast porównywać każdą ocenę z każdym przeniesionym plikiem
+  const trim=p=>p.replace(/[\\/]+$/,''), sepK=bKey(api.sep), from=new Map();
+  for(const r of list) if(r.to) from.set(trim(bKey(r.from)),r);
+  if(!from.size) return;
+  const map=p=>{ let k=trim(bKey(p)); const r0=from.get(k); if(r0) return {r:r0,np:r0.to};
+    for(let i=k.lastIndexOf(sepK);i>0;i=k.lastIndexOf(sepK,i-1)){ const r=from.get(k.slice(0,i)); if(r) return {r,np:r.to+p.slice(trim(r.from).length)}; }
+    return null; };
+  const upd=[];
+  for(const [k,o] of Object.entries(S.stars)){ if(!o||!o.r||!o.p) continue; const m=map(o.p); if(m) upd.push([k,o,m]); }
+  for(const [k,o,{r,np}] of upd){ const nk=bKey(np); S.stars[nk]={...o,p:np,n:api.basename(np)}; if(r.op==='move'&&nk!==k) delete S.stars[k]; sc=true; }
   if(sc){ save(); renderStarsNav(); }
-  for(const r of list){ if(r.op!=='move'||!r.to) continue;
-    for(const b of S.basket){ const rest=under(b.path,r.from); if(rest==null) continue; bItems.delete(b.path); b.path=r.to+rest; b.name=api.basename(b.path); ch=true; } }
+  for(const b of S.basket){ const m=map(b.path); if(!m||m.r.op!=='move') continue; bItems.delete(b.path); b.path=m.np; b.name=api.basename(b.path); ch=true; }
   if(ch){ bSet=new Set(S.basket.map(b=>bKey(b.path))); save(); basketChanged(); }
 }
 async function doTransfer(paths,t,mode){

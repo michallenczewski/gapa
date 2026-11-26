@@ -1392,7 +1392,7 @@ function setTheme(t){S.theme=t==='auto'?null:t;save();applyTheme();themeBtnSync(
 function cycleTheme(){S.theme=document.documentElement.dataset.theme==='dark'?'light':'dark';save();applyTheme();themeBtnSync();}
 
 /* rozmiar miniatur: liczony od liczby kolumn — każdy krok to jedna miniatura więcej albo mniej w rzędzie,
-   a kafelki zawsze dokładnie wypełniają szerokość. Suwak, 1 i 2, Ctrl/⌘ + − +, kółko i szczypnięcie */
+   a kafelki zawsze dokładnie wypełniają szerokość. Suwak, − +, Ctrl/⌘ + − +, kółko i szczypnięcie */
 const gapK=()=>document.body.classList.contains('gridlines')?0:.15;     // odstęp między kolumnami = 15% kafelka
 function gridW(){ const g=document.getElementById('grid'); return g&&g.clientWidth?g.clientWidth:((main&&main.clientWidth)||1200)-48; }
 const tileFor=n=>Math.floor(gridW()/(n+gapK()*(n-1))-0.5);
@@ -1425,7 +1425,7 @@ function zoomTip(t){if(!tipEl){tipEl=document.createElement('div');tipEl.classNa
 document.documentElement.style.setProperty('--lic',S.lic+'px');
 setSize(S.size);
 $('#size').oninput=e=>{ if(S.mode==='list') setSize(+e.target.value/6); else { applyCols(nMax()-(+e.target.value),true); zAcc=S.size; } };
-$('#size').addEventListener('change',()=>{ if(!S.hints||S.hints.zoom) return; hint('zoom',$('#size'),KL.wheel+' nad miniaturami zmienia ich wielkość płynnie, bez sięgania po suwak. Klawisze <kbd>1</kbd> <kbd>2</kbd> robią to samo.'); });
+$('#size').addEventListener('change',()=>{ if(!S.hints||S.hints.zoom) return; hint('zoom',$('#size'),KL.wheel+' nad miniaturami zmienia ich wielkość płynnie, bez sięgania po suwak. Klawisze <kbd>−</kbd> <kbd>+</kbd> robią to samo.'); });
 function sliderFill(){const s=$('#size');s.style.setProperty('--p',((s.value-s.min)/(s.max-s.min)*100)+'%');}
 $('#size').addEventListener('input',sliderFill);
 // Ctrl/⌘ + kółko albo szczypnięcie: płynna zmiana wielkości miniatur (ząbek kółka ≈ 6%, gładzik jeszcze drobniej)
@@ -2278,7 +2278,7 @@ function render(){
   if(has&&(folderEmpty||((virt||lib)&&!view.length))){
     const p=document.createElement('p');p.className='ph';p.style.cssText='font-size:13px;margin:4px;text-transform:none;letter-spacing:0;grid-column:1/-1;max-width:640px;line-height:1.55';
     if(virt==='basket'&&!q&&!S.basket.length){ const d=document.createElement('div'); d.className='bempty'; d.innerHTML='<svg width="30" height="30" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M2.3 6.5h11.4l-1.25 6.2a1.3 1.3 0 0 1-1.27 1H4.82a1.3 1.3 0 0 1-1.27-1z"/><path d="M5.6 6.5 7.6 2.6M10.4 6.5 8.4 2.6"/></svg><b>Koszyk jest pusty</b><p>Zaznacz zdjęcia w dowolnym folderze i naciśnij B albo przeciągnij je na koszyk w panelu bocznym. Pliki zostają na swoich miejscach — koszyk tylko je zbiera, żeby potem przeciągnąć całość do Photoshopa albo Maxa albo skopiować do folderu projektu.</p>'; grid.appendChild(d); status(); return; }
-    p.textContent=virt==='stars'?(q?'Nic z oznaczonych nie pasuje do „'+q+'”.':S.minStar?'Żaden oznaczony plik nie ma tylu gwiazdek.':'Nie ma tu jeszcze plików z gwiazdkami. Zaznacz plik i naciśnij '+MOD+'1, '+MOD+'2 albo '+MOD+'3.')
+    p.textContent=virt==='stars'?(q?'Nic z oznaczonych nie pasuje do „'+q+'”.':S.minStar?'Żaden oznaczony plik nie ma tylu gwiazdek.':'Nie ma tu jeszcze plików z gwiazdkami. Zaznacz plik i naciśnij 1, 2 albo 3.')
       :!q&&S.minStar&&!virt&&!lib&&items.some(it=>on(it.type))?'Żaden plik w tym folderze nie ma oceny '+STARS(S.minStar)+(S.minStar<3?' lub wyższej':'')+'.'
       :virt==='basket'?'Nic w koszyku nie pasuje do „'+q+'”.'
       :lib?(!S.favs.length?'Biblioteka to foldery z Ulubionych. Dodaj gwiazdką foldery z obrazami, a Gapa zapamięta nazwy plików w nich i we wszystkich podfolderach.'
@@ -3007,7 +3007,7 @@ function openViewer(it){
   const files=view.filter(x=>x.kind==='file');
   vList=picked.size>1&&picked.has(it)?files.filter(x=>picked.has(x)):files;
   vi=Math.max(0,vList.indexOf(it)); viewer.classList.add('open'); chromeSync(); showV();
-  if(!S.hints.viewer) setTimeout(()=>{ if(viewer.classList.contains('open')){ const r=stage.getBoundingClientRect(); hint('viewer',{left:r.left,top:r.bottom-70,width:r.width,height:1,right:r.right,bottom:r.bottom-70},'<kbd>A</kbd> <kbd>D</kbd> albo strzałki — poprzedni i następny · <kbd>Z</kbd> — 100% · <kbd>1</kbd> <kbd>2</kbd> — oddal, przybliż · spacja wraca do siatki','above'); } },700);
+  if(!S.hints.viewer) setTimeout(()=>{ if(viewer.classList.contains('open')){ const r=stage.getBoundingClientRect(); hint('viewer',{left:r.left,top:r.bottom-70,width:r.width,height:1,right:r.right,bottom:r.bottom-70},'<kbd>A</kbd> <kbd>D</kbd> albo strzałki — poprzedni i następny · <kbd>Z</kbd> — 100% · <kbd>−</kbd> <kbd>+</kbd> — oddal, przybliż · <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> — gwiazdki · spacja wraca do siatki','above'); } },700);
 }
 // odtwarzacz w stylu macOS (AVKit): pływający, przydymiony panel na dole obrazu, chowa się podczas odtwarzania
 const IC_PLAY='<svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M6.5 4.2v13.6c0 .8.9 1.3 1.6.9l11-6.8c.6-.4.6-1.3 0-1.7l-11-6.8c-.7-.4-1.6.1-1.6.8z" fill="currentColor"/></svg>';
@@ -3351,7 +3351,7 @@ document.addEventListener('contextmenu',e=>{
   en.push('-');
   en.push({label:bLabel(many)+(n>1?' ('+n+')':''),key:'B',run:()=>basketToggle(many)});
   { const cur=many.every(x=>starOf(x.path)===starOf(many[0].path))?starOf(many[0].path):-1;
-    en.push('-',...[1,2,3].map(v=>({label:STARS(v),check:cur===v,key:MOD+v,run:()=>starSet(many,v)})));
+    en.push('-',...[1,2,3].map(v=>({label:STARS(v),check:cur===v,key:String(v),run:()=>starSet(many,v)})));
     if(many.some(x=>starOf(x.path))) en.push({label:'Bez oceny',run:()=>{ const r=many.filter(x=>starOf(x.path)); const by={}; for(const x of r)(by[starOf(x.path)]=by[starOf(x.path)]||[]).push(x); for(const v in by) starSet(by[v],+v); }}); }
   if(n===1&&api.rename&&virt!=='basket') en.push({label:'Zmień nazwę…',key:'F2',run:()=>renameItem(it)});
   if(virt==='basket'&&api.copyTo) en.push({label:'Kopiuj do folderu…'+(n>1?' ('+n+')':''),run:()=>copyBasketTo(many)});
@@ -3397,7 +3397,8 @@ document.addEventListener('keydown',e=>{
     else if(k==='Enter'){e.preventDefault();sheetOpen();}
     return;
   }
-  if(open_&&mod&&!e.shiftKey&&!e.altKey&&/^Digit[1-3]$/.test(e.code)){e.preventDefault();if(vList[vi])starSet([vList[vi]],+e.code[5]);return;}
+  // gwiazdki: same cyfry 1–3 (także z ⌘/Ctrl i z klawiatury numerycznej); ta sama drugi raz zdejmuje ocenę
+  if(open_&&!e.shiftKey&&!e.altKey&&/^(Digit|Numpad)[1-3]$/.test(e.code)){e.preventDefault();if(vList[vi])starSet([vList[vi]],+e.code.slice(-1));return;}
   if(open_){
     if(sheet&&k==='Backspace'){e.preventDefault();renderSheet();return;}
     if(k===' '&&PEEK){e.preventDefault();api.peekClose();}      // spacja w podglądzie z Eksploratora zamyka od razu, jak na Macu
@@ -3406,14 +3407,12 @@ document.addEventListener('keydown',e=>{
     else if(vEl&&vEl.pageBy&&(k==='ArrowUp'||k==='PageUp')){e.preventDefault();vEl.pageBy(-1);}
     else if(k==='ArrowRight'||k==='ArrowDown'||e.code==='KeyD'){e.preventDefault();stepV(1);}
     else if(k==='ArrowLeft'||k==='ArrowUp'||e.code==='KeyA'){e.preventDefault();stepV(-1);}
-    else if(vEl&&vEl.zoomBy&&!e.altKey&&((k==='+'||k==='=')||e.code==='Digit2')){e.preventDefault();vEl.zoomBy(1.25);}
-    else if(vEl&&vEl.zoomBy&&!e.altKey&&(k==='-'||e.code==='Digit1')){e.preventDefault();vEl.zoomBy(1/1.25);}
+    else if(vEl&&vEl.zoomBy&&!e.altKey&&(k==='+'||k==='=')){e.preventDefault();vEl.zoomBy(1.25);}
+    else if(vEl&&vEl.zoomBy&&!e.altKey&&k==='-'){e.preventDefault();vEl.zoomBy(1/1.25);}
     else if(vEl&&vEl.zoomBy&&(k==='0'||k==='z')){e.preventDefault();vEl.zoomBy(0);}
     else if(mod&&(k==='='||k==='+')&&isImg()){e.preventDefault();zoomTo((zm||fitScale())*1.25,null,null,true);}
     else if(mod&&k==='-'&&isImg()){e.preventDefault();zoomTo((zm||fitScale())/1.25,null,null,true);}
     else if(mod&&k==='0'){e.preventDefault();zoomFit(true);}
-    else if(e.code==='Digit2'&&isImg()){zoomTo((zm||fitScale())*1.25,null,null,true);}
-    else if(e.code==='Digit1'&&isImg()){zoomTo((zm||fitScale())/1.25,null,null,true);}
     else if((k==='+'||k==='=')&&isImg()){zoomTo((zm||fitScale())*1.25,null,null,true);}
     else if(k==='-'&&isImg()){zoomTo((zm||fitScale())/1.25,null,null,true);}
     else if(k==='0'){zoomFit(true);}
@@ -3465,8 +3464,8 @@ document.addEventListener('keydown',e=>{
     else if(api.trash&&(!isMac||k==='Backspace')) trashSel(s);
     return;
   }
-  // ocena: ⌘1–3 / Ctrl+1–3, ta sama drugi raz zdejmuje (same cyfry zmieniają wielkość miniatur)
-  if(mod&&!e.shiftKey&&!e.altKey&&/^Digit[1-3]$/.test(e.code)){e.preventDefault();const f=pickedFiles();if(f.length)starSet(f,+e.code[5]);else zoomTip('Zaznacz pliki, którym chcesz dać gwiazdki');return;}
+  // ocena: same cyfry 1–3 (także z ⌘/Ctrl i z klawiatury numerycznej), ta sama drugi raz zdejmuje
+  if(!e.shiftKey&&!e.altKey&&/^(Digit|Numpad)[1-3]$/.test(e.code)){e.preventDefault();const f=pickedFiles();if(f.length)starSet(f,+e.code.slice(-1));else zoomTip('Zaznacz pliki, którym chcesz dać gwiazdki');return;}
   if(mod||e.altKey) return;
   const c=cols(), how=e.shiftKey?'range':undefined;
   const mv=d=>{e.preventDefault();select(sel<0?0:sel+d,how);};
@@ -3485,7 +3484,7 @@ document.addEventListener('keydown',e=>{
   else if(k==='+'||k==='='){zstep(1);}
   else if(k==='-'){zstep(-1);}
   // lewa ręka (prawa zostaje na myszce): A D poprzedni/następny, Q w górę, E edycja, R pokaż w Finderze, F szukaj,
-  // X panel boczny (⇧X informacje), C kopiuj obraz (⇧C ścieżki), V ikony/lista, 1 2 mniejsze/większe
+  // X panel boczny (⇧X informacje), C kopiuj obraz (⇧C ścieżki), V ikony/lista, 1 2 3 gwiazdki
   else if(e.code==='KeyA'){mv(-1);}
   else if(e.code==='KeyD'){mv(1);}
   else if(e.code==='KeyQ'){e.preventDefault();goUp();}
@@ -3497,8 +3496,6 @@ document.addEventListener('keydown',e=>{
   else if(e.code==='KeyC'&&e.shiftKey){const s=[...picked];copyText(s.length?s.map(x=>x.path).join('\n'):curPath||'');}
   else if(e.code==='KeyC'){const it=view[sel];if(it&&it.kind==='file')copyImage(it);}
   else if(e.code==='KeyV'){setMode(S.mode==='list'?'icons':'list');}
-  else if(e.code==='Digit1'){zstep(-1);}
-  else if(e.code==='Digit2'){zstep(1);}
   else if(k==='t'){cycleTheme();}
   else if(k==='g'&&!mod){setGridLines(!S.gridlines);zoomTip(S.gridlines?'Siatka włączona':'Siatka wyłączona');}
   else if(k==='s'&&!mod){S.sound=!(S.sound!==false);save();if(S.sound)SFX('on');zoomTip(S.sound?'Dźwięki włączone':'Dźwięki wyciszone');}
@@ -3659,12 +3656,12 @@ function renderKeys(){
   const K=(k,t,c)=>'<div class="k'+(c?' '+c:'')+'"><i>'+k+'</i><small>'+t+'</small></div>';
   const row=(m,ks)=>'<div class="kr" style="margin-left:'+m+'px">'+ks.join('')+'</div>';
   $('#keys').innerHTML='<div class="kc"><div class="kh"><b>Skróty klawiszowe</b><span>? otwiera tę ściągę · Esc zamyka</span></div>'
-    +row(0,[K('1','mniejsze'),K('2','większe')])
+    +row(0,[K('1','★'),K('2','★★'),K('3','★★★')])
     +row(20,[K('Q','wyżej'),K('W','wszystko w środku'),K('E',editorName||'edytor'),K('R',isMac?'Finder':'Eksplorator'),K('T','jasny / ciemny')])
     +row(34,[K('A','poprzedni'),K('S','dźwięki'),K('D','następny'),K('F','szukaj<em>⇧ biblioteka</em>'),K('G','linie siatki')])
     +row(54,[K('Z','100% / dopasuj'),K('X','panel<em>⇧ info</em>'),K('C','kopiuj obraz<em>⇧ ścieżki</em>'),K('V','ikony / lista'),K('B','koszyk<em>⇧ otwórz</em>')])
     +row(0,[K('Tab','ukryj interfejs','w'),K('spacja','podgląd / wróć do siatki','sp')])
-    +'<div class="km">'+[[KL.mod+'N','nowe okno'],[KL.back+' '+KL.fwd,'wstecz / dalej'],[KL.wheel,'wielkość miniatur'],[KL.del,'przenieś do Kosza'],[KL.mod+'L','wpisz ścieżkę'],[KL.mod+'D','dodaj do ulubionych'],[KL.mod+'1 2 3','gwiazdki (drugi raz zdejmuje)'],[KL.mod+',','ustawienia']]
+    +'<div class="km">'+[[KL.mod+'N','nowe okno'],[KL.back+' '+KL.fwd,'wstecz / dalej'],[KL.wheel,'wielkość miniatur'],[KL.del,'przenieś do Kosza'],[KL.mod+'L','wpisz ścieżkę'],[KL.mod+'D','dodaj do ulubionych'],['− +','mniejsze / większe miniatury'],['1 2 3','gwiazdki (drugi raz zdejmuje)'],[KL.mod+',','ustawienia']]
       .map(([k,t])=>'<div><kbd>'+k+'</kbd>'+t+'</div>').join('')+'</div></div>';
 }
 function toggleKeys(v){ const o=$('#keys'); v=v===undefined?!o.classList.contains('on'):v; if(v){ renderKeys(); hideHint(); } o.classList.toggle('on',v); if(v&&!S.seenKeys){ S.seenKeys=true; save(); } }

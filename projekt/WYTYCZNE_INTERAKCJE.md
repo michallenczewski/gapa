@@ -26,7 +26,7 @@ Do samego przenikania kolorów i przezroczystości — zwykłe `ease` / `ease-ou
 | włączenie przełącznika (wypełnienie od środka) | 0,42 s | sprężyna |
 | „tak” — reakcja na udaną akcję | 0,5–0,55 s | sprężyna + ease-out |
 | „nie” — potrząśnięcie | 0,38 s | ease-out |
-| podpowiedź pod przyciskiem | 0,12 s przezroczystość, 0,2 s przesunięcie | ease / sprężyna |
+| podpowiedź pod przyciskiem | pojawia się po 1,5 s; 0,12 s przezroczystość, 0,2 s przesunięcie | ease / sprężyna |
 
 ## 2. Przycisk z ikoną: najechanie i wciśnięcie
 
@@ -151,7 +151,27 @@ Opcje zależne od narzędzia (np. kolory i grubości mazaka) chowają się, gdy 
 i **wysuwają się** obok niego (max-width 0 → szerokość, 0,42 s sprężyna, przezroczystość 0,2 s).
 Wybrana opcja ma ten sam wygląd co wskaźnik narzędzi (`--toolon` + delikatny cień).
 
-## 8. Mniej ruchu, gdy system o to prosi
+## 8. Ustawienia: jeden przycisk w prawym górnym rogu
+
+We wszystkich programach z rodziny ustawienia są w **tym samym miejscu i pod tą samą ikoną**:
+
+- Jeden przycisk ustawień z ikoną dwóch suwaków, **ostatni na prawym końcu górnego paska**
+  (na Windows tuż przed systemowymi przyciskami okna). Żadnych przycisków ustawień na dole bocznego paska.
+- Ikona suwaków (15 px, kreska 1,3 px):
+  `<path d="M2.5 5.5h11M2.5 10.5h11"/><circle cx="6" cy="5.5" r="1.8" fill="var(--bg)"/><circle cx="10.5" cy="10.5" r="1.8" fill="var(--bg)"/>`
+- Menu otwiera się **pod przyciskiem, wyrównane do jego prawej krawędzi**. Zawsze w tej kolejności,
+  grupy oddzielone kreską:
+  1. **Jasny motyw / Ciemny motyw / Motyw jak w systemie** (zaznaczony ✓; „jak w systemie” to domyślny
+     i reaguje na zmianę motywu w systemie). Osobnego przycisku motywu nie ma.
+  2. **Skróty klawiszowe** (skrót `?`). Osobnego przycisku ściągi nie ma; klawisz `?` działa zawsze.
+  3. Opcje danego programu (np. w Blacie: kółko myszy, aktywowanie po najechaniu).
+  4. Na dole, przygaszony, **numer wersji** („Blat 0.2.5”), a pod nim **Sprawdź aktualizacje** albo
+     **Zainstaluj wersję X**, gdy jest nowsza.
+- Dół bocznego paska (jeśli program go ma) jest tylko na treść, np. ścieżkę do folderu.
+- W bardzo wąskim oknie przycisk ustawień zostaje widoczny do końca; wcześniej chowają się nazwa
+  dokumentu i przyciski z własnym skrótem klawiszowym.
+
+## 9. Mniej ruchu, gdy system o to prosi
 
 ```css
 @media (prefers-reduced-motion: reduce) {
@@ -159,9 +179,10 @@ Wybrana opcja ma ten sam wygląd co wskaźnik narzędzi (`--toolon` + delikatny 
 }
 ```
 
-## 9. Sprawdzenie przed commitem
+## 10. Sprawdzenie przed commitem
 
 - Najechanie, wciśnięcie, włączenie i podpowiedź sprawdzone w **jasnym i ciemnym** motywie.
 - Wskaźnik wybranego narzędzia wyraźnie widoczny w obu motywach (różnica jasności z kapsułą co najmniej ~12/255).
 - Podpowiedzi: każda ma nazwę i skrót zgodny z systemem; nie wraca systemowy dymek.
+- Przycisk ustawień jest ostatni w górnym pasku, menu ma motyw, skróty, wersję i aktualizacje w opisanej kolejności.
 - Płynność bez zmian (animujemy tylko `transform` i `opacity`, poza krótkimi przejściami koloru).

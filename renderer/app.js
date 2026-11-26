@@ -1951,9 +1951,11 @@ async function copyImage(it){
     zoomTip('Skopiowano obraz');
   }catch(e){zoomTip('Nie udało się skopiować');}
 }
-function viewerMenu(){
-  const it=vList[vi]; if(!it) return; const r=$('#vmore').getBoundingClientRect();
-  showMenu(r.right-230,r.bottom+6,null,[
+// menu podglądu: spod przycisku „…” albo, prawym przyciskiem, w miejscu kursora (x, y)
+function viewerMenu(x,y){
+  const it=vList[vi]; if(!it) return; const r=$('#vmore').getBoundingClientRect(), at=x!=null;
+  const st=starOf(it.path);
+  showMenu(at?x:r.right-230,at?y:r.bottom+6,at?it.name:null,[
     {label:'Pokaż w '+FINDER,key:'R',run:()=>api.showInFolder(it.path)},
     {label:'Otwórz w '+edIn(),key:'E',run:()=>openInEditor([it.path])},
     {label:zm?'Dopasuj do okna':'Rozmiar oryginalny (100%)',key:'Z',run:()=>{zm?zoomFit(true):zoomTo(1,null,null,true);}},
@@ -1961,6 +1963,7 @@ function viewerMenu(){
     {label:'Kopiuj ścieżkę',key:'P',run:()=>copyText(it.path)},
     ...(api.writeNew&&canJpg(it)?[{label:'Zapisz jako JPG',run:()=>toJpg([it])}]:[]),
     {label:bLabel([it]),key:'B',run:()=>basketToggle([it])},
+    '-',...[1,2,3].map(v=>({label:STARS(v),check:st===v,key:String(v),run:()=>starSet([it],v)})),
     ...(api.trash&&virt!=='basket'?['-',{label:'Przenieś do Kosza',key:isMac?'⌘⌫':'Delete',run:()=>trashItems([it])}]:[]),
     '-',{label:'Ukryj interfejs',box:document.body.classList.contains('bare'),key:'Tab',run:toggleBare},
     {label:document.documentElement.dataset.theme==='dark'?'Tryb jasny':'Tryb ciemny',key:'T',run:cycleTheme}]);
@@ -2018,7 +2021,9 @@ function showMenu(x,y,title,entries,up){
 async function copyText(t){ await navigator.clipboard.writeText(t).catch(()=>{}); zoomTip('Skopiowano'); }
 const MOD=isMac?'⌘':'Ctrl+';
 document.addEventListener('contextmenu',e=>{
-  if(viewer.classList.contains('open')||!e.target.closest('#main')) return;
+  // w podglądzie (także po powiększeniu) prawy przycisk otwiera menu podglądu w miejscu kursora
+  if(viewer.classList.contains('open')){ if(e.target.closest('#viewer')&&!e.target.closest('input,textarea')){ e.preventDefault(); viewerMenu(e.clientX,e.clientY); } return; }
+  if(!e.target.closest('#main')) return;
   e.preventDefault();
   const t=e.target.closest('[data-i]');
   if(!t){

@@ -46,6 +46,24 @@ header{grid-column:1/4;display:flex;align-items:center;gap:6px;padding:0 12px;mi
 @keyframes tak{0%{background:var(--hover)}100%{background:transparent}}
 .ib.nie{animation:nie .38s ease-out}
 @keyframes nie{20%{transform:translateX(-3px)}45%{transform:translateX(3px)}70%{transform:translateX(-2px)}}
+/* przyciski z napisem, pozycje panelu, menu i ustawień: ugięcie przy wciśnięciu, „tak” po kliknięciu */
+.tb,.act,.nav li,.ctx button,#setp .acts button,#setp .s2 .seg2 button,#setp .s2 .sw-r{transition:background-color .15s,color .15s,opacity .15s,transform .35s var(--spring)}
+.tb:active,.act:active,#setp .acts button:active,#setp .s2 .seg2 button:active{transform:scale(.95)}
+.nav li:active,.ctx button:active,#setp .s2 .sw-r:active{transform:scale(.98)}
+.tb.tak,.act.tak,.nav li.tak,#setp .acts button.tak{animation:tak .55s ease-out}
+.act.primary.tak{animation:takp .45s ease-out}
+@keyframes takp{0%{opacity:.6}100%{opacity:1}}
+.ctx button.hit{animation:mhit .13s steps(1) 1;background:var(--hover)}
+@keyframes mhit{0%{background:var(--hover)}50%{background:transparent}100%{background:var(--hover)}}
+/* przełącznik w ustawieniach: włączenie wypełnia się od środka, gałka przeskakuje ze sprężyną */
+#setp .s2 .sw-r.hit .sw.on{animation:wypelnij .42s var(--spring)}
+#setp .s2 .sw-r.hit .sw.on::after{animation:galkaOn .42s var(--spring)}
+#setp .s2 .sw-r.hit .sw:not(.on)::after{animation:galkaOff .32s var(--spring)}
+@keyframes wypelnij{from{transform:scale(.6);opacity:.3}to{transform:none;opacity:1}}
+@keyframes galkaOn{from{left:2px}to{left:16px}}
+@keyframes galkaOff{from{left:16px}to{left:2px}}
+#setp .s2 .seg2 button.on.hit{animation:segon .42s var(--spring)}
+@keyframes segon{from{transform:scale(.88)}to{transform:none}}
 #btip{position:fixed;z-index:95;display:flex;gap:7px;align-items:center;left:-999px;top:0;background:var(--text);color:var(--bg);font-size:11.5px;line-height:1;padding:5px 8px;border-radius:6px;opacity:0;transform:translateY(-2px);transition:opacity .12s,transform .2s var(--spring);pointer-events:none;white-space:nowrap;max-width:360px}
 #btip.on{opacity:.94;transform:none}
 #btip span{overflow:hidden;text-overflow:ellipsis}
@@ -136,7 +154,7 @@ body.noside #hspace{display:none}
 #qScope:hover{color:var(--text)}
 #qScope[aria-pressed=true]{background:var(--pill);box-shadow:var(--pillsh);color:var(--text)}
 .sep{width:1px;height:16px;background:var(--line);margin:0 6px;flex:none}
-.tb{height:30px;padding:0 8px;border-radius:7px;color:var(--text2);display:flex;align-items:center;gap:6px;white-space:nowrap;flex:none;transition:background-color .15s,color .15s}
+.tb{height:30px;padding:0 8px;border-radius:7px;color:var(--text2);display:flex;align-items:center;gap:6px;white-space:nowrap;flex:none;transition:background-color .15s,color .15s,transform .35s var(--spring)}
 .tb:hover,.tb.open{background:var(--hover);color:var(--text)}
 .tb.on{color:var(--text);background:var(--soft)}
 .tb svg{color:var(--muted)}
@@ -1624,7 +1642,9 @@ function renderSettings(){
     +G.join('')
     +'<div class="about">'+esc(ver)+' · Michał Lenczewski, 2026 · licencja MIT · <a href="https://github.com/michallenczewski/gapa" target="_blank" rel="noopener">github.com/michallenczewski/gapa</a></div></div>';
   o.querySelector('.x').onclick=closeSettings;
-  for(const b of o.querySelectorAll('[data-a]')) b.onclick=async e=>{ e.stopPropagation(); await acts[+b.dataset.a](); renderSettings(); };
+  // po zmianie przez użytkownika przełącznik i segment dostają krótki ruch (wytyczne interakcji, punkty 1 i 4)
+  for(const b of o.querySelectorAll('[data-a]')) b.onclick=async e=>{ e.stopPropagation(); const i=b.dataset.a; await acts[+i](); renderSettings();
+    const nb=$('#setp').querySelector('[data-a="'+i+'"]'); if(nb) nb.classList.add('hit'); };
 }
 $('#setp').addEventListener('click',e=>{ if(e.target.id==='setp') closeSettings(); });
 addEventListener('keydown',e=>{ if(setOpen&&e.key==='Escape'){ e.preventDefault(); e.stopImmediatePropagation(); closeSettings(); } },true);
@@ -3277,7 +3297,7 @@ const ctx=$('#ctx');
 function hideMenu(){ctx.hidden=true;ctx.dataset.of='';setTimeout(syncSearch,0);document.querySelectorAll('.tb.open').forEach(b=>b.classList.remove('open'));}
 const CHECK='<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m2.5 6.2 2.3 2.3 4.7-5"/></svg>';
 function showMenu(x,y,title,entries,up){
-  ctx.textContent=''; delete ctx.dataset.of;
+  ctx.textContent=''; delete ctx.dataset.of; ctx._tok=(ctx._tok||0)+1;
   if(title){const h=document.createElement('div');h.className='ch';h.textContent=title;ctx.appendChild(h);}
   const anyCheck=entries.some(e=>e&&e.check!==undefined);
   for(const en of entries){
@@ -3290,7 +3310,10 @@ function showMenu(x,y,title,entries,up){
     if(anyCheck){const c=document.createElement('span');c.className='c';if(en.check)c.innerHTML=CHECK;b.appendChild(c);}
     const keys=en.keys||(en.key?String(en.key).replace(/^(⌘|Ctrl\+)(.)$/,'$1 $2').split(' '):null);
     if(keys){const k=document.createElement('span');k.className='keys';for(const t of keys){const kb=document.createElement('kbd');kb.textContent=t.replace(/\+$/,'');k.appendChild(kb);}b.appendChild(k);}
-    b.onclick=e=>{e.stopPropagation(); if(!en.keep) hideMenu(); en.run();};
+    // wybór w menu: pozycja krótko mignie, a przycisk, który otworzył menu, potwierdza wybór („tak”)
+    b.onclick=e=>{e.stopPropagation(); if(en.keep){ en.run(); return; }
+      const tok=ctx._tok, trig=document.querySelector('.tb.open'); b.classList.add('hit'); en.run();
+      setTimeout(()=>{ if(ctx._tok===tok&&!ctx.hidden) hideMenu(); btnAnim(trig,'tak'); },130);};
     ctx.appendChild(b);
   }
   ctx.hidden=false;
@@ -3842,6 +3865,8 @@ if(PREP) prepLoop();
 if(!PREP) loadRoots().then(async()=>{ if(PEEK){ if(!api.peekMulti) peekOpen(api.peekPath); return; } const sp=api.startPath; if(sp&&await api.exists(sp)) go(sp); else if(S.last&&await api.exists(S.last)) go(S.last); else { render(); syncTree(); } });
 
 /* --- Język interakcji (projekt/WYTYCZNE_INTERAKCJE.md): reakcje przycisków, wskaźnik w segmentach, podpowiedzi --- */
+// reakcja na kliknięcie w panelu informacji, panelu bocznym i przyciskach w ustawieniach
+document.addEventListener('click',e=>{ const el=e.target.closest&&e.target.closest('.act,.nav li:not(.none),#setp .acts button'); if(el) btnAnim(el,'tak'); },true);
 function btnAnim(b,cls){ if(!b) return; b.classList.remove('tak','nie'); void b.offsetWidth; b.classList.add(cls); }
 // segmenty: jeden wskaźnik przeskakuje pod wciśnięty przycisk (zamiast osobnego tła na każdym przycisku)
 function segSync(seg,instant){

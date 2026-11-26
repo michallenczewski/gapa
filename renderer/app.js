@@ -328,7 +328,9 @@ function renderSettings(){
     +G.join('')
     +'<div class="about">'+esc(ver)+' · Michał Lenczewski, 2026 · licencja MIT · <a href="https://github.com/michallenczewski/gapa" target="_blank" rel="noopener">github.com/michallenczewski/gapa</a></div></div>';
   o.querySelector('.x').onclick=closeSettings;
-  for(const b of o.querySelectorAll('[data-a]')) b.onclick=async e=>{ e.stopPropagation(); await acts[+b.dataset.a](); renderSettings(); };
+  // po zmianie przez użytkownika przełącznik i segment dostają krótki ruch (wytyczne interakcji, punkty 1 i 4)
+  for(const b of o.querySelectorAll('[data-a]')) b.onclick=async e=>{ e.stopPropagation(); const i=b.dataset.a; await acts[+i](); renderSettings();
+    const nb=$('#setp').querySelector('[data-a="'+i+'"]'); if(nb) nb.classList.add('hit'); };
 }
 $('#setp').addEventListener('click',e=>{ if(e.target.id==='setp') closeSettings(); });
 addEventListener('keydown',e=>{ if(setOpen&&e.key==='Escape'){ e.preventDefault(); e.stopImmediatePropagation(); closeSettings(); } },true);
@@ -1981,7 +1983,7 @@ const ctx=$('#ctx');
 function hideMenu(){ctx.hidden=true;ctx.dataset.of='';setTimeout(syncSearch,0);document.querySelectorAll('.tb.open').forEach(b=>b.classList.remove('open'));}
 const CHECK='<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m2.5 6.2 2.3 2.3 4.7-5"/></svg>';
 function showMenu(x,y,title,entries,up){
-  ctx.textContent=''; delete ctx.dataset.of;
+  ctx.textContent=''; delete ctx.dataset.of; ctx._tok=(ctx._tok||0)+1;
   if(title){const h=document.createElement('div');h.className='ch';h.textContent=title;ctx.appendChild(h);}
   const anyCheck=entries.some(e=>e&&e.check!==undefined);
   for(const en of entries){
@@ -1994,7 +1996,10 @@ function showMenu(x,y,title,entries,up){
     if(anyCheck){const c=document.createElement('span');c.className='c';if(en.check)c.innerHTML=CHECK;b.appendChild(c);}
     const keys=en.keys||(en.key?String(en.key).replace(/^(⌘|Ctrl\+)(.)$/,'$1 $2').split(' '):null);
     if(keys){const k=document.createElement('span');k.className='keys';for(const t of keys){const kb=document.createElement('kbd');kb.textContent=t.replace(/\+$/,'');k.appendChild(kb);}b.appendChild(k);}
-    b.onclick=e=>{e.stopPropagation(); if(!en.keep) hideMenu(); en.run();};
+    // wybór w menu: pozycja krótko mignie, a przycisk, który otworzył menu, potwierdza wybór („tak”)
+    b.onclick=e=>{e.stopPropagation(); if(en.keep){ en.run(); return; }
+      const tok=ctx._tok, trig=document.querySelector('.tb.open'); b.classList.add('hit'); en.run();
+      setTimeout(()=>{ if(ctx._tok===tok&&!ctx.hidden) hideMenu(); btnAnim(trig,'tak'); },130);};
     ctx.appendChild(b);
   }
   ctx.hidden=false;
@@ -2546,6 +2551,8 @@ if(PREP) prepLoop();
 if(!PREP) loadRoots().then(async()=>{ if(PEEK){ if(!api.peekMulti) peekOpen(api.peekPath); return; } const sp=api.startPath; if(sp&&await api.exists(sp)) go(sp); else if(S.last&&await api.exists(S.last)) go(S.last); else { render(); syncTree(); } });
 
 /* --- Język interakcji (projekt/WYTYCZNE_INTERAKCJE.md): reakcje przycisków, wskaźnik w segmentach, podpowiedzi --- */
+// reakcja na kliknięcie w panelu informacji, panelu bocznym i przyciskach w ustawieniach
+document.addEventListener('click',e=>{ const el=e.target.closest&&e.target.closest('.act,.nav li:not(.none),#setp .acts button'); if(el) btnAnim(el,'tak'); },true);
 function btnAnim(b,cls){ if(!b) return; b.classList.remove('tak','nie'); void b.offsetWidth; b.classList.add(cls); }
 // segmenty: jeden wskaźnik przeskakuje pod wciśnięty przycisk (zamiast osobnego tła na każdym przycisku)
 function segSync(seg,instant){

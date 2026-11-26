@@ -1,21 +1,23 @@
 name: Buduj instalatory
 
 # Instalatory budują się TYLKO na wyraźne polecenie (Actions → Buduj instalatory → Run workflow),
-# a nie przy każdym wypchnięciu. W prywatnym repo minuty na macOS liczą się ok. 10×, na Windows 2×,
-# więc jedno wydanie zużywa ok. 50 minut z miesięcznej puli 2000.
+# a nie przy każdym wypchnięciu. Repozytorium jest publiczne, więc standardowe maszyny GitHuba nic nie kosztują.
 on:
   workflow_dispatch:
     inputs:
       os:
         description: 'Dla jakiego systemu (win / mac / oba)'
+        type: choice
+        options: [oba, win, mac]
         default: 'oba'
 
 permissions:
-  contents: write
+  contents: read
 
+# osobna kolejka dla każdego systemu: dobudowanie drugiego systemu nie anuluje trwającej budowy pierwszego
 concurrency:
-  group: build-${{ github.ref }}
-  cancel-in-progress: true
+  group: build-${{ github.ref }}-${{ inputs.os }}
+  cancel-in-progress: false
 
 jobs:
   check:
@@ -39,6 +41,8 @@ jobs:
 
   build:
     needs: check
+    permissions:
+      contents: write                 # tylko to zadanie dokłada pliki do wydania
     if: needs.check.outputs.build == 'true'
     strategy:
       fail-fast: false
@@ -51,7 +55,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install
+      # dokładnie te wersje zależności, które są w package-lock.json (powtarzalne budowanie)
+      - run: npm ci
       # pomocnik „spacja w Eksploratorze” (helper/GapaSpacja.cs) — kompilator C# jest w każdym Windows
       - name: Zbuduj pomocnika Windows
         if: runner.os == 'Windows'

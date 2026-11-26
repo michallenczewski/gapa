@@ -1,6 +1,6 @@
 # Architektura Gapy i kiedy zmienić platformę
 
-Stan na listopad 2026, wersja 0.7.0.
+Stan na listopad 2026, wersja 0.10.
 
 ## Jak Gapa jest zbudowana
 
@@ -14,7 +14,9 @@ Gapa to aplikacja Electron, czyli przeglądarka Chromium zamknięta w oknie prog
 - **`preload.js`** to wąski most: interfejs dostaje tylko te funkcje, które są tam wystawione.
 - **Interfejs (`renderer/`)** to HTML, CSS i JavaScript, bez frameworka. Formaty spoza przeglądarki (PSD/PSB, TIFF, TGA, EXR, HDR, RAW, podglądy w DWG, SKP, MAX, 3DM i PLN) dekoduje własny kod w Web Workerach (`renderer/decoders.js`). PDF rysuje pdf.js.
 - **Wersja w przeglądarce (`web/`)** służy tylko do testowania interfejsu. Most `web/web-api.js` zastępuje tam Electron.
-- **Wydania** buduje GitHub Actions, kiedy w `package.json` zmieni się numer wersji.
+- **Wydania** buduje GitHub Actions, tylko po ręcznym uruchomieniu workflow „Buduj instalatory”; zależności w wersjach z `package-lock.json` (`npm ci`).
+- **Oceny i koszyk** leżą w pliku `oceny-i-koszyk.json` w danych programu (proces główny zapisuje go i rozsyła zmiany do wszystkich okien); pozostałe ustawienia interfejsu są w localStorage.
+- **Miniatury w oknie** mają limit ok. 400 MB (100 mln pikseli): najdawniej oglądane spoza widoku są zwalniane i wracają z pamięci na dysku.
 
 ## Pamięć
 

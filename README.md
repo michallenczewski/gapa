@@ -25,9 +25,9 @@ Jak program jest zbudowany i kiedy warto zmienić platformę (Tauri, moduły w R
 
 Gotowe instalatory są w zakładce **Releases** tego repozytorium:
 
-- Windows: `Podglad-…-win-x64.exe`
-- Mac z procesorem Apple (M1–M4): `Podglad-…-mac-arm64.dmg`
-- Mac z procesorem Intel: `Podglad-…-mac-x64.dmg`
+- Windows: `Gapa-…-win-x64.exe`
+- Mac z procesorem Apple (M1–M4): `Gapa-…-mac-arm64.dmg`
+- Mac z procesorem Intel: `Gapa-…-mac-x64.dmg`
 
 ### Pierwsze uruchomienie
 
@@ -51,7 +51,7 @@ Gapa zostaje wtedy w tle z ikoną w zasobniku obok zegara (menu: otwórz, włąc
 
 **Koszyk** zbiera pliki z różnych folderów podczas przeglądania: zaznacz i naciśnij B, wybierz „Dodaj do koszyka” z menu albo przeciągnij miniatury na „Koszyk” w panelu bocznym. Pliki zostają na swoich miejscach. W koszyku przycisk „Przeciągnij wszystkie” przenosi całość naraz do Photoshopa, 3ds Maxa albo Findera, a „Kopiuj do folderu…” kopiuje pliki do folderu projektu (bez nadpisywania). Delete / ⌘⌫ w koszyku tylko wyjmuje plik z koszyka. Przeciągnięcie z koszyka do folderu (także w drugim oknie Gapy) zawsze kopiuje, nigdy nie przenosi. Filtr typów działa też w koszyku. Koszyk pamięta się między uruchomieniami.
 
-**Gwiazdki** oceniają pliki w skali od jednej do trzech: zaznacz plik (albo kilka) i naciśnij 1, 2 lub 3 (z klawiatury numerycznej też); ta sama ocena naciśnięta drugi raz ją zdejmuje. Działa to także w podglądzie i z menu pod prawym przyciskiem. Gwiazdki widać tylko na ocenionych plikach. Filtr pozwala pokazać pliki z co najmniej jedną, dwiema albo trzema gwiazdkami, sortowanie „Ocena” stawia najlepsze na początku, a „Oznaczone gwiazdkami” w panelu bocznym zbiera ocenione pliki ze wszystkich folderów. Gapa trzyma oceny u siebie i nie zapisuje niczego w plikach; ocena idzie za plikiem, gdy przenosisz go, kopiujesz albo zmieniasz mu nazwę w Gapie. Oceny z Adobe Bridge zapisane w pliku .xmp obok obrazu Gapa wczytuje sama (1–2 → ★, 3 → ★★, 4–5 → ★★★).
+**Gwiazdki** oceniają pliki w skali od jednej do trzech: zaznacz plik (albo kilka) i naciśnij 1, 2 lub 3 (z klawiatury numerycznej też); ta sama ocena naciśnięta drugi raz ją zdejmuje. Działa to także w podglądzie i z menu pod prawym przyciskiem. Gwiazdki widać tylko na ocenionych plikach. Filtr pozwala pokazać pliki z co najmniej jedną, dwiema albo trzema gwiazdkami, sortowanie „Ocena” stawia najlepsze na początku, a „Oznaczone gwiazdkami” w panelu bocznym zbiera ocenione pliki ze wszystkich folderów. Gapa trzyma oceny u siebie (w pliku oceny-i-koszyk.json w danych programu, także te nadane w podglądzie spacją) i nie zapisuje niczego w Twoich plikach; ocena idzie za plikiem — i za całym folderem — gdy przenosisz go, kopiujesz albo zmieniasz mu nazwę w Gapie. Oceny z Adobe Bridge zapisane w pliku .xmp obok obrazu Gapa wczytuje sama (1–2 → ★, 3 → ★★, 4–5 → ★★★).
 
 **Biblioteka** to wszystkie foldery z Ulubionych razem z podfolderami. Gapa zapamiętuje nazwy plików w nich (indeks w pliku `biblioteka.json` obok ustawień) i odświeża go w tle po zmianie ulubionych, przy powrocie do okna, jeśli minęło 10 minut, albo na żądanie („Odśwież indeks”). Zakres wyszukiwania wybiera się przyciskiem w polu szukania: tu, podfoldery albo biblioteka. Słowa w zapytaniu muszą wystąpić wszystkie — w nazwie pliku albo folderu, więc „cegły czerwone” znajdzie pliki z folderu „Cegły/czerwone”.
 
@@ -93,13 +93,12 @@ Najczęstsze skróty leżą pod lewą ręką, żeby prawa mogła zostać na mysz
 | Tab | ukryj / pokaż interfejs |
 | Ctrl+spacja (Windows) | pełny ekran 100%: bez paska zadań, paska okna i interfejsu; wyjście tym samym skrótem albo Esc. Na Macu Gapa korzysta z systemowego pełnego ekranu (zielony przycisk, ⌃⌘F) |
 
-W podglądzie (także po powiększeniu) prawy przycisk myszy otwiera w miejscu kursora to samo menu co „…” w pasku, razem z gwiazdkami. W pasku podglądu obok „…” jest ikona pełnego ekranu. Gdy interfejs jest schowany albo okno jest na pełnym ekranie, po poruszeniu myszą w prawym górnym rogu pojawia się mała pastylka z dwoma przyciskami: pokaż interfejs oraz wejdź na pełny ekran albo z niego wyjdź. Po dwóch sekundach bez ruchu pastylka znika razem z kursorem.
 | Esc | zamknij podgląd, wyczyść wyszukiwanie |
 | ⌘/Ctrl + N | nowe okno w tym samym folderze (Koszyk i Ulubione są wspólne) |
 | ⌘[ ⌘] (Mac) / Alt+← Alt+→ (Windows) | wstecz / dalej po odwiedzonych miejscach (też strzałki < > i boczne przyciski myszy) |
 | ⌘/Ctrl + kółko, szczypnięcie | płynna zmiana wielkości miniatur; w podglądzie przybliżanie wokół kursora |
 | ⌘⌫ (Mac) / Delete (Windows) | przenieś do Kosza (foldery po potwierdzeniu); w koszyku tylko wyjmuje z koszyka |
-| ⌘C / ⌘X, potem ⌘V (Ctrl na Windows) | kopiuj albo wytnij zaznaczone pliki i foldery, wklej w bieżącym folderze — także w innym oknie Gapy, w Eksploratorze i w Finderze (i z nich do Gapy) |
+| ⌘C / ⌘X, potem ⌘V (Ctrl na Windows) | kopiuj albo wytnij zaznaczone pliki i foldery, wklej w bieżącym folderze, także w innym oknie Gapy. Skopiowane pliki wkleisz też w Eksploratorze i w Finderze (i z nich do Gapy); wycięcie przenosi tylko przy wklejeniu w Gapie — w Eksploratorze i Finderze wklei się kopia |
 | F2 | zmień nazwę (Enter zapisuje, Esc anuluje) |
 | ⌘Enter / Ctrl+Enter | otwórz w domyślnym programie |
 | ⌘Z / Ctrl+Z | cofnij ostatnie przeniesienie, kopiowanie albo zmianę nazwy |
@@ -111,7 +110,9 @@ W podglądzie (także po powiększeniu) prawy przycisk myszy otwiera w miejscu k
 | ↑ ↓ (PDF) | poprzednia / następna strona |
 | + − albo Ctrl/⌘ + kółko (PDF) | powiększ / pomniejsz strony; 0 wraca do dopasowania |
 
-Pliki można przeciągać z Podglądu prosto do Photoshopa, 3ds Maxa czy Findera/Eksploratora.
+W podglądzie (także po powiększeniu) prawy przycisk myszy otwiera w miejscu kursora to samo menu co „…” w pasku, razem z gwiazdkami. W pasku podglądu obok „…” jest ikona pełnego ekranu. Gdy interfejs jest schowany albo okno jest na pełnym ekranie, po poruszeniu myszą w prawym górnym rogu pojawia się mała pastylka z dwoma przyciskami: pokaż interfejs oraz wejdź na pełny ekran albo z niego wyjdź. Po dwóch sekundach bez ruchu pastylka znika razem z kursorem.
+
+Pliki można przeciągać z Gapy prosto do Photoshopa, 3ds Maxa czy Findera/Eksploratora.
 
 ## Wersja w przeglądarce (do testowania interfejsu)
 
@@ -121,6 +122,6 @@ Plik powstaje z kodu programu: `node scripts/build-web.js`.
 
 ## Nowa wersja programu
 
-Instalatory budują się tylko przy nowej wersji: wystarczy podbić `version` w `package.json` i wypchnąć zmiany. GitHub Actions zbuduje wtedy instalatory na oba systemy (ok. 10 minut) i opublikuje wydanie `v<wersja>`. Push bez zmiany wersji nic nie buduje. Budowanie można też uruchomić ręcznie: *Actions → Buduj instalatory → Run workflow*.
+Instalatory budują się tylko na wyraźne polecenie: podbij `version` w `package.json`, wypchnij zmiany i uruchom *Actions → Buduj instalatory → Run workflow* (system: oba, win albo mac). GitHub Actions zbuduje instalatory (ok. 10 minut) i opublikuje wydanie `v<wersja>`. Samo wypchnięcie niczego nie buduje. Zależności budują się w wersjach zapisanych w `package-lock.json`; po zmianie zależności w `package.json` uruchom *Actions → Odśwież package-lock.json*.
 
 Uruchomienie z kodu: `npm install`, potem `npm start`. Miniatury PDF rysuje pdf.js (zależność `pdfjs-dist`, dołączana przy budowaniu).

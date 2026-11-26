@@ -152,6 +152,9 @@ static class GapaSpacja
     // Każde inne zdarzenie (wszystkie kombinacje z modyfikatorami, klawisze F, cyfry, skróty plików .lnk, PowerToys,
     // zdarzenia wstrzyknięte przez inne programy) idzie od razu dalej przez CallNextHookEx, bez żadnych wywołań systemowych.
     static long spaceAt = 0;                        // kiedy widzieliśmy ostatnie zdarzenie przechwyconej spacji
+    static readonly System.Diagnostics.Stopwatch clk = System.Diagnostics.Stopwatch.StartNew();   // zegar bez przepełnienia (TickCount zawija się po 25 dniach)
+    static long typedAt = -100000;                  // kiedy ostatnio wpisano literę albo cyfrę (szukanie po nazwie w liście), ms zegara clk
+    static long busySince = 0;                      // od kiedy wątek roboczy czyta zaznaczenie (ms zegara clk; 0 = nie czyta)
     static IntPtr Hook(int nCode, IntPtr wParam, IntPtr lParam)
     {
         if (nCode < 0) return CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);
@@ -161,7 +164,12 @@ static class GapaSpacja
             uint vk = k.vkCode;
             bool space = vk == VK_SPACE, esc = vk == VK_ESCAPE, nav = IsNavKey(vk) || vk == 0x0D || vk == 0x08;
             if ((k.flags & LLKHF_INJECTED) != 0 || !(space || esc || nav))
+            {
+                // litera albo cyfra: tylko zapamiętujemy czas (bez wywołań systemowych) — spacja zaraz po niej to część
+                // wpisywanej nazwy w szukaniu po liście Eksploratora („moj plik”), a nie podgląd
+                if ((k.flags & LLKHF_INJECTED) == 0 && ((vk >= 0x30 && vk <= 0x5A) || (vk >= 0x60 && vk <= 0x69))) typedAt = clk.ElapsedMilliseconds;
                 return CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);
+            }
 
             int msg = wParam.ToInt32();
             bool down = msg == 0x100 || msg == 0x104;
@@ -179,6 +187,11 @@ static class GapaSpacja
                     if (up) spaceHeld = false;
                     return (IntPtr)1;
                 }
+                // spacja przechodzi do Eksploratora, gdy: chwilę wcześniej wpisywano litery (szukanie po nazwie)
+                // albo poprzednie czytanie zaznaczenia trwa ponad 300 ms (Eksplorator wisi, np. na dysku sieciowym)
+                long busy = busySince, t = clk.ElapsedMilliseconds;
+                if (t - typedAt < 1000 || (busy != 0 && t - busy > 300))
+                    return CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);
                 if (down && !AnyModifier() && ExplorerFront(out fg, out list) && list)
                 {
                     spaceHeld = true; spaceAt = now;
@@ -238,7 +251,9 @@ static class GapaSpacja
                 {
                     if (previewOpen) { Send("{\"t\":\"space\",\"path\":null}"); continue; }
                     var sel = new System.Collections.Generic.List<string>();
-                    string p = Selection(fg, sel);
+                    string p;
+                    busySince = clk.ElapsedMilliseconds + 1;
+                    try { p = Selection(fg, sel); } finally { busySince = 0; }
                     sel.RemoveAll(x => !File.Exists(x));
                     if ((p == null || !File.Exists(p)) && sel.Count > 0) p = sel[0];
                     if (p == null || !File.Exists(p)) { Reinject(); continue; }   // folder albo nic — spacja wraca do Eksploratora
@@ -252,7 +267,9 @@ static class GapaSpacja
                 else if (parts[0] == "sel")
                 {
                     Thread.Sleep(30);                                              // Eksplorator musi zdążyć przesunąć zaznaczenie
-                    string p = Selection(fg, null);
+                    string p;
+                    busySince = clk.ElapsedMilliseconds + 1;
+                    try { p = Selection(fg, null); } finally { busySince = 0; }
                     if (p != null && p != lastSel && File.Exists(p)) { lastSel = p; Send("{\"t\":\"sel\",\"path\":" + Json(p) + "}"); }
                 }
             }

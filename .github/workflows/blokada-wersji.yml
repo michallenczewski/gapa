@@ -1,0 +1,27 @@
+name: Odśwież package-lock.json
+
+# Uruchamiane ręcznie, gdy zmieniają się zależności w package.json (albo gdy brakuje package-lock.json).
+# Wylicza package-lock.json na czystej maszynie i zapisuje go w repozytorium; niczego nie buduje — instalatory robi build.yml.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --package-lock-only --ignore-scripts
+      - name: Zapisz package-lock.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git diff --cached --quiet && { echo "Bez zmian"; exit 0; }
+          git commit -m "package-lock.json: wersje zależności zapisane przez GitHub Actions"
+          git push

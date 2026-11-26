@@ -28,7 +28,14 @@ const S=Object.assign({types:{},sort:'name',dir:1,size:180,lic:28,mode:'icons',n
 // okno podglądu ze spacji w Eksploratorze (Windows): korzysta z ustawień, ale niczego w nich nie zmienia
 const PEEK=!!api.peekPath;
 const PREP=!!api.prepMode;      // niewidoczne okno, które przygotowuje miniatury biblioteki
-const save=()=>{ if(PEEK||PREP) return; try{localStorage.setItem('podglad',JSON.stringify(S));}catch(e){} };
+// Oceny i koszyk zapisujemy w osobnym pliku (api.dataSet) — także z okna podglądu spacją; reszta ustawień
+// zostaje w localStorage. W wersji przeglądarkowej (bez api.dataGet) wszystko idzie do localStorage jak dawniej.
+const DATA=!!api.dataGet;
+let dataLast='', dataT=0, saveWarned=false;
+function dataSoon(){ if(!DATA||PREP) return; clearTimeout(dataT); dataT=setTimeout(()=>{ const d={stars:S.stars||{},basket:S.basket||[]}, j=JSON.stringify(d); if(j===dataLast) return; dataLast=j; api.dataSet(d); },300); }
+const save=()=>{ dataSoon(); if(PEEK||PREP) return;
+  try{localStorage.setItem('podglad',JSON.stringify(DATA?{...S,stars:undefined,basket:undefined}:S));}
+  catch(e){ if(!saveWarned){ saveWarned=true; setTimeout(()=>zoomTip('Nie udało się zapisać ustawień programu'),0); } } };
 const press=(b,v)=>b.setAttribute('aria-pressed',v?'true':'false');
 
 function applyTheme(){
@@ -112,8 +119,10 @@ function applyCols(n,tip){
   document.documentElement.style.setProperty('--tile-w',t+'px'); sliderFill();
   if(ch&&typeof hdAll==='function') hdAll();
   if(tip&&ch) zoomTip(n+' '+plural(n,'kolumna','kolumny','kolumn'));
-  save();
+  // zapis tylko przy prawdziwej zmianie i z opóźnieniem — przy przeciąganiu krawędzi okna nie zapisujemy co klatkę
+  if(ch){ clearTimeout(colsSaveT); colsSaveT=setTimeout(save,500); }
 }
+let colsSaveT=0;
 function setSize(v,tip){
   if(S.mode==='list'){S.lic=Math.round(Math.max(16,Math.min(96,v)));document.documentElement.style.setProperty('--lic',S.lic+'px');const sl=$('#size');sl.min=96;sl.max=576;sl.value=S.lic*6;sliderFill();if(tip)zoomTip(S.lic+' px');save();return;}
   zAcc=Math.max(70,Math.min(tileFor(2)*1.1,v));
@@ -218,7 +227,7 @@ $('#q').addEventListener('focus',()=>$('.search').classList.remove('min'));
 $('#q').addEventListener('blur',()=>setTimeout(syncSearch,160));
 $('#qScope').addEventListener('mousedown',e=>e.preventDefault());
 let qt=0;
-$('#q').oninput=()=>{ if(api.libSearch&&S.qIn!=='lib'&&S.favs.length&&!S.hints.lib) hint('lib',$('#q'),'<kbd>⇧F</kbd> szuka od razu we wszystkich ulubionych folderach i ich podfolderach.');$('#qClear').hidden=!$('#q').value;clearTimeout(qt);qt=setTimeout(()=>applyView(keep()),120);};
+$('#q').oninput=()=>{ if(api.libSearch&&S.qIn!=='lib'&&S.favs.length&&!S.hints.lib) hint('lib',$('#q'),'<kbd>⇧F</kbd> szuka od razu we wszystkich ulubionych folderach i ich podfolderach.');$('#qClear').hidden=!$('#q').value;clearTimeout(qt);qt=setTimeout(()=>applyView(keep()),view.length>4000?320:120);};
 $('#qClear').addEventListener('mousedown',e=>e.preventDefault());
 $('#qClear').onclick=()=>{$('#q').value='';$('#qClear').hidden=true;applyView(keep());$('#q').focus();};
 // zakres wyszukiwania: ten folder, z podfolderami albo cała biblioteka (wszystkie ulubione foldery, z indeksu)
@@ -261,7 +270,7 @@ let newThumbs=0; setInterval(()=>{if(newThumbs){newThumbs=0;cacheInfo();}},4000)
 async function cacheClear(){
   if(!(await askConfirm('Wyczyścić miniatury?','Zapamiętane miniatury zostaną usunięte i policzą się od nowa przy następnym otwarciu folderów.','Wyczyść'))) return;
   await api.cacheClear();
-  for(const it of items){it.thumb=null;it.state=null;it._tp=null;}
+  thReset(); for(const it of items){it.thumb=null;it.state=null;it._tp=null;it._thc=null;it._thpx=0;}
   for(const d of dirs) resetDir(d);
   render(); prefetch(); cacheInfo();
 }
@@ -632,6 +641,7 @@ async function scan(keepScroll,selectPath){
   prefetch();
 }
 api.onDirChanged(d=>{
+  treeStale([d,api.dirname(d)]);
   if(viewer.classList.contains('open')) return;
   if(samePath(d,curPath)) scan(true);
   else if(curPath&&samePath(api.dirname(d),curPath)){ const dd=dirs.find(x=>samePath(x.path,d)); if(dd){ resetDir(dd); if(dd.tile&&dd.tile.isConnected) loadDir(dd,true); } }
@@ -757,7 +767,13 @@ function crumbsFit(){
   // foldery, dopóki pasek się przepełnia albo ścieżka przekracza swoją największą szerokość
   const pb=$('#pathbox'), hd=pb.parentElement, over=()=>hd.scrollWidth>hd.clientWidth+1||c.scrollWidth>c.clientWidth+1;
   let hide=0; c.classList.add('measure'); pb.style.flexShrink='0'; crumbsDraw(0);
-  while(over()&&hide<n-1){ hide++; crumbsDraw(hide); }
+  if(over()&&n>1){
+    // jeden pomiar: ile pikseli brakuje i ile zajmuje każdy folder razem z ukośnikiem — od razu liczymy, ile schować
+    const miss=Math.max(hd.scrollWidth-hd.clientWidth,c.scrollWidth-c.clientWidth), ch=[...c.children], more=24;
+    let got=-more; while(hide<n-1&&got<miss){ const a=ch[hide*2], sep=ch[hide*2+1]; got+=(a?a.getBoundingClientRect().width:0)+(sep?sep.getBoundingClientRect().width:0); hide++; }
+    crumbsDraw(hide);
+    while(over()&&hide<n-1){ hide++; crumbsDraw(hide); }   // zapas na wypadek zaokrągleń
+  }
   pb.style.flexShrink=''; c.classList.remove('measure');
 }
 { let crT=0; const refit=()=>{ cancelAnimationFrame(crT); crT=requestAnimationFrame(()=>{ if(crumbList.length) crumbsFit(); }); }; new ResizeObserver(refit).observe($('#pathbox').parentElement); addEventListener('resize',refit); }
@@ -768,13 +784,41 @@ function crumbsFit(){
 let roots=[], treeCur=null, treeFollow=true;
 async function loadRoots(){ roots=(await api.roots()).map(r=>({path:r.path,name:r.name,drive:r.drive,kids:null,open:false,up:null})); renderTree(); }
 async function kidsOf(n){
-  if(n.kids) return n.kids;
-  const r=await api.list(n.path,['__brak__']);
-  n.kids=r.dirs.sort((a,b)=>coll.compare(a.name,b.name)).map(d=>({path:d.path,name:d.name,kids:null,open:false,up:n}));
-  return n.kids;
+  if(n.kids&&!n.stale) return n.kids;
+  // jedno wczytanie naraz dla węzła; przy odświeżaniu zachowujemy rozwinięcia podfolderów, które dalej istnieją
+  if(!n._kp) n._kp=(async()=>{
+    try{
+      const r=await api.list(n.path,['__brak__']), old=new Map((n.kids||[]).map(k=>[bKey(k.path),k]));
+      n.kids=r.dirs.sort((a,b)=>coll.compare(a.name,b.name)).map(d=>{ const o=old.get(bKey(d.path)); if(o){ o.name=d.name; o.path=d.path; return o; } return {path:d.path,name:d.name,kids:null,open:false,up:n}; });
+    }catch(e){ n.kids=n.kids||[]; }
+    n.stale=false; n._kp=null; return n.kids;
+  })();
+  return n._kp;
 }
+// drzewo nadąża za zmianami na dysku: folder, który się zmienił (dir-changed), i jego rodzic wczytają się na nowo
+function treeNode(p){
+  const find=list=>{ for(const n of list||[]){ if(samePath(n.path,p)) return n; if(n.kids&&under(p,n.path)){ const f=find(n.kids); if(f) return f; } } return null; };
+  return find(roots);
+}
+async function treeStale(paths){
+  let any=false;
+  for(const p of paths){ const n=p&&treeNode(p); if(n&&n.kids){ n.stale=true; any=true; if(n.open) await kidsOf(n); } }
+  if(any) renderTree();
+}
+// dyski i miejsca: odświeżane po powrocie do okna (np. podłączony dysk USB), bez gubienia rozwinięć
+let rootsT=0;
+async function rootsRefresh(){
+  if(Date.now()-rootsT<5000) return; rootsT=Date.now();
+  let fresh; try{ fresh=await api.roots(); }catch(e){ return; }
+  const old=new Map(roots.map(r=>[bKey(r.path),r]));
+  const next=fresh.map(r=>old.get(bKey(r.path))||{path:r.path,name:r.name,drive:r.drive,kids:null,open:false,up:null});
+  if(next.length!==roots.length||next.some((r,i)=>r!==roots[i])){ roots=next; renderTree(); }
+}
+addEventListener('focus',()=>{ if(!PEEK&&!PREP) rootsRefresh(); });
 const under=(p,root)=>samePath(p,root)||(isMac?p:p.toLowerCase()).startsWith((isMac?root:root.toLowerCase()).replace(/[\\/]?$/,SEP));
+let treeTok=0;
 async function syncTree(){
+  const tok=++treeTok;          // przy szybkim chodzeniu po folderach liczy się tylko ostatnie wywołanie
   treeCur=null;
   if(curPath){
     let best=null; for(const r of roots) if(under(curPath,r.path)&&(!best||r.path.length>best.path.length)) best=r;
@@ -782,8 +826,8 @@ async function syncTree(){
       const rest=curPath.slice(best.path.replace(/[\\/]$/,'').length).split(/[\\/]+/).filter(Boolean);
       if(treeFollow){
         let n=best; n.open=true;
-        for(const seg of rest){const ks=await kidsOf(n);const m=ks.find(k=>samePath(k.name,seg));if(!m){n=null;break;}m.open=true;n=m;}
-        treeCur=n; if(n) await kidsOf(n);
+        for(const seg of rest){const ks=await kidsOf(n); if(tok!==treeTok) return; const m=ks.find(k=>samePath(k.name,seg));if(!m){n=null;break;}m.open=true;n=m;}
+        if(n) await kidsOf(n); if(tok!==treeTok) return; treeCur=n;
       } else {
         // bez rozwijania: zaznacz folder w drzewie tylko wtedy, gdy już jest widoczny
         let n=best; for(const seg of rest){ if(!n.open||!n.kids){n=null;break;} const m=n.kids.find(k=>samePath(k.name,seg)); if(!m){n=null;break;} n=m; }
@@ -917,8 +961,32 @@ function basketView(q,keepPath){
     k=>({label:crumbsOf(k).filter(x=>x.name).slice(-2).map(x=>x.name).join(' / '),target:k}));
   finishView(keepPath);
 }
+/* --- limit pamięci miniatur w oknie (sygnał 1 z ARCHITEKTURA.md): miniatury liczymy w pikselach;
+       po przekroczeniu ok. 400 MB (100 mln pikseli) zwalniamy najdawniej oglądane, które są poza widokiem.
+       Wracają same z pamięci na dysku (pgf://c), gdy kafelek znów wjedzie w widok. --- */
+const thLRU=new Map(); let thPx=0; const TH_PX=100e6;
+function thTrack(it){
+  if(!it||it.kind!=='file'||!it.thumb) return;
+  if(it._thc!==it.thumb){ thPx-=it._thpx||0; it._thc=it.thumb; it._thpx=it.thumb.width*it.thumb.height; thPx+=it._thpx; }
+  thLRU.delete(it); thLRU.set(it,1); thTrim();
+}
+function thTouch(it){ if(thLRU.has(it)){ thLRU.delete(it); thLRU.set(it,1); } }
+function thTrim(){
+  if(thPx<=TH_PX) return;
+  for(const it of [...thLRU.keys()]){
+    if(thPx<=TH_PX*0.85) break;
+    if((it.visible&&it.tile&&it.tile.isConnected)||it===vList[vi]||it.state==='loading') continue;
+    thDrop(it);
+  }
+}
+function thDrop(it){
+  thLRU.delete(it); thPx-=it._thpx||0; it._thpx=0; it._thc=null;
+  const c=it.thumb; it.thumb=null; it._tp=null; if(it.state==='done') it.state=null;
+  if(c){ if(c.parentNode) c.remove(); c.width=c.height=0; }   // zwalnia pamięć płótna od razu
+}
+function thReset(){ thLRU.clear(); thPx=0; }
 const io=new IntersectionObserver(es=>{for(const e of es){const it=e.target._it;if(!it)continue;it.visible=e.isIntersecting;
-  if(!it.visible)continue; if(it.kind==='dir')loadDir(it,true); else { enqueue(it,true); if(it.thumb) wantHD(it); } }},{root:main,rootMargin:'600px'});
+  if(!it.visible)continue; thTouch(it); if(it.kind==='dir')loadDir(it,true); else { enqueue(it,true); if(it.thumb) wantHD(it); } }},{root:main,rootMargin:'600px'});
 
 /* --- ostre miniatury dla dużych kafelków: zwykła miniatura ma 480 px; gdy komórka jest większa,
        widoczne pliki dostają wersję w rozdzielczości komórki (do 2048 px), trzymaną tylko w pamięci --- */
@@ -1318,7 +1386,7 @@ function pump(){
     const it=take(); if(!it) break;
     running++; it.state='loading'; const hv=isHeavy(it); if(hv) heavyRun++;
     thumbOf(it).then(()=>{it.state='done';},e=>{it.state='error';it.err=e&&e.message||String(e);})
-      .finally(()=>{running--; if(hv) heavyRun--;
+      .finally(()=>{running--; if(hv) heavyRun--; if(it.thumb) thTrack(it);
         if(it.tile&&it.tile.isConnected) paint(it);
         if(it.cb){const c=it.cb;it.cb=null;c();}
         if(view[sel]===it) status();
@@ -1839,6 +1907,9 @@ function afterShow(it,v,tok){
       if(tok!==vTok||n<2) return;
       const nx=vList[((vi+d)%n+n)%n]; if(nx===it) continue;
       if(!nx.thumb) enqueue(nx,true);
+      // PDF-ów i filmów nie wczytujemy z wyprzedzeniem: cały dokument w pdf.js albo wideo zajmują dużo pamięci,
+      // a nie trafiają do pamięci podglądu (media) — wystarczy im miniatura
+      if(nx.type==='pdf'||nx.type==='vid') continue;
       try{await fullOf(nx);}catch(e){}
     }
   },60);
@@ -2063,7 +2134,7 @@ document.addEventListener('contextmenu',e=>{
     }
     if(!curPath) return;
     showMenu(e.clientX,e.clientY,api.basename(curPath)||curPath,[
-      {label:'Odśwież',key:'R',run:()=>scan(true)},
+      {label:'Odśwież',key:'⇧R',run:()=>scan(true)},
       ...(clipLoad()&&api.transfer?[{label:(fileClip.cut?'Wklej (przenieś) ':'Wklej ')+fileClip.paths.length,key:MOD+'V',run:async()=>{ const c=fileClip, r=await doTransfer(c.paths,{path:curPath,name:api.basename(curPath)||curPath},c.cut?'move':'copy'); if(c.cut&&r&&r.done.length) clipSave(null); }},'-']:[]),
       {label:'Kopiuj ścieżkę folderu',run:()=>copyText(curPath)},
       {label:'Przejdź do ścieżki…',key:MOD+'L',run:editPath},
@@ -2258,12 +2329,19 @@ function newWindow(){ if(!api.newWindow){ zoomTip('Nowe okna są w programie, ni
 addEventListener('storage',e=>{
   if(e.key!=='podglad'||!e.newValue) return;
   let o; try{ o=JSON.parse(e.newValue); }catch(err){ return; }
-  const favCh=JSON.stringify(o.favs||[])!==JSON.stringify(S.favs), bCh=JSON.stringify(o.basket||[])!==JSON.stringify(S.basket);
+  const favCh=JSON.stringify(o.favs||[])!==JSON.stringify(S.favs), bCh=!DATA&&JSON.stringify(o.basket||[])!==JSON.stringify(S.basket);
   if(favCh){ S.favs=o.favs||[]; renderSide(); for(const t of document.querySelectorAll('.tile.dir'))t._sync&&t._sync(); }
-  if(JSON.stringify(o.stars||{})!==JSON.stringify(S.stars)){ S.stars=o.stars||{}; starsChanged(); }
-  if(bCh){ S.basket=o.basket||[]; bSet=new Set(S.basket.map(b=>bKey(b.path))); basketChanged(); }
+  if(!DATA&&JSON.stringify(o.stars||{})!==JSON.stringify(S.stars)){ S.stars=o.stars||{}; starsChanged(); }
+  if(!DATA&&bCh){ S.basket=o.basket||[]; bSet=new Set(S.basket.map(b=>bKey(b.path))); basketChanged(); }
 });
 
+// oceny i koszyk z pliku: wczytanie przy starcie (pierwszy raz — przeniesienie z localStorage) i zmiany z innych okien
+if(DATA){
+  const take=d=>{ S.stars=d&&d.stars&&typeof d.stars==='object'?d.stars:{}; S.basket=d&&Array.isArray(d.basket)?d.basket:[];
+    dataLast=JSON.stringify({stars:S.stars,basket:S.basket}); bSet=new Set(S.basket.map(b=>bKey(b.path))); starsChanged(); basketChanged(); };
+  api.dataGet().then(d=>{ if(d) take(d); else { dataLast=''; dataSoon(); save(); } });
+  api.onDataChanged(take);
+}
 /* --- Koszyk w panelu bocznym: klik otwiera, upuszczenie plików z siatki dodaje --- */
 { const r=$('#tray');
   r.onclick=openBasket;
@@ -2309,12 +2387,18 @@ function showDrop(t,e){
 document.addEventListener('dragenter',e=>{ if(!hasFiles(e)) return; if(dragN++===0) learnDrag(); if(!curPath&&!draggingOut) document.body.dataset.drop='1'; });
 document.addEventListener('dragleave',e=>{ if(!hasFiles(e)) return; if(--dragN<=0){ dragN=0; delete document.body.dataset.drop; clearDrop(); } });
 document.addEventListener('dragover',e=>{ e.preventDefault(); if(hasFiles(e)) showDrop(dropTarget(e),e); });
-function applyMoves(list){        // przeniesione pliki w koszyku dostają nowe ścieżki; ocena idzie za plikiem (także do kopii)
+// przeniesione albo przemianowane pliki i foldery: oceny i koszyk idą za nimi (oceny także do kopii).
+// Folder przenosi wszystko, co leży w środku (po początku ścieżki). Zmiana samej wielkości liter
+// na Windows daje ten sam klucz — wtedy tylko poprawiamy zapisaną ścieżkę, niczego nie kasując.
+function applyMoves(list){
   let ch=false, sc=false;
-  for(const r of list){ const o=S.stars[bKey(r.from)]; if(!o||!o.r) continue;
-    S.stars[bKey(r.to)]={...o,p:r.to,n:api.basename(r.to)}; if(r.op==='move') delete S.stars[bKey(r.from)]; sc=true; }
+  const under=(p,from)=>{ const k=bKey(p), f=bKey(from); if(k===f) return ''; const pre=f.replace(/[\\/]+$/,'')+bKey(api.sep); return k.startsWith(pre)?p.slice(from.replace(/[\\/]+$/,'').length):null; };
+  for(const r of list){ if(!r.to) continue;
+    for(const [k,o] of Object.entries(S.stars)){ if(!o||!o.r||!o.p) continue; const rest=under(o.p,r.from); if(rest==null) continue;
+      const np=r.to+rest, nk=bKey(np); S.stars[nk]={...o,p:np,n:api.basename(np)}; if(r.op==='move'&&nk!==k) delete S.stars[k]; sc=true; } }
   if(sc){ save(); renderStarsNav(); }
-  for(const r of list){ if(r.op!=='move'||!inBasket(r.from)) continue; const b=S.basket.find(x=>samePath(x.path,r.from)); if(b){ bItems.delete(b.path); b.path=r.to; b.name=api.basename(r.to); ch=true; } }
+  for(const r of list){ if(r.op!=='move'||!r.to) continue;
+    for(const b of S.basket){ const rest=under(b.path,r.from); if(rest==null) continue; bItems.delete(b.path); b.path=r.to+rest; b.name=api.basename(b.path); ch=true; } }
   if(ch){ bSet=new Set(S.basket.map(b=>bKey(b.path))); save(); basketChanged(); }
 }
 async function doTransfer(paths,t,mode){
@@ -2375,6 +2459,7 @@ function showTip(el){
 }
 document.addEventListener('mouseover',e=>{
   const el=e.target.closest('[title],[data-tip]'); if(!el||el===tipFor) return;
+  if(el.matches(BTSEL)) return;   // przyciski mają własną podpowiedź z wytycznych (po 1,5 s) — bez drugiego dymka
   if(el.hasAttribute('title')){ el.dataset.tip=el.getAttribute('title'); el.removeAttribute('title'); }
   hideTip(); if(!el.dataset.tip) return;
   const nm=el.matches('.nav li,.tile,tr')?el.querySelector('.nm'):null;

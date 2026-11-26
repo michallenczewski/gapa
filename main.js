@@ -59,6 +59,34 @@ function saveSettings() {
   try { fs.writeFileSync(settingsFile(), JSON.stringify(settings, null, 2)); } catch (e) {}
 }
 
+/* ---------- oceny i koszyk: osobny plik zamiast pamięci przeglądarki ---------- */
+// W localStorage był limit ok. 5 MB na wszystkie ustawienia — przy dużym archiwum ocen z Bridge'a zapis
+// przestawał działać po cichu. Plik nie ma tego limitu, zapisuje go też okno podglądu spacją,
+// a zmiany z jednego okna trafiają od razu do pozostałych (zdarzenie data-changed).
+const dataFile = () => path.join(app.getPath('userData'), 'oceny-i-koszyk.json');
+let userData = null, dataDirty = false, dataTimer = null, dataWriting = false;
+function dataLoad() { try { const d = JSON.parse(fs.readFileSync(dataFile(), 'utf8')); userData = { stars: d.stars || {}, basket: Array.isArray(d.basket) ? d.basket : [] }; } catch (e) { userData = null; } }
+async function dataWrite() {
+  clearTimeout(dataTimer); dataTimer = null;
+  if (!dataDirty || !userData) return;
+  if (dataWriting) { dataTimer = setTimeout(dataWrite, 500); return; }
+  dataDirty = false; dataWriting = true;
+  try { const tmp = dataFile() + '.tmp'; await fsp.writeFile(tmp, JSON.stringify(userData)); await fsp.rename(tmp, dataFile()); } catch (e) { dataDirty = true; }
+  dataWriting = false;
+}
+function dataWriteNow() {
+  if (!dataDirty || !userData) return; dataDirty = false;
+  try { const tmp = dataFile() + '.tmp2'; fs.writeFileSync(tmp, JSON.stringify(userData)); fs.renameSync(tmp, dataFile()); } catch (e) {}
+}
+ipcMain.handle('data-get', () => userData);
+ipcMain.handle('data-set', (e, d) => {
+  if (!d || typeof d !== 'object') return false;
+  userData = { stars: d.stars && typeof d.stars === 'object' && !Array.isArray(d.stars) ? d.stars : {}, basket: Array.isArray(d.basket) ? d.basket : [] };
+  for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed() && w.webContents !== e.sender) w.webContents.send('data-changed', userData);
+  dataDirty = true; if (!dataTimer) dataTimer = setTimeout(dataWrite, 400);
+  return true;
+});
+
 /* ---------- pamięć miniatur na dysku ---------- */
 // Każda miniatura to plik .webp w podfolderze cacheDir/ab/, nazwany skrótem ścieżki, rozmiaru i daty zmiany.
 // Indeks (wymiary, format, czas użycia, rozmiar) trzymamy w jednym pliku indeks.json.
@@ -84,16 +112,32 @@ function openCache(dir) {
   }
   cacheBytes = Object.values(idx.items).reduce((a, e) => a + (e.s || 0), 0);
 }
-function saveIndexSoon() {
+// Zapis indeksu: w trakcie pracy asynchronicznie (proces główny nie staje przy dużym indeksie),
+// synchronicznie tylko przy zamykaniu i czyszczeniu. Sam odczyt miniatury nie wymusza zapisu (patrz thumb-get).
+let idxWriting = false;
+function saveIndexSoon(ms) {
   idxDirty = true;
   if (idxTimer) return;
-  idxTimer = setTimeout(saveIndexNow, 3000);
+  idxTimer = setTimeout(saveIndexAsync, ms || 3000);
+}
+async function saveIndexAsync() {
+  clearTimeout(idxTimer); idxTimer = null;
+  if (!idxDirty) return;
+  if (idxWriting) { saveIndexSoon(); return; }
+  idxDirty = false; idxWriting = true;
+  try {
+    const tmp = path.join(cacheDir, 'indeks.json.tmp');
+    await fsp.writeFile(tmp, JSON.stringify(idx));
+    await fsp.rename(tmp, path.join(cacheDir, 'indeks.json'));
+  } catch (e) { idxDirty = true; }
+  idxWriting = false;
 }
 function saveIndexNow() {
   clearTimeout(idxTimer); idxTimer = null;
-  if (!idxDirty) return; idxDirty = false;
+  if (!idxDirty || idxWriting) { if (idxWriting) idxDirty = true; if (!idxDirty) return; }
+  idxDirty = false;
   try {
-    const tmp = path.join(cacheDir, 'indeks.json.tmp');
+    const tmp = path.join(cacheDir, 'indeks.json.tmp2');
     fs.writeFileSync(tmp, JSON.stringify(idx));
     fs.renameSync(tmp, path.join(cacheDir, 'indeks.json'));
   } catch (e) {}
@@ -145,7 +189,9 @@ async function cacheCarry(from, to, copy) {
 ipcMain.handle('thumb-get', (e, k) => {
   const h = keyHash(k), it = idx.items[h];
   if (!it) return null;
-  it.t = Date.now(); saveIndexSoon();
+  // czas użycia służy tylko do sprzątania najstarszych miniatur: odświeżamy go najwyżej raz na godzinę
+  // i zapisujemy leniwie (co 60 s), zamiast przepisywać cały indeks przy każdym przewinięciu
+  const now = Date.now(); if (now - (it.t || 0) > 3600e3) { it.t = now; saveIndexSoon(60000); }
   return { url: 'pgf://c/' + h.slice(0, 2) + '/' + h + '.webp', dims: it.d || null, meta: it.m || null, hash: h };
 });
 ipcMain.handle('thumb-put', async (e, k, buf, dims, meta) => {
@@ -379,7 +425,7 @@ ipcMain.handle('lib-search', async (e, q, exts, names) => {
 // Windows: instalator pobiera się do folderu tymczasowego i instaluje po cichu, a Gapa uruchamia się ponownie.
 // Mac: obraz .dmg trafia do Pobranych i się otwiera — Gapę przeciąga się do Aplikacji (aplikacja nie jest podpisana u Apple).
 const REPO = 'michallenczewski/gapa';   // dawniej podglad — GitHub przekierowuje stary adres
-let upd = { state: 'idle', version: null, url: null, name: null, size: 0, got: 0, notes: '', error: '' };
+let upd = { state: 'idle', version: null, url: null, name: null, size: 0, digest: '', got: 0, notes: '', error: '' };
 const verNum = v => String(v || '').replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
 const newer = (a, b) => { const x = verNum(a), y = verNum(b); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; };
 function updTell() { const s = { ...upd, current: app.getVersion() }; for (const w of mainWindows()) w.webContents.send('update-status', s); }
@@ -389,9 +435,11 @@ async function updCheck() {
     const r = await net.fetch('https://api.github.com/repos/' + REPO + '/releases/latest', { headers: { 'User-Agent': 'Gapa', Accept: 'application/vnd.github+json' } });
     if (!r.ok) throw new Error('GitHub odpowiedział ' + r.status);
     const j = await r.json(), v = String(j.tag_name || '').replace(/^v/, '');
-    const want = isWin ? /-win-x64\.exe$/ : isMac ? new RegExp('-mac-' + process.arch + '\\.dmg$') : null;
+    // dokładnie nasz plik dla tej wersji (Gapa-<wersja>-win-x64.exe / Gapa-<wersja>-mac-<arch>.dmg)
+    const ve = v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const want = isWin ? new RegExp('^Gapa-' + ve + '-win-x64\\.exe$') : isMac ? new RegExp('^Gapa-' + ve + '-mac-' + process.arch + '\\.dmg$') : null;
     const a = want && (j.assets || []).find(x => want.test(x.name));
-    if (a && newer(v, app.getVersion())) Object.assign(upd, { state: 'available', version: v, url: a.browser_download_url, name: a.name, size: a.size, notes: String(j.body || '').slice(0, 600), error: '' });
+    if (a && newer(v, app.getVersion())) Object.assign(upd, { state: 'available', version: v, url: a.browser_download_url, name: a.name, size: a.size, digest: String(a.digest || ''), notes: String(j.body || '').slice(0, 600), error: '' });
     else Object.assign(upd, { state: 'none', version: v, error: '' });
   } catch (err) { upd.state = 'error'; upd.error = err.message; }
   updTell(); return { ...upd, current: app.getVersion() };
@@ -407,8 +455,17 @@ async function updInstall() {
     const out = fs.createWriteStream(file + '.part'); let last = 0;
     for await (const chunk of r.body) { out.write(chunk); upd.got += chunk.length; if (Date.now() - last > 400) { last = Date.now(); updTell(); } }
     await new Promise((res, rej) => out.end(err => (err ? rej(err) : res())));
+    // sprawdzamy, czy pobrał się dokładnie plik z wydania: rozmiar i (gdy GitHub go podaje) skrót SHA-256
+    const st = await fsp.stat(file + '.part');
+    if (upd.size && st.size !== upd.size) throw new Error('pobrany plik ma zły rozmiar');
+    const m = /^sha256:([0-9a-f]{64})$/i.exec(upd.digest || '');
+    if (m) {
+      const hs = crypto.createHash('sha256');
+      await new Promise((res, rej) => fs.createReadStream(file + '.part').on('data', d => hs.update(d)).on('end', res).on('error', rej));
+      if (hs.digest('hex') !== m[1].toLowerCase()) throw new Error('pobrany plik nie zgadza się z wydaniem (SHA-256)');
+    }
     await fsp.rename(file + '.part', file);
-  } catch (err) { upd.state = 'available'; upd.error = err.message; updTell(); return false; }
+  } catch (err) { try { await fsp.unlink(file + '.part'); } catch (e) {} upd.state = 'available'; upd.error = err.message; updTell(); return false; }
   upd.state = 'ready'; updTell();
   if (isWin) {
     // cicha instalacja w to samo miejsce; --force-run uruchamia nową Gapę po instalacji
@@ -528,6 +585,7 @@ ipcMain.handle('pick-folder', async e => {
 /* obserwowanie bieżącego folderu: nowy render pojawia się sam */
 // obserwowanie bieżącego folderu — osobno dla każdego okna
 const watchers = new Map();
+const watchHooked = new Set();
 ipcMain.handle('watch', (e, dir) => {
   const id = e.sender.id, old = watchers.get(id);
   if (old) { old.w.close(); clearTimeout(old.t); watchers.delete(id); }
@@ -540,7 +598,8 @@ ipcMain.handle('watch', (e, dir) => {
     });
     rec.w.on('error', () => {});
     watchers.set(id, rec);
-    e.sender.once('destroyed', () => { const r = watchers.get(id); if (r) { r.w.close(); watchers.delete(id); } });
+    // sprzątanie po zamknięciu okna rejestrujemy raz na okno, a nie przy każdej zmianie folderu
+    if (!watchHooked.has(id)) { watchHooked.add(id); e.sender.once('destroyed', () => { watchHooked.delete(id); const r = watchers.get(id); if (r) { r.w.close(); clearTimeout(r.t); watchers.delete(id); } }); }
   } catch (err) {}
 });
 
@@ -552,16 +611,18 @@ async function osThumbHere(p, size) {
 // Windows: miniatury systemowe robi osobny proces (patrz „Tryb pomocniczy” na początku pliku). Jeśli plik zawiesi
 // dostawcę miniatur, po 12 s proces jest zabijany, plik dostaje „brak miniatury”, a następny zaczyna od świeżego procesu.
 // Gdyby proces pomocniczy w ogóle nie ruszył, wracamy do miniatur w procesie głównym.
-let ot = null, otBroken = false, otId = 0, otIdle = null;
+// otBroken: do kiedy (ms) nie próbujemy osobnego procesu; po 5 minutach próbujemy znowu (np. po skanie antywirusa)
+let ot = null, otBroken = 0, otId = 0, otIdle = null;
+const otOff = () => { otBroken = Date.now() + 5 * 60 * 1000; };
 const otWait = new Map();
 function otKill() { if (!ot) return; try { ot.kill(); } catch (e) {} ot = null; for (const w of otWait.values()) { clearTimeout(w.t); w.res(null); } otWait.clear(); }
 function otStart() {
   if (ot) return ot;
   const c = { proc: null, ready: null };
   const args = app.isPackaged ? ['--gapa-os-thumb'] : [app.getAppPath(), '--gapa-os-thumb'];
-  try { c.proc = spawn(process.execPath, args, { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true }); } catch (e) { otBroken = true; return null; }
+  try { c.proc = spawn(process.execPath, args, { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true }); } catch (e) { otOff(); return null; }
   c.ready = new Promise(res => {
-    const t = setTimeout(() => { otBroken = true; res(false); }, 15000);
+    const t = setTimeout(() => { otOff(); res(false); }, 15000);
     let buf = '';
     c.proc.stdout.setEncoding('utf8');
     c.proc.stdout.on('data', d => {
@@ -578,7 +639,7 @@ function otStart() {
   ot = c; return c;
 }
 async function osThumbAway(p, size) {
-  const c = otStart(); if (!c || !(await c.ready)) { otKill(); otBroken = true; return osThumbHere(p, size); }
+  const c = otStart(); if (!c || !(await c.ready)) { otKill(); otOff(); return osThumbHere(p, size); }
   clearTimeout(otIdle); otIdle = setTimeout(otKill, 90000);           // bezczynny proces znika po półtorej minuty
   return new Promise(res => {
     const id = ++otId;
@@ -587,7 +648,7 @@ async function osThumbAway(p, size) {
     try { c.proc.stdin.write(JSON.stringify({ id, p, s: size }) + '\n'); } catch (e) { clearTimeout(t); otWait.delete(id); res(null); }
   });
 }
-ipcMain.handle('os-thumb', (e, p, size) => (isWin && !otBroken) ? osThumbAway(p, size) : osThumbHere(p, size));
+ipcMain.handle('os-thumb', (e, p, size) => (isWin && Date.now() > otBroken) ? osThumbAway(p, size) : osThumbHere(p, size));
 app.on('will-quit', otKill);
 
 /* ---------- system: Finder/Eksplorator, programy, przeciąganie ---------- */
@@ -659,7 +720,9 @@ ipcMain.handle('editors', () => {
   const cur = currentEditor();
   return { list, current: cur || null };
 });
-ipcMain.handle('editor-set', (e, p) => { settings.editor = p || null; saveSettings(); const c = currentEditor(); return c ? editorLabel(c) : null; });
+// program do edycji: tylko istniejąca aplikacja (.app na Macu, .exe na Windows) — okno nie może ustawić dowolnego pliku do uruchomienia
+const editorOk = p => { try { return isMac ? /\.app$/i.test(p) && fs.statSync(p).isDirectory() : /\.exe$/i.test(p) && fs.statSync(p).isFile(); } catch (e) { return false; } };
+ipcMain.handle('editor-set', (e, p) => { if (p && !editorOk(String(p))) return null; settings.editor = p || null; saveSettings(); const c = currentEditor(); return c ? editorLabel(c) : null; });
 function launch(appPath, files) {
   if (isMac) execFile('open', ['-a', appPath, ...files]);
   else spawn(appPath, files, { detached: true, stdio: 'ignore' }).unref();
@@ -712,7 +775,7 @@ ipcMain.handle('mem', () => {
   return { total, renderer };
 });
 ipcMain.handle('dev-of', (e, paths) => Promise.all((paths || []).map(p => fsp.stat(p).then(s => s.dev).catch(() => null))));
-ipcMain.handle('current-drag', () => lastDrag && Date.now() - lastDrag.t < 120000 ? { files: lastDrag.files, copy: lastDrag.copy } : null);
+ipcMain.handle('current-drag', () => lastDrag && Date.now() - lastDrag.t < 20000 ? { files: lastDrag.files, copy: lastDrag.copy } : null);
 // schowek systemowy z plikami: Gapa → Eksplorator / Finder (⌘C / Ctrl+C) i z powrotem (⌘V / Ctrl+V w Gapie)
 const psq = s => "'" + String(s).replace(/'/g, "''") + "'";
 // schowek plików na Macu przez AppKit (JavaScript for Automation) — Finder czyta i zapisuje adresy plików (NSURL)
@@ -723,7 +786,14 @@ ipcMain.handle('clip-files', async (e, paths) => {
   if (!paths.length) return false;
   try {
     if (isWin) {
-      await new Promise(res => execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'Set-Clipboard -LiteralPath ' + paths.map(psq).join(',')], { windowsHide: true }, () => res()));
+      // ścieżki idą przez stdin (bez limitu długości wiersza poleceń), a błąd PowerShella zwracamy oknu
+      const ok = await new Promise(res => {
+        const ps = execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+          '[Console]::InputEncoding=[Text.Encoding]::UTF8; $p=@([Console]::In.ReadToEnd() -split "`n" | Where-Object { $_ }); Set-Clipboard -LiteralPath $p'],
+          { windowsHide: true }, err => res(!err));
+        ps.stdin.end(paths.join('\n'), 'utf8');
+      });
+      if (!ok) return false;
     } else if (isMac) {
       // pliki do schowka tak jak robi to Finder: adresy plików przez NSPasteboard (⌘V w Finderze wkleja kopie)
       const ok = await new Promise(res => execFile('osascript', ['-l', 'JavaScript', '-e', MAC_CLIP_WRITE, ...paths], (err, so) => res(!err && /true/.test(so))));
@@ -781,8 +851,13 @@ ipcMain.handle('rename', async (e, src, name) => {
   const to = path.join(path.dirname(src), name);
   if (to === src) return { to };
   try {
-    if (lc(to) !== lc(src)) { try { await fsp.access(to); return { error: 'Plik o tej nazwie już tu jest' }; } catch (err) {} }
-    await fsp.rename(src, to); cacheCarry(src, to, false);
+    // ten sam plik pod nazwą różniącą się tylko wielkością liter (APFS i NTFS nie rozróżniają) — wolno;
+    // inny istniejący plik o tej nazwie — nie nadpisujemy
+    let same = false;
+    try { const a = await fsp.stat(src), b = await fsp.stat(to); same = a.ino === b.ino && a.dev === b.dev; if (!same) return { error: 'Plik o tej nazwie już tu jest' }; } catch (err) {}
+    if (same) { const tmp = src + '.gapa-zmiana-' + Date.now(); await fsp.rename(src, tmp); await fsp.rename(tmp, to); }
+    else await fsp.rename(src, to);
+    cacheCarry(src, to, false);
     transfers.push([{ from: src, to, op: 'move' }]); if (transfers.length > 20) transfers.shift();
     tellDirs([path.dirname(src)]);
     return { to };
@@ -811,8 +886,11 @@ ipcMain.on('drag-out', (e, files, icon, copy) => {
     try { img = nativeImage.createFromBuffer(Buffer.from(icon.slice(22), 'base64'), { scaleFactor: 2 }); if (img.isEmpty()) img = null; } catch (err) { img = null; }
   }
   if (!img) { if (!dragIcon) dragIcon = nativeImage.createFromPath(path.join(__dirname, 'renderer', 'icon.png')).resize({ width: 48, height: 48 }); img = dragIcon; }
-  lastDrag = { files, copy: !!copy, t: Date.now() };
+  const d = lastDrag = { files, copy: !!copy, t: Date.now() };
   e.sender.startDrag({ file: files[0], files, icon: img });
+  // na Windows startDrag wraca dopiero po upuszczeniu — wtedy od razu zapominamy przeciąganie,
+  // żeby nie pomylić go z późniejszym przeciąganiem z Eksploratora (na Macu wystarcza krótki czas ważności)
+  if (isWin) setTimeout(() => { if (lastDrag === d) lastDrag = null; }, 300);
 });
 
 /* ---------- okno ---------- */
@@ -848,7 +926,8 @@ function createWindow(startPath) {
   win.on('close', () => { remember(); saveSettings(); });
   win.on('closed', () => { if (isWin && !keepAlive() && !quitting && !mainWindows().length) app.quit(); });
   // linki zewnętrzne w przeglądarce, nie w oknie programu
-  win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
+  // linki otwieramy w przeglądarce tylko dla bezpiecznych schematów (np. nie file:, nie własne protokoły)
+  win.webContents.setWindowOpenHandler(({ url }) => { if (/^(https?:|mailto:)/i.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   return win;
 }
 ipcMain.on('new-window', (e, p) => createWindow(p || null));
@@ -874,8 +953,9 @@ function peekStart() {
   if (!fs.existsSync(exe)) return;
   try { peekProc = spawn(exe, [], { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true }); } catch (e) { peekProc = null; return; }
   let buf = '';
+  peekProc.stdout.setEncoding('utf8');            // znaki wielobajtowe (ą, ś…) mogą trafić na granicę kawałków
   peekProc.stdout.on('data', d => {
-    buf += d.toString('utf8');
+    buf += d;
     let i;
     while ((i = buf.indexOf('\n')) >= 0) {
       const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
@@ -983,7 +1063,7 @@ if (!app.requestSingleInstanceLock()) app.quit();
 else {
   app.on('second-instance', () => { const w = mainWindows()[0]; if (w) { if (w.isMinimized()) w.restore(); w.focus(); } else createWindow(); });
   app.whenReady().then(() => {
-    loadSettings(); libLoad();
+    loadSettings(); libLoad(); dataLoad();
     openCache(settings.cacheDir);
     protocol.handle('pgf', async req => {
       if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
@@ -998,9 +1078,12 @@ else {
         const type = MIME[ext] || 'application/octet-stream';
         const range = req.headers.get('range');
         if (range) {
-          const m = /bytes=(\d+)-(\d*)/.exec(range);
-          const s = +m[1], end = Math.min(m[2] ? +m[2] : st.size - 1, st.size - 1);
-          if (s > end) return new Response(new Uint8Array(0), { status: 206, headers: { ...CORS, 'Content-Range': 'bytes */' + st.size } });
+          const m = /bytes=(\d*)-(\d*)/.exec(range);
+          let s, end;
+          if (m && m[1] === '' && m[2] !== '') { s = Math.max(0, st.size - +m[2]); end = st.size - 1; }   // bytes=-N: ostatnie N bajtów
+          else if (m && m[1] !== '') { s = +m[1]; end = Math.min(m[2] ? +m[2] : st.size - 1, st.size - 1); }
+          else { s = 0; end = st.size - 1; }
+          if (s > end || s >= st.size) return new Response(new Uint8Array(0), { status: 416, headers: { ...CORS, 'Content-Range': 'bytes */' + st.size } });
           return new Response(Readable.toWeb(fs.createReadStream(p, { start: s, end })), {
             status: 206, headers: { ...CORS, 'Content-Type': type, 'Content-Length': String(end - s + 1), 'Content-Range': `bytes ${s}-${end}/${st.size}`, 'Accept-Ranges': 'bytes' } });
         }
@@ -1017,7 +1100,7 @@ else {
     if (settings.icon === 'retro') { delete settings.icon; saveSettings(); if (isWin) setTimeout(winShortcutIcons, 3000); }   // po wariancie 1-bitowym
     app.on('activate', () => { if (!mainWindows().length) createWindow(); });
   });
-  app.on('before-quit', () => { quitting = true; saveIndexNow(); saveSettings(); if (peekProc) try { peekProc.kill(); } catch (e) {} });
+  app.on('before-quit', () => { quitting = true; saveIndexNow(); saveSettings(); dataWriteNow(); if (peekProc) try { peekProc.kill(); } catch (e) {} });
   // na Macu zamknięcie ostatniego okna nie kończy programu (zostaje w Docku, ⌘Q kończy); na Windows kończy
-  app.on('window-all-closed', () => { saveIndexNow(); saveSettings(); if (!isMac && !keepAlive()) app.quit(); });
+  app.on('window-all-closed', () => { saveIndexNow(); saveSettings(); dataWriteNow(); if (!isMac && !keepAlive()) app.quit(); });
 }

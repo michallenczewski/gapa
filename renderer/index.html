@@ -94,10 +94,12 @@ header{grid-column:1/4;display:flex;align-items:center;gap:6px;padding:0 12px;mi
 #pathbox #pathCopy{margin-left:auto}
 #pathbox.edit #pathCopy,#pathbox.edit #crumbs{display:none}
 #crumbs{display:flex;align-items:center;min-width:0;margin:0 18px 0 4px;font-size:13px;font-weight:400;white-space:nowrap;overflow:hidden;flex:0 1 auto}
-#crumbs a{color:var(--muted);padding:4px 6px;border-radius:6px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:28px}
+#crumbs a{color:var(--muted);padding:4px 6px;border-radius:6px;cursor:pointer;flex:none;transition:background-color .15s,color .15s}
+#crumbs a.more{letter-spacing:.05em}
+#crumbs.measure span{flex:none}
 #crumbs a:hover{color:var(--text);background:var(--hover)}
-#crumbs i{font-style:normal;color:var(--muted2);opacity:.6;flex:none}
-#crumbs span{font-weight:500;padding:4px 6px;flex:none}
+#crumbs i{font-style:normal;color:var(--muted2);opacity:.6;flex:none;padding:0 1px}
+#crumbs span{font-weight:500;padding:4px 6px;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
 #count{color:var(--muted2);font-size:12px;white-space:nowrap;flex:none;margin-left:2px}
 /* paski przewijania: cienkie, bez strzałek i bez toru; w panelu bocznym widoczne dopiero po najechaniu */
 ::-webkit-scrollbar{width:10px;height:10px;background:transparent}

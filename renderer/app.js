@@ -722,20 +722,42 @@ document.addEventListener('paste',async e=>{
   }
   if(t&&!t.includes('\n')&&/^(["']?)(\/|~|[A-Za-z]:[\\/]|\\\\|file:\/\/)/.test(t)){ e.preventDefault(); goPath(t); }
 });
+// ścieżka: nazwy folderów zawsze w całości; gdy się nie mieszczą, najwyższe chowamy pod jednym „…”
+// (klik pokazuje je w menu). Skraca się wyłącznie nazwa bieżącego folderu, gdy nie mieści się nawet sama.
+let crumbList=[];
 function renderCrumbs(){
-  const c=$('#crumbs'); c.textContent='';
+  const c=$('#crumbs'); c.textContent=''; crumbList=[];
   if(virt==='basket'){ const s=document.createElement('span'); s.textContent='Koszyk'; c.appendChild(s); document.title='Koszyk — Gapa'; return; }
   if(virt==='stars'){ const s=document.createElement('span'); s.textContent='Oznaczone gwiazdkami'; c.appendChild(s); document.title='Oznaczone gwiazdkami — Gapa'; return; }
   if(!curPath) return;
-  const cs=crumbsOf(curPath);
+  crumbList=crumbsOf(curPath);
+  crumbsFit();
+  document.title=crumbList[crumbList.length-1].name+' — Gapa';
+}
+function crumbsDraw(hide){
+  const c=$('#crumbs'), cs=crumbList; c.textContent='';
+  const sep=()=>{const s=document.createElement('i');s.textContent='/';c.appendChild(s);};
+  if(hide>0){
+    const m=document.createElement('a'); m.className='more'; m.textContent='…'; m.title='Wyższe foldery';
+    m.onclick=e=>{ e.stopPropagation(); const r=m.getBoundingClientRect();
+      showMenu(r.left,r.bottom+6,null,cs.slice(0,hide).map(x=>({label:x.name,run:()=>go(x.path)}))); };
+    c.appendChild(m);
+  }
   cs.forEach((x,i)=>{
-    if(i){const s=document.createElement('i');s.textContent='/';c.appendChild(s);}
+    if(i<hide) return;
+    if(i>0) sep();
     const el=document.createElement(i===cs.length-1?'span':'a');
     el.textContent=x.name; el.title=x.path; if(i<cs.length-1) el.onclick=()=>go(x.path);
     c.appendChild(el);
   });
-  document.title=cs[cs.length-1].name+' — Gapa';
 }
+function crumbsFit(){
+  const c=$('#crumbs'), n=crumbList.length; if(!n) return;
+  let hide=0; c.classList.add('measure'); crumbsDraw(0);
+  while(c.scrollWidth>c.clientWidth+1&&hide<n-1){ hide++; crumbsDraw(hide); }
+  c.classList.remove('measure');
+}
+{ let crT=0; const refit=()=>{ cancelAnimationFrame(crT); crT=requestAnimationFrame(()=>{ if(crumbList.length) crumbsFit(); }); }; new ResizeObserver(refit).observe($('#pathbox').parentElement); addEventListener('resize',refit); }
 
 /* --- drzewo folderów: miejsca w systemie i dyski, jak zakładka Folders w Bridge --- */
 // treeFollow: drzewo rozwija się do bieżącego folderu tylko przy chodzeniu po drzewie i miejscach;

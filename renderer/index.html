@@ -57,6 +57,9 @@ header{grid-column:1/4;display:flex;align-items:center;gap:6px;padding:0 12px;mi
 /* przyciski z napisem i pozycje paneli: tło przenika (0,15 s), po kliknięciu błyska kolorem najechania i gaśnie („tak”, 0,55 s) */
 .act,.nav li,.ctx button,#setp .acts button,#setp .s2 .seg2 button{transition:background-color .15s,color .15s,opacity .15s}
 .tb.tak,.act.tak,.nav li.tak,#setp .acts button.tak{animation:tak .55s ease-out}
+/* wiersz panelu bocznego po kliknięciu: ugięcie wraca sprężyną i tło błyska (działa też na wierszu odtworzonym po przebudowie panelu) */
+.nav li.tak{animation:odbij .35s var(--spring),tak .55s ease-out}
+@keyframes odbij{from{transform:scale(.97)}to{transform:none}}
 .act.primary.tak{animation:takp .55s ease-out}
 @keyframes takp{0%{opacity:.6}100%{opacity:1}}
 .ctx button.hit{background:var(--hover)}

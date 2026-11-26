@@ -2552,7 +2552,13 @@ if(!PREP) loadRoots().then(async()=>{ if(PEEK){ if(!api.peekMulti) peekOpen(api.
 
 /* --- Język interakcji (projekt/WYTYCZNE_INTERAKCJE.md): reakcje przycisków, wskaźnik w segmentach, podpowiedzi --- */
 // reakcja na kliknięcie w panelu informacji, panelu bocznym i przyciskach w ustawieniach
-document.addEventListener('click',e=>{ const el=e.target.closest&&e.target.closest('.act,.nav li:not(.none),#setp .acts button'); if(el) btnAnim(el,'tak'); },true);
+document.addEventListener('click',e=>{ const el=e.target.closest&&e.target.closest('.act,.nav li:not(.none),#setp .acts button'); if(!el) return; btnAnim(el,'tak');
+  // panel boczny przebudowuje się zaraz po kliknięciu (nowy folder), więc kliknięty wiersz znika razem z animacją;
+  // szukamy jego następcy (ta sama lista, ten sam napis) i odgrywamy na nim ugięcie z powrotem i błysk
+  if(el.matches('.nav li')){ const ul=el.parentElement&&el.parentElement.id, key=el.textContent.trim(); let done=false;
+    const again=()=>{ if(done||el.isConnected) return; const n=[...document.querySelectorAll('#'+ul+' > li')].find(x=>x.textContent.trim()===key); if(n){ done=true; btnAnim(n,'tak'); } };
+    requestAnimationFrame(again); setTimeout(again,60); setTimeout(again,200); setTimeout(again,450); }
+},true);
 // wzorzec przycisków (projekt/wzorzec_przyciskow.html, KOPIUJ: JS): wciśnięcie to klasa .wcis zamiast :active,
 // bo :active trwa tyle co kliknięcie (~0,1 s) i ugięcia prawie nie widać; zdejmujemy ją nie wcześniej niż po 90 ms
 document.addEventListener('pointerdown',e=>{

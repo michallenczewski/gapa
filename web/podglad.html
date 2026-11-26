@@ -56,6 +56,9 @@ header{grid-column:1/4;display:flex;align-items:center;gap:6px;padding:0 12px;mi
 /* przyciski z napisem i pozycje paneli: tło przenika (0,15 s), po kliknięciu błyska kolorem najechania i gaśnie („tak”, 0,55 s) */
 .act,.nav li,.ctx button,#setp .acts button,#setp .s2 .seg2 button{transition:background-color .15s,color .15s,opacity .15s}
 .tb.tak,.act.tak,.nav li.tak,#setp .acts button.tak{animation:tak .55s ease-out}
+/* wiersz panelu bocznego po kliknięciu: ugięcie wraca sprężyną i tło błyska (działa też na wierszu odtworzonym po przebudowie panelu) */
+.nav li.tak{animation:odbij .35s var(--spring),tak .55s ease-out}
+@keyframes odbij{from{transform:scale(.97)}to{transform:none}}
 .act.primary.tak{animation:takp .55s ease-out}
 @keyframes takp{0%{opacity:.6}100%{opacity:1}}
 .ctx button.hit{background:var(--hover)}
@@ -3869,7 +3872,13 @@ if(!PREP) loadRoots().then(async()=>{ if(PEEK){ if(!api.peekMulti) peekOpen(api.
 
 /* --- Język interakcji (projekt/WYTYCZNE_INTERAKCJE.md): reakcje przycisków, wskaźnik w segmentach, podpowiedzi --- */
 // reakcja na kliknięcie w panelu informacji, panelu bocznym i przyciskach w ustawieniach
-document.addEventListener('click',e=>{ const el=e.target.closest&&e.target.closest('.act,.nav li:not(.none),#setp .acts button'); if(el) btnAnim(el,'tak'); },true);
+document.addEventListener('click',e=>{ const el=e.target.closest&&e.target.closest('.act,.nav li:not(.none),#setp .acts button'); if(!el) return; btnAnim(el,'tak');
+  // panel boczny przebudowuje się zaraz po kliknięciu (nowy folder), więc kliknięty wiersz znika razem z animacją;
+  // szukamy jego następcy (ta sama lista, ten sam napis) i odgrywamy na nim ugięcie z powrotem i błysk
+  if(el.matches('.nav li')){ const ul=el.parentElement&&el.parentElement.id, key=el.textContent.trim(); let done=false;
+    const again=()=>{ if(done||el.isConnected) return; const n=[...document.querySelectorAll('#'+ul+' > li')].find(x=>x.textContent.trim()===key); if(n){ done=true; btnAnim(n,'tak'); } };
+    requestAnimationFrame(again); setTimeout(again,60); setTimeout(again,200); setTimeout(again,450); }
+},true);
 // wzorzec przycisków (projekt/wzorzec_przyciskow.html, KOPIUJ: JS): wciśnięcie to klasa .wcis zamiast :active,
 // bo :active trwa tyle co kliknięcie (~0,1 s) i ugięcia prawie nie widać; zdejmujemy ją nie wcześniej niż po 90 ms
 document.addEventListener('pointerdown',e=>{

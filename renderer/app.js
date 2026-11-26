@@ -389,7 +389,7 @@ function toggleFav(p){hintDone('fav');
 }
 async function openFav(f){
   if(!(await api.exists(f.path))){status('Folderu „'+f.name+'” nie ma pod zapisaną ścieżką — mógł zostać przeniesiony.');return;}
-  go(f.path);
+  treeFollow=false; go(f.path);
 }
 
 /* --- foldery i pliki --- */
@@ -738,7 +738,9 @@ function renderCrumbs(){
 }
 
 /* --- drzewo folderów: miejsca w systemie i dyski, jak zakładka Folders w Bridge --- */
-let roots=[], treeCur=null;
+// treeFollow: drzewo rozwija się do bieżącego folderu tylko przy chodzeniu po drzewie i miejscach;
+// po otwarciu ulubionego zostaje tak, jak było (bez rozwijania całej ścieżki), aż znów klikniesz w drzewo
+let roots=[], treeCur=null, treeFollow=true;
 async function loadRoots(){ roots=(await api.roots()).map(r=>({path:r.path,name:r.name,drive:r.drive,kids:null,open:false,up:null})); renderTree(); }
 async function kidsOf(n){
   if(n.kids) return n.kids;
@@ -752,10 +754,16 @@ async function syncTree(){
   if(curPath){
     let best=null; for(const r of roots) if(under(curPath,r.path)&&(!best||r.path.length>best.path.length)) best=r;
     if(best){
-      let n=best; n.open=true;
       const rest=curPath.slice(best.path.replace(/[\\/]$/,'').length).split(/[\\/]+/).filter(Boolean);
-      for(const seg of rest){const ks=await kidsOf(n);const m=ks.find(k=>samePath(k.name,seg));if(!m){n=null;break;}m.open=true;n=m;}
-      treeCur=n; if(n) await kidsOf(n);
+      if(treeFollow){
+        let n=best; n.open=true;
+        for(const seg of rest){const ks=await kidsOf(n);const m=ks.find(k=>samePath(k.name,seg));if(!m){n=null;break;}m.open=true;n=m;}
+        treeCur=n; if(n) await kidsOf(n);
+      } else {
+        // bez rozwijania: zaznacz folder w drzewie tylko wtedy, gdy już jest widoczny
+        let n=best; for(const seg of rest){ if(!n.open||!n.kids){n=null;break;} const m=n.kids.find(k=>samePath(k.name,seg)); if(!m){n=null;break;} n=m; }
+        treeCur=n;
+      }
     }
   }
   renderTree();
@@ -775,7 +783,7 @@ function renderTree(){
     const nm=document.createElement('span'); nm.className='nm'; nm.textContent=n.name;
     li.append(tw,nm,favBtn('rf',n.path)); if(n===treeCur) li.classList.add('on');
     tw.onclick=async e=>{e.stopPropagation();n.open=!n.open;if(n.open)await kidsOf(n);renderTree();};
-    li.onclick=()=>go(n.path);
+    li.onclick=()=>{treeFollow=true;go(n.path);};
     if(virt) li.classList.remove('on');
     ul.appendChild(li);
     if(n.open&&n.kids) for(const k of n.kids) add(k,d+1);
@@ -786,7 +794,7 @@ function renderTree(){
     const li=document.createElement('li'); li.title=r.path;
     const nm=document.createElement('span'); nm.className='nm'; nm.textContent=r.name; li.appendChild(nm);
     if(best===r&&samePath(curPath,r.path)) li.classList.add('on');
-    li.onclick=()=>go(r.path); pl.appendChild(li);
+    li.onclick=()=>{treeFollow=true;go(r.path);}; pl.appendChild(li);
   }
   if(!roots.length) pl.innerHTML='<li class="none"><span>Brak</span></li>';
   document.documentElement.classList.toggle('oneroot',roots.length<2);

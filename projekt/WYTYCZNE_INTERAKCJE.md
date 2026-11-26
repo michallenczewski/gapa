@@ -72,6 +72,12 @@ ugiąć, więc **ugina się cały**: do 0,97 w 0,09 s (ease-out), po puszczeniu 
 `.wcis` dodaje ten sam kod JS co przy ikonach (dopisz selektor przycisków tekstowych). Po kliknięciu, jak wszędzie,
 „tak”: tło błyska kolorem najechania i gaśnie (na ciemnym głównym przycisku zamiast tła — przezroczystość 0,6 → 1).
 
+Przycisk z ikoną **i** napisem (np. sortowanie, filtr typów, nagłówek sekcji) traktujemy jak przycisk z napisem:
+ugina się cały do 0,97, a ikona w środku dodatkowo ugina się jak w punkcie 2 — inaczej rusza się tylko ikonka, a napis stoi.
+
+Gdy kliknięcie przebudowuje listę (np. panel boczny po wejściu do folderu), kliknięty element znika razem z animacją.
+Odegraj wtedy „tak” na jego następcy w nowej liście (ta sama lista, ten sam napis).
+
 ```css
 .act { transition: background-color .15s, color .15s, opacity .15s, transform .35s var(--spring); }
 .act.wcis { transform: scale(.97); transition: transform .09s ease-out; }

@@ -53,6 +53,8 @@ header{grid-column:1/4;display:flex;align-items:center;gap:6px;padding:0 12px;mi
 /* przycisk z samym tekstem (wzorzec, punkt 2b): nie ma ikony, więc ugina się cały — do 0,97 w 0,09 s, powrót sprężyną */
 .act:not(:has(>svg)),.nav li,.ctx button,.btn,#dlg .db button,#setp .acts button,#setp .s2 .seg2 button{transition:background-color .15s,color .15s,opacity .15s,transform .35s var(--spring)}
 .act:not(:has(>svg)).wcis,.nav li.wcis,.ctx button.wcis,.btn.wcis,#dlg .db button.wcis,#setp .acts button.wcis,#setp .s2 .seg2 button.wcis{transform:scale(.97);transition:transform .09s ease-out}
+/* przycisk z ikoną i napisem (sortowanie, typy, nagłówki sekcji): ugina się cały jak przycisk z napisem, ikona w środku dodatkowo */
+.tb.wcis,.sec.wcis{transform:scale(.97);transition:transform .09s ease-out}
 /* przyciski z napisem i pozycje paneli: tło przenika (0,15 s), po kliknięciu błyska kolorem najechania i gaśnie („tak”, 0,55 s) */
 .act,.nav li,.ctx button,#setp .acts button,#setp .s2 .seg2 button{transition:background-color .15s,color .15s,opacity .15s}
 .tb.tak,.act.tak,.nav li.tak,#setp .acts button.tak{animation:tak .55s ease-out}
@@ -161,7 +163,7 @@ body.noside #hspace{display:none}
 #qScope:hover{color:var(--text)}
 #qScope[aria-pressed=true]{background:var(--pill);box-shadow:var(--pillsh);color:var(--text)}
 .sep{width:1px;height:16px;background:var(--line);margin:0 6px;flex:none}
-.tb{height:30px;padding:0 8px;border-radius:7px;color:var(--text2);display:flex;align-items:center;gap:6px;white-space:nowrap;flex:none;transition:background-color .15s,color .15s}
+.tb{height:30px;padding:0 8px;border-radius:7px;color:var(--text2);display:flex;align-items:center;gap:6px;white-space:nowrap;flex:none;transition:background-color .15s,color .15s,transform .35s var(--spring)}
 .tb:hover,.tb.open{background:var(--hover);color:var(--text)}
 .tb.on{color:var(--text);background:var(--soft)}
 .tb svg{color:var(--muted)}
@@ -181,7 +183,7 @@ body.noside #hspace{display:none}
 /* --- pasek boczny --- */
 aside{grid-row:2;grid-column:1;width:220px;padding:6px 10px 12px 12px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 body.noside aside{display:none}
-.sec{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted);padding:16px 10px 6px;width:100%;text-align:left;flex:none}
+.sec{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted);padding:16px 10px 6px;width:100%;text-align:left;flex:none;transition:color .15s,transform .35s var(--spring)}
 .sec .gi{flex:none;color:var(--muted2)}
 .sec .ch{margin-left:auto;opacity:0;color:var(--muted2);transition:transform .15s,opacity .12s}
 .sec:hover .ch,.sec.shut .ch{opacity:1}
@@ -1709,7 +1711,7 @@ function toggleFav(p){hintDone('fav');
 }
 async function openFav(f){
   if(!(await api.exists(f.path))){status('Folderu „'+f.name+'” nie ma pod zapisaną ścieżką — mógł zostać przeniesiony.');return;}
-  go(f.path);
+  treeFollow=false; go(f.path);
 }
 
 /* --- foldery i pliki --- */
@@ -2058,7 +2060,9 @@ function renderCrumbs(){
 }
 
 /* --- drzewo folderów: miejsca w systemie i dyski, jak zakładka Folders w Bridge --- */
-let roots=[], treeCur=null;
+// treeFollow: drzewo rozwija się do bieżącego folderu tylko przy chodzeniu po drzewie i miejscach;
+// po otwarciu ulubionego zostaje tak, jak było (bez rozwijania całej ścieżki), aż znów klikniesz w drzewo
+let roots=[], treeCur=null, treeFollow=true;
 async function loadRoots(){ roots=(await api.roots()).map(r=>({path:r.path,name:r.name,drive:r.drive,kids:null,open:false,up:null})); renderTree(); }
 async function kidsOf(n){
   if(n.kids) return n.kids;
@@ -2072,10 +2076,16 @@ async function syncTree(){
   if(curPath){
     let best=null; for(const r of roots) if(under(curPath,r.path)&&(!best||r.path.length>best.path.length)) best=r;
     if(best){
-      let n=best; n.open=true;
       const rest=curPath.slice(best.path.replace(/[\\/]$/,'').length).split(/[\\/]+/).filter(Boolean);
-      for(const seg of rest){const ks=await kidsOf(n);const m=ks.find(k=>samePath(k.name,seg));if(!m){n=null;break;}m.open=true;n=m;}
-      treeCur=n; if(n) await kidsOf(n);
+      if(treeFollow){
+        let n=best; n.open=true;
+        for(const seg of rest){const ks=await kidsOf(n);const m=ks.find(k=>samePath(k.name,seg));if(!m){n=null;break;}m.open=true;n=m;}
+        treeCur=n; if(n) await kidsOf(n);
+      } else {
+        // bez rozwijania: zaznacz folder w drzewie tylko wtedy, gdy już jest widoczny
+        let n=best; for(const seg of rest){ if(!n.open||!n.kids){n=null;break;} const m=n.kids.find(k=>samePath(k.name,seg)); if(!m){n=null;break;} n=m; }
+        treeCur=n;
+      }
     }
   }
   renderTree();
@@ -2095,7 +2105,7 @@ function renderTree(){
     const nm=document.createElement('span'); nm.className='nm'; nm.textContent=n.name;
     li.append(tw,nm,favBtn('rf',n.path)); if(n===treeCur) li.classList.add('on');
     tw.onclick=async e=>{e.stopPropagation();n.open=!n.open;if(n.open)await kidsOf(n);renderTree();};
-    li.onclick=()=>go(n.path);
+    li.onclick=()=>{treeFollow=true;go(n.path);};
     if(virt) li.classList.remove('on');
     ul.appendChild(li);
     if(n.open&&n.kids) for(const k of n.kids) add(k,d+1);
@@ -2106,7 +2116,7 @@ function renderTree(){
     const li=document.createElement('li'); li.title=r.path;
     const nm=document.createElement('span'); nm.className='nm'; nm.textContent=r.name; li.appendChild(nm);
     if(best===r&&samePath(curPath,r.path)) li.classList.add('on');
-    li.onclick=()=>go(r.path); pl.appendChild(li);
+    li.onclick=()=>{treeFollow=true;go(r.path);}; pl.appendChild(li);
   }
   if(!roots.length) pl.innerHTML='<li class="none"><span>Brak</span></li>';
   document.documentElement.classList.toggle('oneroot',roots.length<2);

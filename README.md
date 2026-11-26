@@ -93,7 +93,7 @@ Najczęstsze skróty leżą pod lewą ręką, żeby prawa mogła zostać na mysz
 | Tab | ukryj / pokaż interfejs |
 | Ctrl+spacja (Windows) | pełny ekran 100%: bez paska zadań, paska okna i interfejsu; wyjście tym samym skrótem albo Esc. Na Macu Gapa korzysta z systemowego pełnego ekranu (zielony przycisk, ⌃⌘F) |
 
-W pasku podglądu obok „…” jest ikona pełnego ekranu. Gdy interfejs jest schowany albo okno jest na pełnym ekranie, po poruszeniu myszą w prawym górnym rogu pojawia się mała pastylka z dwoma przyciskami: pokaż interfejs oraz wejdź na pełny ekran albo z niego wyjdź. Po dwóch sekundach bez ruchu pastylka znika razem z kursorem.
+W podglądzie (także po powiększeniu) prawy przycisk myszy otwiera w miejscu kursora to samo menu co „…” w pasku, razem z gwiazdkami. W pasku podglądu obok „…” jest ikona pełnego ekranu. Gdy interfejs jest schowany albo okno jest na pełnym ekranie, po poruszeniu myszą w prawym górnym rogu pojawia się mała pastylka z dwoma przyciskami: pokaż interfejs oraz wejdź na pełny ekran albo z niego wyjdź. Po dwóch sekundach bez ruchu pastylka znika razem z kursorem.
 | Esc | zamknij podgląd, wyczyść wyszukiwanie |
 | ⌘/Ctrl + N | nowe okno w tym samym folderze (Koszyk i Ulubione są wspólne) |
 | ⌘[ ⌘] (Mac) / Alt+← Alt+→ (Windows) | wstecz / dalej po odwiedzonych miejscach (też strzałki < > i boczne przyciski myszy) |

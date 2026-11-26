@@ -17,9 +17,9 @@ Jak program jest zbudowany i kiedy warto zmienić platformę (Tauri, moduły w R
 
 **Ikona programu na Windows:** zmiana ikony podmienia ją też w skrótach Gapy (menu Start, pulpit, przypięta na pasku zadań). Przypięta ikona czasem odświeża się dopiero po ponownym zalogowaniu.
 
-**Aktualizacje:** Gapa sama sprawdza, czy na GitHubie jest nowsza wersja (po starcie i co 6 godzin). Wtedy w stopce pojawia się „Nowa wersja …”; klik pobiera ją i instaluje (Windows: po cichu, z ponownym uruchomieniem; Mac: obraz .dmg w Pobranych — Gapę przeciąga się do Aplikacji). Ręcznie: ustawienia → „Sprawdź aktualizacje”.
+**Aktualizacje:** Gapa sama sprawdza, czy na GitHubie jest nowsza wersja (po starcie i co 6 godzin). Wtedy na przycisku ustawień (dwa suwaki w prawym górnym rogu) pojawia się kropka, a w jego menu „Zainstaluj wersję …”; klik pobiera ją i instaluje (Windows: po cichu, z ponownym uruchomieniem; Mac: obraz .dmg w Pobranych — Gapę przeciąga się do Aplikacji). Ręcznie: menu ustawień → „Sprawdź aktualizacje”.
 
-**Miniatury całej biblioteki:** w ustawieniach (koło zębate) → „Przygotuj miniatury biblioteki…”. Gapa robi brakujące miniatury wszystkich plików z ulubionych folderów w osobnym, niewidocznym oknie: gdy pracujesz, po jednym pliku, gdy komputer stoi bezczynnie — pełną mocą; komputer nie zasypia do końca. Postęp jest w stopce (klik: wstrzymaj, zatrzymaj). Opcja „Przygotowuj co noc” robi to samo między 2:00 a 6:00, jeśli Gapa działa (na Windows zostaje wtedy w tle z ikoną w zasobniku). Większe wersje miniatur dla dużych kafelków też trafiają na dysk, a przeniesienie lub zmiana nazwy pliku w Gapie zabiera jego miniaturę ze sobą.
+**Miniatury całej biblioteki:** w ustawieniach (menu pod przyciskiem z suwakami → „Wszystkie ustawienia…”) → „Przygotuj miniatury biblioteki…”. Gapa robi brakujące miniatury wszystkich plików z ulubionych folderów w osobnym, niewidocznym oknie: gdy pracujesz, po jednym pliku, gdy komputer stoi bezczynnie — pełną mocą; komputer nie zasypia do końca. Postęp jest w stopce (klik: wstrzymaj, zatrzymaj). Opcja „Przygotowuj co noc” robi to samo między 2:00 a 6:00, jeśli Gapa działa (na Windows zostaje wtedy w tle z ikoną w zasobniku). Większe wersje miniatur dla dużych kafelków też trafiają na dysk, a przeniesienie lub zmiana nazwy pliku w Gapie zabiera jego miniaturę ze sobą.
 
 ## Pobieranie
 
@@ -88,7 +88,7 @@ Najczęstsze skróty leżą pod lewą ręką, żeby prawa mogła zostać na mysz
 | V | ikony ↔ lista (także L) |
 | B / ⇧B | dodaj do koszyka lub wyjmij / otwórz koszyk |
 | ⌘1 ⌘2 ⌘3 (Mac) / Ctrl+1 Ctrl+2 Ctrl+3 (Windows) | gwiazdki; ta sama drugi raz zdejmuje ocenę |
-| ⌘, (Mac) / Ctrl+, (Windows) | otwórz lub zamknij ustawienia (także zębatka na dole panelu) |
+| ⌘, (Mac) / Ctrl+, (Windows) | otwórz lub zamknij wszystkie ustawienia (krótkie menu ustawień jest pod przyciskiem z suwakami w prawym górnym rogu) |
 | 1 / 2 | mniejsze / większe miniatury; w podglądzie oddal / przybliż (także − + oraz ⌘/Ctrl + − +, ⌘/Ctrl+0 przywraca) |
 | Tab | ukryj / pokaż interfejs |
 | Ctrl+spacja (Windows) | pełny ekran 100%: bez paska zadań, paska okna i interfejsu; wyjście tym samym skrótem albo Esc. Na Macu Gapa korzysta z systemowego pełnego ekranu (zielony przycisk, ⌃⌘F) |

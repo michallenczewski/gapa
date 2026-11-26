@@ -270,7 +270,6 @@ let memT=0;
 async function memTick(){ if(!S.showMem||!api.mem) return; const m=await api.mem(); $('#mem').textContent='RAM '+fmtSize(m.total*1024); $('#mem').title='Pamięć RAM wszystkich procesów Gapy: '+fmtSize(m.total*1024)+' (okna: '+fmtSize(m.renderer*1024)+')'; }
 function setShowMem(v){ S.showMem=v; save(); $('#mem').hidden=!v; clearInterval(memT); if(v){ memTick(); memT=setInterval(memTick,2000); } }
 /* --- ustawienia: okno na środku, dwie kolumny sekcji --- */
-const GEAR='<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M6.9 1.8h2.2l.35 1.7 1.2.5 1.45-.96 1.56 1.56-.96 1.45.5 1.2 1.7.35v2.2l-1.7.35-.5 1.2.96 1.45-1.56 1.56-1.45-.96-1.2.5-.35 1.7H6.9l-.35-1.7-1.2-.5-1.45.96-1.56-1.56.96-1.45-.5-1.2-1.7-.35V6.9l1.7-.35.5-1.2-.96-1.45L3.9 2.34l1.45.96 1.2-.5z"/><circle cx="8" cy="8" r="2.1"/></svg>';
 const SUN='<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="2.8"/><path d="M8 1.6v1.5M8 12.9v1.5M3.5 3.5l1 1M11.5 11.5l1 1M1.6 8h1.5M12.9 8h1.5M3.5 12.5l1-1M11.5 4.5l1-1"/></svg>';
 const MOON='<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M13.2 10.1A5.6 5.6 0 0 1 5.9 2.8a5.6 5.6 0 1 0 7.3 7.3z"/></svg>';
 function themeBtnSync(){ const b=$('#themeBtn'); if(!b) return; const dark=document.documentElement.dataset.theme==='dark'; b.innerHTML=dark?SUN:MOON; b.title=(dark?'Tryb jasny':'Tryb ciemny')+' (T)'; b.setAttribute('aria-label',b.title); }
@@ -333,8 +332,31 @@ function renderSettings(){
 }
 $('#setp').addEventListener('click',e=>{ if(e.target.id==='setp') closeSettings(); });
 addEventListener('keydown',e=>{ if(setOpen&&e.key==='Escape'){ e.preventDefault(); e.stopImmediatePropagation(); closeSettings(); } },true);
-$('#setBtn').innerHTML=GEAR; $('#setBtn').title='Ustawienia ('+(isMac?'⌘,':'Ctrl+,')+')'; $('#setBtn').onclick=e=>{ e.stopPropagation(); setOpen?closeSettings():settingsMenu(); };
-if($('#themeBtn')){ $('#themeBtn').onclick=e=>{ e.stopPropagation(); cycleTheme(); }; themeBtnSync(); }
+// przycisk ustawień: ostatni w górnym pasku, menu pod nim wyrównane do prawej krawędzi (wytyczne interakcji, punkt 8)
+$('#setBtn').title='Ustawienia ('+(isMac?'⌘,':'Ctrl+,')+')';
+$('#setBtn').onclick=e=>{ e.stopPropagation(); if(!ctx.hidden&&ctx.dataset.of==='set'){ hideMenu(); return; } if(setOpen) closeSettings(); setMenu(); };
+function setMenu(){
+  const r=$('#setBtn').getBoundingClientRect(), t=S.theme||'auto', u=updSt||{};
+  const upd=u.state==='available'?{label:'Zainstaluj wersję '+u.version,run:updAsk}
+    :u.state==='downloading'?{label:'Pobieram '+u.version+(u.size?' · '+Math.round(u.got/u.size*100)+'%':''),dim:true,keep:true,run:()=>{}}
+    :u.state==='ready'?{label:isMac?'Gapa '+u.version+' w Pobranych':'Instaluję '+u.version+'…',dim:true,keep:true,run:()=>{}}
+    :api.updateCheck?{label:'Sprawdź aktualizacje',run:updManual}:null;
+  showMenu(r.right,r.bottom+6,null,[
+    {label:'Jasny motyw',check:t==='light',run:()=>setTheme('light')},
+    {label:'Ciemny motyw',check:t==='dark',run:()=>setTheme('dark')},
+    {label:'Motyw jak w systemie',check:t==='auto',run:()=>setTheme('auto')},
+    '-',
+    {label:'Skróty klawiszowe',key:'?',run:()=>toggleKeys(true)},
+    '-',
+    {label:'Nazwy plików',box:S.names!==false,key:'N',run:()=>setNames(!(S.names!==false))},
+    {label:'Linie siatki',box:!!S.gridlines,key:'G',run:()=>setGridLines(!S.gridlines)},
+    {label:'Dźwięki',box:S.sound!==false,key:'S',run:()=>{S.sound=!(S.sound!==false);save();if(S.sound)SFX('on');}},
+    {label:'Wszystkie ustawienia…',key:isMac?'⌘,':'Ctrl+,',run:settingsMenu},
+    '-',
+    {head:updSt&&updSt.current?'Gapa '+updSt.current:'Gapa'},
+    ...(upd?[upd]:[])]);
+  ctx.style.left=Math.max(6,r.right-ctx.offsetWidth)+'px'; ctx.dataset.of='set';
+}
 
 /* --- pliki: odczyt przez protokół pgf:// (z zakresami, więc PSD czytamy kawałkami) --- */
 const ref=f=>({name:f.name,size:f.size,url:api.fileUrl(f.path)});
@@ -1944,10 +1966,10 @@ api.editorName().then(n=>{editorName=n;});
 // wybór programu do edycji: wykryte (Photoshop, Affinity) albo dowolny inny
 async function editorMenu(){
   const r=$('#setBtn').getBoundingClientRect(), {list,current}=await api.editors();
-  showMenu(r.left-4,r.top-8,'Otwieraj pliki (E) w',[
+  showMenu(r.right-230,r.bottom+6,'Otwieraj pliki (E) w',[
     ...list.map(x=>({label:x.name,check:x.path===current,run:async()=>{ editorName=await api.editorSet(x.path); zoomTip('E otwiera teraz w: '+editorName); }})),
     ...(list.length?['-']:[]),
-    {label:'Inny program…',run:async()=>{ const n=await api.openEditor([],true); if(n){ editorName=n; zoomTip('E otwiera teraz w: '+n); } }}],true);
+    {label:'Inny program…',run:async()=>{ const n=await api.openEditor([],true); if(n){ editorName=n; zoomTip('E otwiera teraz w: '+n); } }}]);
 }
 async function openInEditor(paths,choose){
   const n=await api.openEditor(paths,choose);
@@ -2458,11 +2480,13 @@ let peekState=null; if(api.peekGet&&!PEEK) api.peekGet().then(r=>{ peekState=r; 
 /* --- aktualizacje: dyskretna informacja w stopce, klik pobiera i instaluje --- */
 let updSt=null;
 function updShow(s){
-  updSt=s; const el=$('#upd'); if(!el) return;
-  if(s.state==='available'){ el.hidden=false; el.textContent='Nowa wersja '+s.version; el.title='Kliknij, żeby pobrać i zainstalować Gapę '+s.version+(s.error?'\nPoprzednia próba: '+s.error:''); }
-  else if(s.state==='downloading'){ el.hidden=false; el.textContent='Pobieram '+s.version+(s.size?' · '+Math.round(s.got/s.size*100)+'%':''); el.title=''; }
-  else if(s.state==='ready'){ el.hidden=false; el.textContent=isMac?'Gapa '+s.version+' w Pobranych':'Instaluję '+s.version+'…'; el.title=isMac?'Zamknij Gapę (⌘Q) i przeciągnij nową wersję do Aplikacji, zastępując starą.':''; }
-  else el.hidden=true;
+  // nowa wersja: kropka na przycisku ustawień, a w jego menu „Zainstaluj wersję …” (wytyczne interakcji, punkt 8)
+  updSt=s; const b=$('#setBtn'); if(!b) return;
+  const on=s.state==='available'||s.state==='downloading'||s.state==='ready';
+  b.classList.toggle('dot',on);
+  b.title=(s.state==='available'?'Ustawienia · nowa wersja '+s.version:s.state==='ready'&&isMac?'Ustawienia · Gapa '+s.version+' w Pobranych':'Ustawienia')+' ('+(isMac?'⌘,':'Ctrl+,')+')';
+  if(b.dataset.tip!==undefined){ b.dataset.tip=b.title; b.removeAttribute('title'); }
+  if(s.state==='ready'&&isMac) zoomTip('Zamknij Gapę (⌘Q) i przeciągnij nową wersję do Aplikacji, zastępując starą.');
 }
 async function updAsk(){
   if(!updSt||updSt.state!=='available') return;
@@ -2476,7 +2500,7 @@ async function updManual(){
   else if(s.state==='error') zoomTip('Nie udało się sprawdzić: '+s.error);
   else zoomTip('Masz najnowszą wersję ('+s.current+')');
 }
-if(api.updateGet&&!PREP&&!PEEK){ api.updateGet().then(updShow); api.onUpdateStatus(updShow); $('#upd').onclick=e=>{ e.stopPropagation(); updAsk(); }; }
+if(api.updateGet&&!PREP&&!PEEK){ api.updateGet().then(updShow); api.onUpdateStatus(updShow); }
 
 /* --- miniatury całej biblioteki: polecenie w ustawieniach, postęp w stopce, liczenie w osobnym oknie --- */
 let prepSt=null, prepHideT=0;

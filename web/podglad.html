@@ -413,6 +413,11 @@ body.bare #grid .nm{display:none}
 @media (max-width:1100px){.zoom,.sep{display:none}.search:not(.min){width:170px}}
 @media (max-width:860px){#hspace{display:none}#sortBtn span,#typesBtn span{display:none}#sortBtn,#typesBtn{padding:0 6px}.search:not(.min){width:130px}#qScope{display:none}aside{display:none}}
 @media (max-width:760px){#insp{display:none!important}#count{display:none}}
+/* przycisk ustawień zostaje do końca; wcześniej chowają się przyciski z własnym skrótem */
+#setBtn{flex:none;position:relative}
+#setBtn.dot::after{content:"";position:absolute;top:5px;right:5px;width:6px;height:6px;border-radius:50%;background:var(--text);box-shadow:0 0 0 2px var(--bg)}
+@media (max-width:700px){#scope,#mode,#inspBtn{display:none}}
+@media (max-width:520px){#sortBtn,#typesBtn{display:none}}
 
 /* koszyk: wiersz w panelu bocznym, znacznik na kafelku, pasek nad zawartością */
 #tray{flex:none;margin-top:auto;padding:8px 10px 6px;border-radius:10px;cursor:pointer;transition:background .15s}
@@ -637,6 +642,7 @@ body.bare.idle,body.bare.idle *,.fs body.idle,.fs body.idle *{cursor:none!import
   <button id="inspBtn" class="ib" aria-label="Panel informacji" title="Panel informacji ( ] lub I )" style="margin-left:4px">
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="M10 3v10"/></svg>
   </button>
+  <button id="setBtn" class="ib" aria-label="Ustawienia" title="Ustawienia" aria-haspopup="menu"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true"><path d="M2.5 5.5h11M2.5 10.5h11"/><circle cx="6" cy="5.5" r="1.8" fill="var(--bg)"/><circle cx="10.5" cy="10.5" r="1.8" fill="var(--bg)"/></svg></button>
 </header>
 
 <aside>
@@ -651,15 +657,11 @@ body.bare.idle,body.bare.idle *,.fs body.idle,.fs body.idle *{cursor:none!import
     <div id="bRow"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M2.3 6.5h11.4l-1.25 6.2a1.3 1.3 0 0 1-1.27 1H4.82a1.3 1.3 0 0 1-1.27-1z"/><path d="M5.6 6.5 7.6 2.6M10.4 6.5 8.4 2.6"/></svg><span class="nm">Koszyk</span><span class="n" id="bCount"></span></div>
     <div id="bThumbs"></div>
   </div>
-  <div class="foot2"><span id="prep" class="num" hidden></span><button id="upd" class="num" hidden></button></div>
+  <div class="foot2"><span id="prep" class="num" hidden></span></div>
   <div class="foot">
     <span id="cache" class="num"></span>
     <span id="mem" class="num" hidden></span>
     <span id="prog" class="num"></span>
-    <button id="themeBtn" class="ib" aria-label="Tryb ciemny" title="Tryb ciemny (T)"></button>
-    <button id="setBtn" class="ib" aria-label="Ustawienia" title="Ustawienia">
-      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v1.6M8 12.6v1.6M3.6 3.6l1.1 1.1M11.3 11.3l1.1 1.1M1.8 8h1.6M12.6 8h1.6M3.6 12.4l1.1-1.1M11.3 4.7l1.1-1.1"/></svg>
-    </button>
   </div>
 </aside>
 
@@ -1564,7 +1566,6 @@ let memT=0;
 async function memTick(){ if(!S.showMem||!api.mem) return; const m=await api.mem(); $('#mem').textContent='RAM '+fmtSize(m.total*1024); $('#mem').title='Pamięć RAM wszystkich procesów Gapy: '+fmtSize(m.total*1024)+' (okna: '+fmtSize(m.renderer*1024)+')'; }
 function setShowMem(v){ S.showMem=v; save(); $('#mem').hidden=!v; clearInterval(memT); if(v){ memTick(); memT=setInterval(memTick,2000); } }
 /* --- ustawienia: okno na środku, dwie kolumny sekcji --- */
-const GEAR='<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M6.9 1.8h2.2l.35 1.7 1.2.5 1.45-.96 1.56 1.56-.96 1.45.5 1.2 1.7.35v2.2l-1.7.35-.5 1.2.96 1.45-1.56 1.56-1.45-.96-1.2.5-.35 1.7H6.9l-.35-1.7-1.2-.5-1.45.96-1.56-1.56.96-1.45-.5-1.2-1.7-.35V6.9l1.7-.35.5-1.2-.96-1.45L3.9 2.34l1.45.96 1.2-.5z"/><circle cx="8" cy="8" r="2.1"/></svg>';
 const SUN='<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="2.8"/><path d="M8 1.6v1.5M8 12.9v1.5M3.5 3.5l1 1M11.5 11.5l1 1M1.6 8h1.5M12.9 8h1.5M3.5 12.5l1-1M11.5 4.5l1-1"/></svg>';
 const MOON='<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M13.2 10.1A5.6 5.6 0 0 1 5.9 2.8a5.6 5.6 0 1 0 7.3 7.3z"/></svg>';
 function themeBtnSync(){ const b=$('#themeBtn'); if(!b) return; const dark=document.documentElement.dataset.theme==='dark'; b.innerHTML=dark?SUN:MOON; b.title=(dark?'Tryb jasny':'Tryb ciemny')+' (T)'; b.setAttribute('aria-label',b.title); }
@@ -1627,8 +1628,31 @@ function renderSettings(){
 }
 $('#setp').addEventListener('click',e=>{ if(e.target.id==='setp') closeSettings(); });
 addEventListener('keydown',e=>{ if(setOpen&&e.key==='Escape'){ e.preventDefault(); e.stopImmediatePropagation(); closeSettings(); } },true);
-$('#setBtn').innerHTML=GEAR; $('#setBtn').title='Ustawienia ('+(isMac?'⌘,':'Ctrl+,')+')'; $('#setBtn').onclick=e=>{ e.stopPropagation(); setOpen?closeSettings():settingsMenu(); };
-if($('#themeBtn')){ $('#themeBtn').onclick=e=>{ e.stopPropagation(); cycleTheme(); }; themeBtnSync(); }
+// przycisk ustawień: ostatni w górnym pasku, menu pod nim wyrównane do prawej krawędzi (wytyczne interakcji, punkt 8)
+$('#setBtn').title='Ustawienia ('+(isMac?'⌘,':'Ctrl+,')+')';
+$('#setBtn').onclick=e=>{ e.stopPropagation(); if(!ctx.hidden&&ctx.dataset.of==='set'){ hideMenu(); return; } if(setOpen) closeSettings(); setMenu(); };
+function setMenu(){
+  const r=$('#setBtn').getBoundingClientRect(), t=S.theme||'auto', u=updSt||{};
+  const upd=u.state==='available'?{label:'Zainstaluj wersję '+u.version,run:updAsk}
+    :u.state==='downloading'?{label:'Pobieram '+u.version+(u.size?' · '+Math.round(u.got/u.size*100)+'%':''),dim:true,keep:true,run:()=>{}}
+    :u.state==='ready'?{label:isMac?'Gapa '+u.version+' w Pobranych':'Instaluję '+u.version+'…',dim:true,keep:true,run:()=>{}}
+    :api.updateCheck?{label:'Sprawdź aktualizacje',run:updManual}:null;
+  showMenu(r.right,r.bottom+6,null,[
+    {label:'Jasny motyw',check:t==='light',run:()=>setTheme('light')},
+    {label:'Ciemny motyw',check:t==='dark',run:()=>setTheme('dark')},
+    {label:'Motyw jak w systemie',check:t==='auto',run:()=>setTheme('auto')},
+    '-',
+    {label:'Skróty klawiszowe',key:'?',run:()=>toggleKeys(true)},
+    '-',
+    {label:'Nazwy plików',box:S.names!==false,key:'N',run:()=>setNames(!(S.names!==false))},
+    {label:'Linie siatki',box:!!S.gridlines,key:'G',run:()=>setGridLines(!S.gridlines)},
+    {label:'Dźwięki',box:S.sound!==false,key:'S',run:()=>{S.sound=!(S.sound!==false);save();if(S.sound)SFX('on');}},
+    {label:'Wszystkie ustawienia…',key:isMac?'⌘,':'Ctrl+,',run:settingsMenu},
+    '-',
+    {head:updSt&&updSt.current?'Gapa '+updSt.current:'Gapa'},
+    ...(upd?[upd]:[])]);
+  ctx.style.left=Math.max(6,r.right-ctx.offsetWidth)+'px'; ctx.dataset.of='set';
+}
 
 /* --- pliki: odczyt przez protokół pgf:// (z zakresami, więc PSD czytamy kawałkami) --- */
 const ref=f=>({name:f.name,size:f.size,url:api.fileUrl(f.path)});
@@ -3238,10 +3262,10 @@ api.editorName().then(n=>{editorName=n;});
 // wybór programu do edycji: wykryte (Photoshop, Affinity) albo dowolny inny
 async function editorMenu(){
   const r=$('#setBtn').getBoundingClientRect(), {list,current}=await api.editors();
-  showMenu(r.left-4,r.top-8,'Otwieraj pliki (E) w',[
+  showMenu(r.right-230,r.bottom+6,'Otwieraj pliki (E) w',[
     ...list.map(x=>({label:x.name,check:x.path===current,run:async()=>{ editorName=await api.editorSet(x.path); zoomTip('E otwiera teraz w: '+editorName); }})),
     ...(list.length?['-']:[]),
-    {label:'Inny program…',run:async()=>{ const n=await api.openEditor([],true); if(n){ editorName=n; zoomTip('E otwiera teraz w: '+n); } }}],true);
+    {label:'Inny program…',run:async()=>{ const n=await api.openEditor([],true); if(n){ editorName=n; zoomTip('E otwiera teraz w: '+n); } }}]);
 }
 async function openInEditor(paths,choose){
   const n=await api.openEditor(paths,choose);
@@ -3752,11 +3776,13 @@ let peekState=null; if(api.peekGet&&!PEEK) api.peekGet().then(r=>{ peekState=r; 
 /* --- aktualizacje: dyskretna informacja w stopce, klik pobiera i instaluje --- */
 let updSt=null;
 function updShow(s){
-  updSt=s; const el=$('#upd'); if(!el) return;
-  if(s.state==='available'){ el.hidden=false; el.textContent='Nowa wersja '+s.version; el.title='Kliknij, żeby pobrać i zainstalować Gapę '+s.version+(s.error?'\nPoprzednia próba: '+s.error:''); }
-  else if(s.state==='downloading'){ el.hidden=false; el.textContent='Pobieram '+s.version+(s.size?' · '+Math.round(s.got/s.size*100)+'%':''); el.title=''; }
-  else if(s.state==='ready'){ el.hidden=false; el.textContent=isMac?'Gapa '+s.version+' w Pobranych':'Instaluję '+s.version+'…'; el.title=isMac?'Zamknij Gapę (⌘Q) i przeciągnij nową wersję do Aplikacji, zastępując starą.':''; }
-  else el.hidden=true;
+  // nowa wersja: kropka na przycisku ustawień, a w jego menu „Zainstaluj wersję …” (wytyczne interakcji, punkt 8)
+  updSt=s; const b=$('#setBtn'); if(!b) return;
+  const on=s.state==='available'||s.state==='downloading'||s.state==='ready';
+  b.classList.toggle('dot',on);
+  b.title=(s.state==='available'?'Ustawienia · nowa wersja '+s.version:s.state==='ready'&&isMac?'Ustawienia · Gapa '+s.version+' w Pobranych':'Ustawienia')+' ('+(isMac?'⌘,':'Ctrl+,')+')';
+  if(b.dataset.tip!==undefined){ b.dataset.tip=b.title; b.removeAttribute('title'); }
+  if(s.state==='ready'&&isMac) zoomTip('Zamknij Gapę (⌘Q) i przeciągnij nową wersję do Aplikacji, zastępując starą.');
 }
 async function updAsk(){
   if(!updSt||updSt.state!=='available') return;
@@ -3770,7 +3796,7 @@ async function updManual(){
   else if(s.state==='error') zoomTip('Nie udało się sprawdzić: '+s.error);
   else zoomTip('Masz najnowszą wersję ('+s.current+')');
 }
-if(api.updateGet&&!PREP&&!PEEK){ api.updateGet().then(updShow); api.onUpdateStatus(updShow); $('#upd').onclick=e=>{ e.stopPropagation(); updAsk(); }; }
+if(api.updateGet&&!PREP&&!PEEK){ api.updateGet().then(updShow); api.onUpdateStatus(updShow); }
 
 /* --- miniatury całej biblioteki: polecenie w ustawieniach, postęp w stopce, liczenie w osobnym oknie --- */
 let prepSt=null, prepHideT=0;
@@ -3857,7 +3883,7 @@ document.addEventListener('pointerover',e=>{
   const el=e.target.closest&&e.target.closest(BTSEL); if(!el||el===btEl) return;
   if(el.title){ el.dataset.tip=el.title; el.removeAttribute('title'); }   // także gdy program zmieni title później
   btHide(); btEl=el;
-  btT=setTimeout(()=>{ if(btEl===el) btShow(el); }, Date.now()-btLast<400?0:450);
+  btT=setTimeout(()=>{ if(btEl===el) btShow(el); }, Date.now()-btLast<400?0:1500);
 });
 document.addEventListener('pointerout',e=>{ const el=e.target.closest&&e.target.closest(BTSEL); if(el&&el===btEl&&!el.contains(e.relatedTarget)) btHide(); });
 addEventListener('pointerdown',btHide,true); addEventListener('wheel',btHide,{passive:true}); addEventListener('keydown',btHide,true);

@@ -731,7 +731,7 @@ function renderCrumbs(){
   if(virt==='stars'){ const s=document.createElement('span'); s.textContent='Oznaczone gwiazdkami'; c.appendChild(s); document.title='Oznaczone gwiazdkami — Gapa'; return; }
   if(!curPath) return;
   crumbList=crumbsOf(curPath);
-  crumbsFit();
+  crumbsFit(); requestAnimationFrame(()=>{ if(crumbList.length) crumbsFit(); });
   document.title=crumbList[crumbList.length-1].name+' — Gapa';
 }
 function crumbsDraw(hide){
@@ -753,9 +753,12 @@ function crumbsDraw(hide){
 }
 function crumbsFit(){
   const c=$('#crumbs'), n=crumbList.length; if(!n) return;
-  let hide=0; c.classList.add('measure'); crumbsDraw(0);
-  while(c.scrollWidth>c.clientWidth+1&&hide<n-1){ hide++; crumbsDraw(hide); }
-  c.classList.remove('measure');
+  // mierzymy wolne miejsce w całym górnym pasku: ścieżka na chwilę się nie kurczy, a my chowamy najwyższe
+  // foldery, dopóki pasek się przepełnia albo ścieżka przekracza swoją największą szerokość
+  const pb=$('#pathbox'), hd=pb.parentElement, over=()=>hd.scrollWidth>hd.clientWidth+1||c.scrollWidth>c.clientWidth+1;
+  let hide=0; c.classList.add('measure'); pb.style.flexShrink='0'; crumbsDraw(0);
+  while(over()&&hide<n-1){ hide++; crumbsDraw(hide); }
+  pb.style.flexShrink=''; c.classList.remove('measure');
 }
 { let crT=0; const refit=()=>{ cancelAnimationFrame(crT); crT=requestAnimationFrame(()=>{ if(crumbList.length) crumbsFit(); }); }; new ResizeObserver(refit).observe($('#pathbox').parentElement); addEventListener('resize',refit); }
 

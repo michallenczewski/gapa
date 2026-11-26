@@ -84,7 +84,7 @@ header{grid-column:1/4;display:flex;align-items:center;gap:6px;padding:0 12px;mi
 /* ścieżka: okruszki do klikania, a klik w wolne miejsce zamienia je w pole do wpisania lub wklejenia ścieżki */
 .ok-show{margin:6px 4px;height:28px;padding:0 12px;border-radius:8px;background:var(--soft);color:var(--text);font:inherit;font-size:12px}
 .ok-show:hover{background:var(--hover)}
-#pathbox{position:relative;display:flex;align-items:center;min-width:120px;flex:0 1 auto;max-width:min(640px,45vw);height:30px;border-radius:8px;cursor:text;padding-right:2px}
+#pathbox{position:relative;display:flex;align-items:center;min-width:120px;flex:0 1 auto;max-width:720px;height:30px;border-radius:8px;cursor:text;padding-right:2px}
 #pathbox:hover{background:var(--hover)}
 #pathbox.edit{flex:0 1 auto;max-width:min(720px,55vw);background:var(--field,var(--soft));box-shadow:0 0 0 1px var(--line) inset}
 #pathIn{flex:1;field-sizing:content;min-width:260px;max-width:100%;padding-right:28px!important;height:30px;border:0;outline:0;background:transparent;padding:0 10px;font:inherit;font-size:13px;color:var(--text)}
@@ -2057,7 +2057,7 @@ function renderCrumbs(){
   if(virt==='stars'){ const s=document.createElement('span'); s.textContent='Oznaczone gwiazdkami'; c.appendChild(s); document.title='Oznaczone gwiazdkami — Gapa'; return; }
   if(!curPath) return;
   crumbList=crumbsOf(curPath);
-  crumbsFit();
+  crumbsFit(); requestAnimationFrame(()=>{ if(crumbList.length) crumbsFit(); });
   document.title=crumbList[crumbList.length-1].name+' — Gapa';
 }
 function crumbsDraw(hide){
@@ -2079,9 +2079,12 @@ function crumbsDraw(hide){
 }
 function crumbsFit(){
   const c=$('#crumbs'), n=crumbList.length; if(!n) return;
-  let hide=0; c.classList.add('measure'); crumbsDraw(0);
-  while(c.scrollWidth>c.clientWidth+1&&hide<n-1){ hide++; crumbsDraw(hide); }
-  c.classList.remove('measure');
+  // mierzymy wolne miejsce w całym górnym pasku: ścieżka na chwilę się nie kurczy, a my chowamy najwyższe
+  // foldery, dopóki pasek się przepełnia albo ścieżka przekracza swoją największą szerokość
+  const pb=$('#pathbox'), hd=pb.parentElement, over=()=>hd.scrollWidth>hd.clientWidth+1||c.scrollWidth>c.clientWidth+1;
+  let hide=0; c.classList.add('measure'); pb.style.flexShrink='0'; crumbsDraw(0);
+  while(over()&&hide<n-1){ hide++; crumbsDraw(hide); }
+  pb.style.flexShrink=''; c.classList.remove('measure');
 }
 { let crT=0; const refit=()=>{ cancelAnimationFrame(crT); crT=requestAnimationFrame(()=>{ if(crumbList.length) crumbsFit(); }); }; new ResizeObserver(refit).observe($('#pathbox').parentElement); addEventListener('resize',refit); }
 

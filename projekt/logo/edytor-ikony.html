@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Edytor ikony Gapy</title>
+<style>
+:root{--bg:#f6f5f1;--panel:#fff;--line:#e3e1da;--text:#1b1b1d;--mute:#77756f;--acc:#1b1b1d}
+@media (prefers-color-scheme:dark){:root{--bg:#18181a;--panel:#212124;--line:#333336;--text:#ececea;--mute:#9a9893;--acc:#ececea}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
+.wrap{display:grid;grid-template-columns:minmax(320px,1fr) 400px;gap:20px;padding:20px;max-width:1240px;margin:0 auto}
+@media (max-width:820px){.wrap{grid-template-columns:1fr}}
+h1{font-size:15px;font-weight:600;margin:0 0 2px}
+.sub{color:var(--mute);margin:0 0 16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.stage{display:flex;flex-direction:column;gap:14px;position:sticky;top:20px;align-self:start}
+.big{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+.big>div{display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--mute);font-size:12px}
+.big .pad{border-radius:14px;padding:18px}
+.strip{display:flex;gap:12px;align-items:end;justify-content:center;border-radius:10px;padding:12px}
+.dock{display:flex;gap:10px;align-items:end;justify-content:center;border-radius:16px;padding:10px 14px}
+.dock span{display:block;width:48px;height:48px;border-radius:11px}
+.sec{margin-bottom:16px}
+.sec>label,.lab{display:block;font-weight:600;margin-bottom:6px}
+.presets{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.btn{all:unset;box-sizing:border-box;cursor:pointer;border:1px solid var(--line);border-radius:8px;padding:6px 9px;display:flex;align-items:center;gap:8px;font-size:12px;transition:background .15s,transform .15s cubic-bezier(.34,1.56,.64,1)}
+.btn:hover{background:rgba(127,127,127,.08)}
+.btn:active{transform:scale(.96)}
+.btn svg{flex:none}
+.btn.on{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc)}
+.lays{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.lays .btn{flex-direction:column;gap:3px;padding:6px 4px;text-align:center}
+.row{display:grid;grid-template-columns:96px 1fr 30px;align-items:center;gap:8px;margin-bottom:7px}
+.row .nm{color:var(--mute)}
+.sw{display:flex;flex-wrap:wrap;gap:4px}
+.sw button{all:unset;cursor:pointer;width:18px;height:18px;border-radius:5px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)}
+.sw button.on{outline:2px solid var(--acc);outline-offset:1px}
+input[type=color]{width:30px;height:24px;border:1px solid var(--line);border-radius:6px;padding:0;background:none;cursor:pointer}
+.sl{display:grid;grid-template-columns:96px 1fr 34px;align-items:center;gap:8px;margin-bottom:6px}
+.sl span{color:var(--mute)}
+.sl output{text-align:right;font-variant-numeric:tabular-nums;color:var(--mute)}
+input[type=range]{width:100%;accent-color:var(--acc)}
+.out{display:flex;gap:6px;flex-wrap:wrap}
+.note{color:var(--mute);font-size:12px;margin-top:8px;min-height:1em}
+.hide{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <div class="stage">
+  <div>
+   <h1>Edytor ikony Gapy</h1>
+   <p class="sub">Stos kart z okiem. Zmiany widać od razu we wszystkich rozmiarach.</p>
+  </div>
+  <div class="card">
+   <div class="big">
+    <div><div class="pad" style="background:#ecebe6" id="pL"></div>Jasne tło</div>
+    <div><div class="pad" style="background:#1f1f1f" id="pD"></div>Ciemne tło</div>
+   </div>
+  </div>
+  <div class="card" style="display:flex;flex-direction:column;gap:10px">
+   <div class="strip" style="background:#ecebe6" id="sL"></div>
+   <div class="strip" style="background:#1f1f1f" id="sD"></div>
+   <div class="dock" style="background:rgba(236,235,230,.9)" id="dL"></div>
+   <div class="dock" style="background:rgba(40,40,42,.9)" id="dD"></div>
+  </div>
+ </div>
+
+ <div class="card">
+  <div class="sec"><span class="lab">Gotowe zestawy</span><div class="presets" id="presets"></div></div>
+  <div class="sec"><span class="lab">Układ</span><div class="lays" id="lays"></div></div>
+  <div class="sec"><span class="lab">Kolor kafelka</span>
+   <div class="sw" id="tileSw" style="gap:5px;margin-bottom:10px"></div>
+   <div id="tileHsl"></div>
+   <div style="display:flex;align-items:center;gap:8px;margin-top:4px"><span style="color:var(--mute);width:96px">Dowolny</span><input type="color" id="tileCol" aria-label="Kolor kafelka"><span id="tileHex" style="color:var(--mute);font-variant-numeric:tabular-nums"></span></div>
+  </div>
+  <div class="sec"><span class="lab">Kolory</span><div id="cols"></div></div>
+  <div class="sec"><span class="lab">Kształt</span><div id="sliders"></div></div>
+  <div class="sec"><span class="lab">Zapis</span>
+   <div class="out">
+    <button class="btn" id="bCopy">Kopiuj ustawienia</button>
+    <button class="btn" id="bSvg">Pobierz SVG</button>
+    <button class="btn" id="bPng">Pobierz PNG 1024</button>
+    <button class="btn" id="bSave">Zapamiętaj wersję</button>
+   </div>
+   <div class="note" id="note"></div>
+  </div>
+  <div class="sec hide" id="savedSec"><span class="lab">Zapamiętane wersje</span><div class="presets" id="saved"></div></div>
+ </div>
+</div>
+
+<script>
+const PAL=[
+ ['Złamana biel','#f3f1ea'],['Ciepła biel','#ede6d8'],['Biel','#ffffff'],['Jasna szarość','#d9d7d0'],
+ ['Grafit','#3a3a3c'],['Ciepła czerń','#24211e'],['Prawie czerń','#1c1c1f'],['Czerń','#16161a'],
+ ['Róż','#f2507b'],['Jasny róż','#ffb3c7'],['Czerwień Gapy','#F2475B'],['Pomarańcz','#ff7a3d'],
+ ['Żółty','#ffd23f'],['Błękit','#00b4e6'],['Jasny błękit','#dcf0fb'],['Mięta','#CDF7E6'],
+ ['Fiolet Gapy','#7B2EFF'],['Granat','#1b1d2e']];
+const OW='#f3f1ea',OB='#1c1c1f',K='#16161a',W='#ffffff',PK='#f2507b',PP='#ffb3c7',LB='#dcf0fb',CY='#00b4e6',GR='#F2475B',MI='#CDF7E6',V='#7B2EFF';
+
+const COLS=[['third','Karta trzecia'],['back','Karta tylna'],['front','Karta przednia'],['white','Białko oka'],['iris','Tęczówka'],['line','Obrys'],['shadow','Grubość'],['cshadow','Cień między kartami'],['halo','Obwódka stosu']];
+const SL=[['scale','Wielkość stosu',50,130,1],['vshift','Przesunięcie w pionie',-30,30,1],['shift','Przesunięcie w poziomie',-30,30,1],['spread','Rozsunięcie kart',-10,24,1],['cs','Cień między kartami',0,16,1],['co','Krycie cienia',0,100,5],['depth','Wypchnięcie',0,14,1],['stroke','Obrys',0,8,0.5],['halo','Obwódka stosu',0,10,0.5],['eye','Wielkość oka',60,150,5],['radius','Narożnik kafelka',20,50,1],['cardR','Narożnik kart',2,24,1]];
+const TILE_PAL=[
+ ['Biel papieru','#faf8f3'],['Złamana biel','#f3f1ea'],['Ciepła biel','#ede6d8'],['Kość słoniowa','#f1ead6'],['Chłodna biel','#eef0f2'],['Szałwia jasna','#e3e8df'],
+ ['Kamień','#d9d5cb'],['Szarość ciepła','#b9b4a9'],['Szarość chłodna','#a9adb3'],['Grafit ciepły','#4a4743'],['Grafit','#3a3a3c'],['Łupek','#2f343b'],
+ ['Ciepła czerń','#24211e'],['Prawie czerń','#1c1c1f'],['Czerń granatowa','#171a22'],['Czerń zielona','#18201c'],['Czerń śliwkowa','#201a1f'],['Czerń','#111113'],
+ ['Pudrowy róż','#ffd9e2'],['Jasny błękit','#dcf0fb'],['Mięta','#CDF7E6'],['Jasny żółty','#fff1c2'],['Lawenda','#e9dcff'],['Brzoskwinia','#ffe0cc'],
+ ['Róż','#f2507b'],['Czerwień','#F2475B'],['Pomarańcz','#ff7a3d'],['Żółty','#ffd23f'],['Zieleń','#1fae6b'],['Błękit','#00b4e6'],['Kobalt','#2f6bff'],['Fiolet','#7B2EFF'],['Granat','#1b1d2e'],['Butelkowa zieleń','#173a2e'],['Bordo','#5a1a2b'],['Oliwka','#6b6a3a']];
+
+const LAYS={
+ dwie:{n:'Dwie karty',items:[[32,40,74,56,'back'],[50,54,78,58,'front']],eye:[89,83,25,10]},
+ wachlarz:{n:'Wachlarz',items:[[34,46,70,54,'back',-10],[50,54,76,56,'front',4]],eye:[88,82,23,9.5],dir:[-0.8,-0.6]},
+ trzy:{n:'Trzy karty',items:[[26,34,68,50,'third'],[38,44,72,54,'back'],[52,58,76,56,'front']],eye:[90,86,23,9.5]},
+ jedna:{n:'Jedna karta',items:[[30,42,100,74,'front']],eye:[80,79,34,13]},
+ listwa:{n:'Folder z listwą',items:[[30,34,100,8,'back',0,4],[26,46,108,74,'front',0,1.15]],eye:[80,82,36,13],dir:[0,-1]},
+ zakladka:{n:'Folder z zakładką',items:[[26,36,48,26,'back',0,0.7,0],[26,50,108,70,'front',0,1.08,0]],eye:[80,85,34,13]},
+ dwaFoldery:{n:'Dwa foldery',items:[[44,24,40,20,'third',0,0.7,0],[44,34,96,60,'back',0,1,0],[20,52,42,24,'third',0,0.7,1],[20,64,104,64,'front',0,1,1]],eye:[72,96,30,11],dir:[0.75,-0.66]},
+ obecne:{n:'Obecne logo',ball:true,items:[]},
+ przechyl:{n:'Folder przechylony',items:[[26,36,48,26,'back',0,0.7,0],[26,50,108,70,'front',0,1.08,0]],eye:[80,85,34,13],rot:-7}
+};
+
+const PRESETS=[
+ ['Obecne logo Gapy',{lay:'obecne',tile:'#7B2EFF',front:'#CDF7E6',iris:'#F2475B',shadow:'#161616',line:K,halo:OW,stroke:0,depth:0,h:0,eye:100,scale:100,shift:0,vshift:0,radius:35}],
+ ['Biel: róż i błękit',{tile:OW,third:PP,back:PK,front:LB,white:W,iris:CY,line:K,shadow:K,halo:OW,h:0}],
+ ['Czerń: róż i błękit',{tile:OB,third:PP,back:PK,front:LB,white:W,iris:CY,line:K,shadow:K,halo:OW,h:4}],
+ ['Biel z czarną kartą',{tile:OW,third:PP,back:PK,front:OB,white:W,iris:CY,line:K,shadow:K,halo:OW,h:0}],
+ ['Czerń z białą kartą',{tile:OB,third:PP,back:PK,front:OW,white:W,iris:CY,line:K,shadow:K,halo:OW,h:4}],
+ ['Biel, karty czerń i biel',{tile:OW,third:'#3a3a3c',back:OB,front:W,white:OW,iris:PK,line:K,shadow:K,halo:OW,h:0}],
+ ['Czerń, karty biel i czerń',{tile:OB,third:'#d9d7d0',back:OW,front:'#3a3a3c',white:OW,iris:PK,line:K,shadow:K,halo:OW,h:4}],
+ ['Biel, kolory Gapy',{tile:OW,third:PP,back:GR,front:MI,white:W,iris:V,line:K,shadow:K,halo:OW,h:0}],
+ ['Czerń, kolory Gapy',{tile:OB,third:PP,back:GR,front:MI,white:W,iris:V,line:K,shadow:K,halo:OW,h:4}],
+ ['Ciepła biel, żółty',{tile:'#ede6d8',third:PP,back:'#ffd23f',front:W,white:W,iris:PK,line:K,shadow:K,halo:OW,h:0}],
+ ['Ciepła czerń, pomarańcz',{tile:'#24211e',third:PP,back:'#ff7a3d',front:OW,white:W,iris:CY,line:K,shadow:K,halo:OW,h:4}]
+];
+
+const DEF={lay:'dwie',tile:OW,third:PP,back:PK,front:LB,white:W,iris:CY,line:K,shadow:K,halo:OW,depth:6,stroke:4.5,h:0,eye:100,radius:36,cardR:13,shift:0,scale:100,vshift:0,spread:0,cs:0,co:30,cshadow:'#16161a'};
+let S;try{S=Object.assign({},DEF,JSON.parse(localStorage.getItem('gapaIkona')||'{}'))}catch(e){S={...DEF}}
+let saved=[];try{saved=JSON.parse(localStorage.getItem('gapaIkonaZapis')||'[]')}catch(e){}
+let UID=0;
+
+function svg(st,px,forExport){
+ const L=LAYS[st.lay],D=+st.depth,SW=+st.stroke,HW=SW+2*(+st.h),k=st.eye/100,sx=+st.shift,sp=+st.spread||0,cs=+st.cs||0,co=(+st.co||0)/100;
+ const dir=L.dir||[-0.6,-0.8];
+ const gs=L.items.map((it,i)=>it[7]??i),gMax=Math.max(...gs),gMin=Math.min(...gs);
+ let halo='',body='';const lower=[];
+ L.items.forEach((it,i)=>{const [x0,y0,w,h,key,rot,rm]=it,g=gs[i],off=(gMax-g)*sp;
+  const x=x0+sx+dir[0]*off,y=y0+dir[1]*off,r=Math.min(st.cardR*(rm||1),h/2),tr=rot?` transform="rotate(${rot} ${x+w/2} ${y+h/2})"`:'',f=st[key];
+  const rect=(dx,dy,fill,s,sw,extra='')=>`<rect x="${x+dx}" y="${y+dy}" width="${w}" height="${h}" rx="${r}" fill="${fill}"${sw>0?` stroke="${s}" stroke-width="${sw}" stroke-linejoin="round"`:''}${extra}/>`;
+  if(+st.h>0){let s='';for(const d of [D,D/2,0])s+=rect(0,d,st.halo,st.halo,HW);halo+=`<g${tr}>${s}</g>`;}
+  let s='';
+  if(cs>0&&co>0&&g>gMin){const lw=lower.filter(l=>l.g<g);if(lw.length){const id='cp'+(++UID);
+   body+=`<clipPath id="${id}">${lw.map(l=>l.clip).join('')}</clipPath><g clip-path="url(#${id})"><g${tr}>${rect(dir[0]*cs*1.4,dir[1]*cs*1.4,st.cshadow||st.shadow,'',0,` opacity="${co}"`)}</g></g>`;}}
+  if(D>0)for(const d of [D,D*0.66,D*0.33])s+=rect(0,d,st.shadow,st.shadow,Math.max(SW,0.01));
+  s+=rect(0,0,f,st.line,SW);body+=`<g${tr}>${s}</g>`;
+  lower.push({g,clip:rect(0,0,'#000','',0,tr)});});
+ if(L.ball){const bx=80+sx,by=72,R=42,ix=bx+18*k,iy=by-4,ir=16*k,st2=SW>0?` stroke="${st.line}" stroke-width="${SW}"`:'';
+  if(+st.h>0)for(const d of [D,D/2,0])halo+=`<circle cx="${bx}" cy="${by+d}" r="${R+SW/2+ +st.h}" fill="${st.halo}"/>`;
+  let b=`<ellipse cx="${bx}" cy="124" rx="40" ry="10" fill="${st.shadow}"/>`;
+  if(D>0)for(const d of [D,D*0.66,D*0.33])b+=`<circle cx="${bx}" cy="${by+d}" r="${R}" fill="${st.shadow}"${SW>0?` stroke="${st.shadow}" stroke-width="${SW}"`:''}/>`;
+  b+=`<circle cx="${bx}" cy="${by}" r="${R}" fill="${st.front}"${st2}/><circle cx="${ix}" cy="${iy}" r="${ir}" fill="${st.iris}"${st2}/><circle cx="${ix+3*k}" cy="${iy-1}" r="${6.5*k}" fill="${K}"/>`;
+  body=b;}
+ const [ex,ey,ew0,ir0]=L.eye||[0,0,0,0],cx=ex+sx,cy=ey,w=ew0*k,ir=ir0*k,eh=w*0.82;
+ const st2=SW>0?` stroke="${st.line}" stroke-width="${Math.max(SW-0.8,0.5)}" stroke-linejoin="round"`:'';
+ const eye=`<path d="M${cx-w} ${cy} C${cx-w*0.5} ${cy-eh} ${cx+w*0.5} ${cy-eh} ${cx+w} ${cy} C${cx+w*0.5} ${cy+eh} ${cx-w*0.5} ${cy+eh} ${cx-w} ${cy}Z" fill="${st.white}"${st2}/><circle cx="${cx}" cy="${cy}" r="${ir}" fill="${st.iris}"${st2}/><circle cx="${cx}" cy="${cy}" r="${ir*0.42}" fill="${K}"/><circle cx="${cx-ir*0.3}" cy="${cy-ir*0.3}" r="${ir*0.16}" fill="#fff"/>`;
+ const gT=`<g transform="translate(80 ${80+(+st.vshift||0)}) scale(${(+st.scale||100)/100}) rotate(${L.rot||0}) translate(-80 -80)">`;
+ const size=forExport?`width="${px}" height="${px}" xmlns="http://www.w3.org/2000/svg"`:`width="${px}" height="${px}"`;
+ return `<svg viewBox="0 0 160 160" ${size} role="img" aria-label="Ikona Gapy"><rect width="160" height="160" rx="${st.radius}" fill="${st.tile}"/>${gT}${halo}${body}${L.ball?'':eye}</g></svg>`;
+}
+
+// kolor kafelka: HSL
+function hex2hsl(hx){let r=parseInt(hx.slice(1,3),16)/255,g=parseInt(hx.slice(3,5),16)/255,b=parseInt(hx.slice(5,7),16)/255;
+ const mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2;let h=0,s=0;
+ if(mx!==mn){const d=mx-mn;s=l>0.5?d/(2-mx-mn):d/(mx+mn);h=mx===r?(g-b)/d+(g<b?6:0):mx===g?(b-r)/d+2:(r-g)/d+4;h*=60;}
+ return [Math.round(h),Math.round(s*100),Math.round(l*100)];}
+function hsl2hex(h,s,l){s/=100;l/=100;const a=s*Math.min(l,1-l),f=n=>{const k=(n+h/30)%12,c=l-a*Math.max(Math.min(k-3,9-k,1),-1);return Math.round(c*255).toString(16).padStart(2,'0');};return '#'+f(0)+f(8)+f(4);}
+
+function render(){
+ const pv=svg(S,200);document.getElementById('pL').innerHTML=pv;document.getElementById('pD').innerHTML=pv;
+ const strip=[128,64,48,32,24,16].map(p=>svg(S,p)).join('');
+ document.getElementById('sL').innerHTML=strip;document.getElementById('sD').innerHTML=strip;
+ const ghost=c=>`<span style="background:${c}"></span>`;
+ const dock=ghost('#8fa9c4')+ghost('#e9e4d4')+svg(S,48)+ghost('#5a8f6a')+ghost('#f0b04a');
+ document.getElementById('dL').innerHTML=dock;document.getElementById('dD').innerHTML=dock;
+ try{localStorage.setItem('gapaIkona',JSON.stringify(S))}catch(e){}
+ sync();
+}
+
+function sync(){
+ document.querySelectorAll('#lays .btn').forEach(b=>b.classList.toggle('on',b.dataset.k===S.lay));
+ document.querySelectorAll('.row').forEach(r=>{const k=r.dataset.k;
+  r.querySelectorAll('.sw button').forEach(b=>b.classList.toggle('on',b.dataset.c.toLowerCase()===String(S[k]).toLowerCase()));
+  r.querySelector('input').value=S[k];
+  r.classList.toggle('hide',k==='third'&&!LAYS[S.lay].items.some(i=>i[4]==='third'));});
+ document.querySelectorAll('#tileSw button').forEach(b=>b.classList.toggle('on',b.dataset.c.toLowerCase()===String(S.tile).toLowerCase()));
+ document.getElementById('tileCol').value=S.tile;document.getElementById('tileHex').textContent=S.tile;
+ if(!hslLock){const [h,sa,l]=hex2hsl(S.tile);[['th',h],['ts',sa],['tl',l]].forEach(([k,v])=>{const r=document.querySelector('#tileHsl [data-k='+k+']');r.querySelector('input').value=v;r.querySelector('output').textContent=v;});}
+ document.querySelectorAll('#sliders .sl').forEach(r=>{const k=r.dataset.k;r.querySelector('input').value=S[k];r.querySelector('output').textContent=S[k];});
+}
+
+// presety
+const pres=document.getElementById('presets');
+PRESETS.forEach(([n,p])=>{const b=document.createElement('button');b.className='btn';
+ b.innerHTML=svg({...S,...p,lay:S.lay},26)+n;
+ b.onclick=()=>{Object.assign(S,p);render();};pres.appendChild(b);});
+function refreshPresetIcons(){[...pres.children].forEach((b,i)=>{const [n,p]=PRESETS[i];b.innerHTML=svg({...S,...p},26)+n;});}
+
+// układy
+const lays=document.getElementById('lays');
+Object.entries(LAYS).forEach(([k,l])=>{const b=document.createElement('button');b.className='btn';b.dataset.k=k;
+ b.onclick=()=>{S.lay=k;render();refreshLays();refreshPresetIcons();};lays.appendChild(b);});
+function refreshLays(){[...lays.children].forEach(b=>{b.innerHTML=svg({...S,lay:b.dataset.k},40)+`<span>${LAYS[b.dataset.k].n}</span>`;});}
+
+// kolory
+const cols=document.getElementById('cols');
+COLS.forEach(([k,n])=>{const r=document.createElement('div');r.className='row';r.dataset.k=k;
+ r.innerHTML=`<span class="nm">${n}</span><div class="sw">${PAL.map(([pn,c])=>`<button title="${pn}" data-c="${c}" style="background:${c}"></button>`).join('')}</div><input type="color" aria-label="${n}">`;
+ r.querySelectorAll('.sw button').forEach(b=>b.onclick=()=>{S[k]=b.dataset.c;render();refreshLays();});
+ r.querySelector('input').oninput=e=>{S[k]=e.target.value;render();};
+ r.querySelector('input').onchange=()=>refreshLays();
+ cols.appendChild(r);});
+
+// suwaki
+const sls=document.getElementById('sliders');
+SL.forEach(([k,n,a,b,s])=>{const key=k==='halo'?'h':k;const r=document.createElement('div');r.className='sl';r.dataset.k=key;
+ r.innerHTML=`<span>${n}</span><input type="range" min="${a}" max="${b}" step="${s}"><output></output>`;
+ r.querySelector('input').oninput=e=>{S[key]=+e.target.value;render();};
+ r.querySelector('input').onchange=()=>{refreshLays();refreshPresetIcons();};
+ sls.appendChild(r);});
+
+// kafelek
+let hslLock=false;
+const tsw=document.getElementById('tileSw');
+TILE_PAL.forEach(([n,c])=>{const b=document.createElement('button');b.title=n;b.dataset.c=c;b.style.background=c;b.style.width=b.style.height='22px';
+ b.onclick=()=>{S.tile=c;render();refreshLays();refreshPresetIcons();};tsw.appendChild(b);});
+const th=document.getElementById('tileHsl');
+[['th','Odcień',0,360],['ts','Nasycenie',0,100],['tl','Jasność',0,100]].forEach(([k,n,a,b])=>{const r=document.createElement('div');r.className='sl';r.dataset.k=k;
+ r.innerHTML=`<span>${n}</span><input type="range" min="${a}" max="${b}" step="1"><output></output>`;
+ r.querySelector('input').oninput=()=>{const v=k2=>+document.querySelector('#tileHsl [data-k='+k2+'] input').value;
+  S.tile=hsl2hex(v('th'),v('ts'),v('tl'));r.querySelector('output').textContent=r.querySelector('input').value;hslLock=true;render();hslLock=false;};
+ r.querySelector('input').onchange=()=>{refreshLays();refreshPresetIcons();};th.appendChild(r);});
+document.getElementById('tileCol').oninput=e=>{S.tile=e.target.value;render();};
+document.getElementById('tileCol').onchange=()=>{refreshLays();refreshPresetIcons();};
+
+// zapis
+const note=t=>{const n=document.getElementById('note');n.textContent=t;clearTimeout(note.t);note.t=setTimeout(()=>n.textContent='',4000);};
+let DLS=null;
+const bS=document.getElementById('bSvg'),bP=document.getElementById('bPng');bS.classList.add('hide');bP.classList.add('hide');
+try{window.claude&&window.claude.use&&window.claude.use('downloads').then(d=>{DLS=d;if(d){bS.classList.remove('hide');bP.classList.remove('hide');}}).catch(()=>{});}catch(e){}
+async function dl(name,data){if(!DLS)return;try{await DLS.save({filename:name,data});note('Zapisano plik '+name+'.');}
+ catch(e){const c=e&&e.code;if(c==='declined')return;if(c==='rate_limited'){note('Chwila, poprzednie okno zapisu jest jeszcze otwarte.');return;}
+  if(c==='host_unavailable'){note('Tutaj nie da się zapisać pliku. Otwórz edytor w przeglądarce na komputerze.');}else{note('Nie udało się zapisać pliku.');}
+  if(c&&!['bad_request','too_large'].includes(c)){bS.classList.add('hide');bP.classList.add('hide');}}}
+document.getElementById('bCopy').onclick=async()=>{const t=JSON.stringify(S);
+ try{await navigator.clipboard.writeText(t);note('Ustawienia skopiowane. Wklej je w rozmowie.');}
+ catch(e){prompt('Skopiuj ustawienia:',t);}};
+document.getElementById('bSvg').onclick=()=>dl('gapa-ikona.svg',new Blob([svg(S,1024,true)],{type:'image/svg+xml'}));
+document.getElementById('bPng').onclick=()=>{const img=new Image();img.onload=()=>{const c=document.createElement('canvas');c.width=c.height=1024;c.getContext('2d').drawImage(img,0,0,1024,1024);c.toBlob(b=>dl('gapa-ikona.png',b));};
+ img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg(S,1024,true));};
+function drawSaved(){const sec=document.getElementById('savedSec'),box=document.getElementById('saved');sec.classList.toggle('hide',!saved.length);box.innerHTML='';
+ saved.forEach((v,i)=>{const b=document.createElement('button');b.className='btn';b.innerHTML=svg(v,26)+`Wersja ${i+1}`;b.title='Kliknij, żeby wczytać. Z klawiszem ⌥ (Mac) albo Alt (Windows) usuwa wersję.';
+  b.onclick=e=>{if(e.altKey){saved.splice(i,1);}else{S={...DEF,...v};refreshLays();refreshPresetIcons();}
+   try{localStorage.setItem('gapaIkonaZapis',JSON.stringify(saved))}catch(err){}render();drawSaved();};box.appendChild(b);});}
+document.getElementById('bSave').onclick=()=>{saved.push({...S});try{localStorage.setItem('gapaIkonaZapis',JSON.stringify(saved))}catch(e){}drawSaved();note('Wersja zapamiętana w tej przeglądarce.');};
+
+refreshLays();render();drawSaved();
+</script>
+</body>
+</html>

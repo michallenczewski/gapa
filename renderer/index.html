@@ -96,7 +96,6 @@ header{grid-column:1/4;display:flex;align-items:center;gap:6px;padding:0 12px;mi
 #crumbs{display:flex;align-items:center;min-width:0;margin:0 18px 0 4px;font-size:13px;font-weight:400;white-space:nowrap;overflow:hidden;flex:0 1 auto}
 #crumbs a{color:var(--muted);padding:4px 6px;border-radius:6px;cursor:pointer;flex:none;transition:background-color .15s,color .15s}
 #crumbs a.more{letter-spacing:.05em}
-#crumbs.measure span{flex:none}
 #crumbs a:hover{color:var(--text);background:var(--hover)}
 #crumbs i{font-style:normal;color:var(--muted2);opacity:.6;flex:none;padding:0 1px}
 #crumbs span{font-weight:500;padding:4px 6px;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
@@ -448,7 +447,7 @@ body.bare #grid .nm{display:none}
 /* przycisk ustawień zostaje do końca; wcześniej chowają się przyciski z własnym skrótem */
 #setBtn{flex:none;position:relative}
 #setBtn.dot::after{content:"";position:absolute;top:5px;right:5px;width:6px;height:6px;border-radius:50%;background:var(--text);box-shadow:0 0 0 2px var(--bg)}
-@media (max-width:700px){#scope,#mode,#inspBtn{display:none}}
+@media (max-width:960px){#scope,#mode,#inspBtn{display:none}}
 @media (max-width:520px){#sortBtn,#typesBtn{display:none}}
 
 /* koszyk: wiersz w panelu bocznym, znacznik na kafelku, pasek nad zawartością */

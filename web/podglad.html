@@ -95,7 +95,6 @@ header{grid-column:1/4;display:flex;align-items:center;gap:6px;padding:0 12px;mi
 #crumbs{display:flex;align-items:center;min-width:0;margin:0 18px 0 4px;font-size:13px;font-weight:400;white-space:nowrap;overflow:hidden;flex:0 1 auto}
 #crumbs a{color:var(--muted);padding:4px 6px;border-radius:6px;cursor:pointer;flex:none;transition:background-color .15s,color .15s}
 #crumbs a.more{letter-spacing:.05em}
-#crumbs.measure span{flex:none}
 #crumbs a:hover{color:var(--text);background:var(--hover)}
 #crumbs i{font-style:normal;color:var(--muted2);opacity:.6;flex:none;padding:0 1px}
 #crumbs span{font-weight:500;padding:4px 6px;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
@@ -447,7 +446,7 @@ body.bare #grid .nm{display:none}
 /* przycisk ustawień zostaje do końca; wcześniej chowają się przyciski z własnym skrótem */
 #setBtn{flex:none;position:relative}
 #setBtn.dot::after{content:"";position:absolute;top:5px;right:5px;width:6px;height:6px;border-radius:50%;background:var(--text);box-shadow:0 0 0 2px var(--bg)}
-@media (max-width:700px){#scope,#mode,#inspBtn{display:none}}
+@media (max-width:960px){#scope,#mode,#inspBtn{display:none}}
 @media (max-width:520px){#sortBtn,#typesBtn{display:none}}
 
 /* koszyk: wiersz w panelu bocznym, znacznik na kafelku, pasek nad zawartością */
@@ -2070,7 +2069,7 @@ function renderCrumbs(){
   if(virt==='stars'){ const s=document.createElement('span'); s.textContent='Oznaczone gwiazdkami'; c.appendChild(s); document.title='Oznaczone gwiazdkami — Gapa'; return; }
   if(!curPath) return;
   crumbList=crumbsOf(curPath);
-  crumbsFit(); requestAnimationFrame(()=>{ if(crumbList.length) crumbsFit(); });
+  crLast=''; crumbsFit(); requestAnimationFrame(()=>{ crLast=''; if(crumbList.length) crumbsFit(); });
   document.title=crumbList[crumbList.length-1].name+' — Gapa';
 }
 function crumbsDraw(hide){
@@ -2090,22 +2089,38 @@ function crumbsDraw(hide){
     c.appendChild(el);
   });
 }
+// Ile folderów się mieści, liczymy bez przestawiania paska: szerokość pozostałych elementów paska mierzymy przy
+// schowanej ścieżce, a szerokość nazw — z czcionki (canvas.measureText). Ścieżkę rysujemy raz, więc przy
+// zmniejszaniu okna nic nie skacze ani nie migocze. Najpierw chowają się najwyższe foldery, na końcu skraca się
+// nazwa bieżącego; przyciski z własnym skrótem chowają się przy węższych oknach (reguły @media w index.html).
+const crMeasure=document.createElement('canvas').getContext('2d');
+let crLast='';
 function crumbsFit(){
-  const c=$('#crumbs'), n=crumbList.length; if(!n) return;
-  // mierzymy wolne miejsce w całym górnym pasku: ścieżka na chwilę się nie kurczy, a my chowamy najwyższe
-  // foldery, dopóki pasek się przepełnia albo ścieżka przekracza swoją największą szerokość
-  const pb=$('#pathbox'), hd=pb.parentElement, over=()=>hd.scrollWidth>hd.clientWidth+1||c.scrollWidth>c.clientWidth+1;
-  let hide=0; c.classList.add('measure'); pb.style.flexShrink='0'; crumbsDraw(0);
-  if(over()&&n>1){
-    // jeden pomiar: ile pikseli brakuje i ile zajmuje każdy folder razem z ukośnikiem — od razu liczymy, ile schować
-    const miss=Math.max(hd.scrollWidth-hd.clientWidth,c.scrollWidth-c.clientWidth), ch=[...c.children], more=24;
-    let got=-more; while(hide<n-1&&got<miss){ const a=ch[hide*2], sep=ch[hide*2+1]; got+=(a?a.getBoundingClientRect().width:0)+(sep?sep.getBoundingClientRect().width:0); hide++; }
-    crumbsDraw(hide);
-    while(over()&&hide<n-1){ hide++; crumbsDraw(hide); }   // zapas na wypadek zaokrągleń
-  }
-  pb.style.flexShrink=''; c.classList.remove('measure');
+  const c=$('#crumbs'), pb=$('#pathbox'), hd=pb.parentElement, n=crumbList.length; if(!n) return;
+  const key=hd.clientWidth+'|'+crumbList.map(x=>x.path).join('|')+'|'+document.body.className;
+  if(key===crLast&&c.childElementCount) return; crLast=key;
+  // miejsce na ścieżkę: szerokość paska minus pozostałe elementy (rozpychacze o flex-grow liczą się jako zero) i odstępy
+  const pd=pb.style.display; pb.style.display='none';
+  const hs=getComputedStyle(hd), gap=parseFloat(hs.columnGap)||0;
+  let used=parseFloat(hs.paddingLeft)+parseFloat(hs.paddingRight), cnt=0;
+  for(const ch of hd.children){ if(ch===pb) continue; const st=getComputedStyle(ch);
+    if(st.display==='none'||st.position==='absolute'||st.position==='fixed') continue; cnt++;
+    if(parseFloat(st.flexGrow)>0) continue; used+=ch.getBoundingClientRect().width+parseFloat(st.marginLeft)+parseFloat(st.marginRight); }
+  pb.style.display=pd;
+  const ps=getComputedStyle(pb), cst=getComputedStyle(c);
+  let extra=parseFloat(ps.paddingLeft)+parseFloat(ps.paddingRight)+parseFloat(cst.marginLeft)+parseFloat(cst.marginRight);
+  for(const ch of pb.children) if(ch!==c&&!ch.hidden&&getComputedStyle(ch).display!=='none') extra+=ch.getBoundingClientRect().width;
+  const avail=Math.min(parseFloat(ps.maxWidth)||1e9,hd.clientWidth-used-gap*cnt)-extra-2;
+  // szerokości nazw z czcionki ścieżki
+  const fam=cst.fontFamily, fs=cst.fontSize, w=(t,b)=>{ crMeasure.font=(b?'500 ':'400 ')+fs+' '+fam; return crMeasure.measureText(t).width; };
+  const segA=crumbList.map(x=>w(x.name)+12), sep=w('/')+2, more=w('…')+12+1, last=w(crumbList[n-1].name,true)+12;
+  let total=last; for(let i=0;i<n-1;i++) total+=segA[i]+sep;
+  let hide=0;
+  while(hide<n-1&&total>avail){ total-=segA[hide]+sep; if(hide===0) total+=more+sep; hide++; }
+  crumbsDraw(hide);
 }
-{ let crT=0; const refit=()=>{ cancelAnimationFrame(crT); crT=requestAnimationFrame(()=>{ if(crumbList.length) crumbsFit(); }); }; new ResizeObserver(refit).observe($('#pathbox').parentElement); addEventListener('resize',refit); }
+{ const refit=()=>{ if(crumbList.length) crumbsFit(); };
+  new ResizeObserver(refit).observe($('#pathbox').parentElement); addEventListener('resize',refit); }
 
 /* --- drzewo folderów: miejsca w systemie i dyski, jak zakładka Folders w Bridge --- */
 // treeFollow: drzewo rozwija się do bieżącego folderu tylko przy chodzeniu po drzewie i miejscach;

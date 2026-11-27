@@ -168,10 +168,14 @@ const fmtDur=s=>{if(!isFinite(s))return '';s=Math.round(s);const h=Math.floor(s/
 const ICO_DOWN='<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="m2.5 4 2.5 2.5L7.5 4"/></svg>';
 function renderTypes(){
   const n=typeCounts(), present=TYPES.filter(t=>n[t]), shown=present.filter(t=>on(t));
-  const b=$('#typesBtn'); let l='Filtr';
-  if(shown.length<present.length) l='Filtr: '+(shown.length?shown.slice(0,2).map(TLABEL).join(', ')+(shown.length>2?' +'+(shown.length-2):''):'nic');
-  if(S.minStar) l=(l==='Filtr'?'Filtr: ':l+', ')+STARS(S.minStar)+(S.minStar<3?'+':'');
-  b.innerHTML='<span></span>'+ICO_DOWN; b.firstChild.textContent=l; b.classList.toggle('on',shown.length<present.length||!!S.minStar);
+  // napis przycisku jest zawsze ten sam („Filtr”), żeby pasek nie skakał przy zmianie filtrów;
+  // włączony filtr widać po tle przycisku, a co dokładnie jest odfiltrowane — w podpowiedzi
+  const b=$('#typesBtn'), part=[];
+  if(shown.length<present.length) part.push(shown.length?shown.map(TLABEL).join(', '):'żaden rodzaj');
+  if(S.minStar) part.push(STARS(S.minStar)+(S.minStar<3?' i więcej':''));
+  if(!b.firstChild){ b.innerHTML='<span>Filtr</span>'+ICO_DOWN; }
+  b.title=part.length?'Filtr: '+part.join(' · '):'Filtr: rodzaje plików i ocena';
+  b.classList.toggle('on',part.length>0);
 }
 function refilter(){save();renderTypes();for(const d of dirs)resetDir(d);applyView(keep());}
 function typesMenu(){
@@ -189,10 +193,20 @@ $('#typesBtn').onclick=e=>{e.stopPropagation();ctx.hidden||ctx.dataset.of!=='typ
 const DEF_DIR={name:1,type:1,date:-1,size:-1,dims:-1,stars:-1};
 const SORTS=[['name','Nazwa','A → Z','Z → A'],['date','Data zmiany','Od najstarszych','Od najnowszych'],['size','Rozmiar pliku','Od najmniejszych','Od największych'],['dims','Wymiary','Od najmniejszych','Od największych'],['type','Rodzaj','JPG, PNG, PSD…','Odwrotnie'],['stars','Ocena','Od najniższej','Od najwyższej']];
 function setSort(k){ if(S.sort===k) S.dir=-S.dir; else {S.sort=k;S.dir=DEF_DIR[k]||1;} save(); markSort(); applyView(keep()); }
+// na przycisku krótka nazwa; szerokość przycisku jest stała (jak dla najdłuższej nazwy), żeby zmiana sortowania nie przesuwała paska
+const SORT_SHORT={date:'Data',size:'Rozmiar'};
+let sortW=0;
+function sortWidth(){
+  if(sortW) return; const b=$('#sortBtn'), cs=getComputedStyle(b), c=document.createElement('canvas').getContext('2d');
+  c.font=cs.fontWeight+' '+cs.fontSize+' '+cs.fontFamily; if(!document.fonts||document.fonts.status!=='loaded'){ document.fonts&&document.fonts.ready.then(()=>{sortW=0;sortWidth();}); }
+  const w=Math.max(...SORTS.map(x=>c.measureText(SORT_SHORT[x[0]]||x[1]).width));
+  sortW=Math.ceil(w+10+parseFloat(cs.columnGap||6)+parseFloat(cs.paddingLeft)+parseFloat(cs.paddingRight)+1);
+  b.style.setProperty('--sortw',sortW+'px');
+}
 function markSort(){
   const s=SORTS.find(x=>x[0]===S.sort)||SORTS[0], b=$('#sortBtn');
   b.innerHTML='<span></span><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="'+(S.dir>0?'M5 8V2M2.5 4.5 5 2l2.5 2.5':'M5 2v6M2.5 5.5 5 8l2.5-2.5')+'"/></svg>';
-  b.firstChild.textContent=s[1]; b.title='Sortowanie: '+s[1]+', '+(S.dir>0?s[2]:s[3]).replace(/^(Od|Odwrotnie)\b/,m=>m.toLowerCase());
+  b.firstChild.textContent=SORT_SHORT[s[0]]||s[1]; sortWidth(); b.title='Sortowanie: '+s[1]+', '+(S.dir>0?s[2]:s[3]).replace(/^(Od|Odwrotnie)\b/,m=>m.toLowerCase());
 }
 function sortMenu(){
   const r=$('#sortBtn').getBoundingClientRect(), s=SORTS.find(x=>x[0]===S.sort)||SORTS[0];

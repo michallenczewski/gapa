@@ -53,6 +53,8 @@ Gapa zostaje wtedy w tle z ikoną w zasobniku obok zegara (menu: otwórz, włąc
 
 **Gwiazdki** oceniają pliki w skali od jednej do trzech: zaznacz plik (albo kilka) i naciśnij 1, 2 lub 3 (z klawiatury numerycznej też); ta sama ocena naciśnięta drugi raz ją zdejmuje. Działa to także w podglądzie i z menu pod prawym przyciskiem. Gwiazdki widać tylko na ocenionych plikach. Filtr pozwala pokazać pliki z co najmniej jedną, dwiema albo trzema gwiazdkami, sortowanie „Ocena” stawia najlepsze na początku, a „Oznaczone gwiazdkami” w panelu bocznym zbiera ocenione pliki ze wszystkich folderów. Gapa trzyma oceny u siebie (w pliku oceny-i-koszyk.json w danych programu, także te nadane w podglądzie spacją) i nie zapisuje niczego w Twoich plikach; ocena idzie za plikiem — i za całym folderem — gdy przenosisz go, kopiujesz albo zmieniasz mu nazwę w Gapie. Oceny z Adobe Bridge zapisane w pliku .xmp obok obrazu Gapa wczytuje sama (1–2 → ★, 3 → ★★, 4–5 → ★★★).
 
+**Sortowanie „Rodzaj”** układa pliki w grupy według formatu, w tej samej kolejności co w filtrze: najpierw JPG, potem PNG, PSD, TIFF i dalej; każda grupa ma nagłówek z liczbą plików, a w środku pliki idą alfabetycznie. Drugie kliknięcie odwraca kolejność grup.
+
 **Biblioteka** to wszystkie foldery z Ulubionych razem z podfolderami. Gapa zapamiętuje nazwy plików w nich (indeks w pliku `biblioteka.json` obok ustawień) i odświeża go w tle po zmianie ulubionych, przy powrocie do okna, jeśli minęło 10 minut, albo na żądanie („Odśwież indeks”). Zakres wyszukiwania wybiera się przyciskiem w polu szukania: tu, podfoldery albo biblioteka. Słowa w zapytaniu muszą wystąpić wszystkie — w nazwie pliku albo folderu, więc „cegły czerwone” znajdzie pliki z folderu „Cegły/czerwone”.
 
 ## Jak działa pamięć miniatur

@@ -309,6 +309,7 @@ div.grp{grid-column:1/-1;display:flex;align-items:baseline;gap:10px;padding:22px
 div.grp:first-child{padding-top:4px}
 .grp b{color:var(--text);font-weight:500;font-size:13px;cursor:pointer}
 .grp b:hover{text-decoration:underline;text-underline-offset:3px}
+.grp b.plain{cursor:default}.grp b.plain:hover{text-decoration:none}
 tr.grp td{padding:20px 8px 6px;background:none!important;color:var(--muted2);font-size:12px}
 tr.grp td b{margin-right:10px}
 
@@ -1512,12 +1513,12 @@ function typesMenu(){
 }
 $('#typesBtn').onclick=e=>{e.stopPropagation();ctx.hidden||ctx.dataset.of!=='types'?(typesMenu(),ctx.dataset.of='types'):hideMenu();};
 const DEF_DIR={name:1,type:1,date:-1,size:-1,dims:-1,stars:-1};
-const SORTS=[['name','Nazwa','A → Z','Z → A'],['date','Data zmiany','Od najstarszych','Od najnowszych'],['size','Rozmiar pliku','Od najmniejszych','Od największych'],['dims','Wymiary','Od najmniejszych','Od największych'],['type','Rodzaj','A → Z','Z → A'],['stars','Ocena','Od najniższej','Od najwyższej']];
+const SORTS=[['name','Nazwa','A → Z','Z → A'],['date','Data zmiany','Od najstarszych','Od najnowszych'],['size','Rozmiar pliku','Od najmniejszych','Od największych'],['dims','Wymiary','Od najmniejszych','Od największych'],['type','Rodzaj','JPG, PNG, PSD…','Odwrotnie'],['stars','Ocena','Od najniższej','Od najwyższej']];
 function setSort(k){ if(S.sort===k) S.dir=-S.dir; else {S.sort=k;S.dir=DEF_DIR[k]||1;} save(); markSort(); applyView(keep()); }
 function markSort(){
   const s=SORTS.find(x=>x[0]===S.sort)||SORTS[0], b=$('#sortBtn');
   b.innerHTML='<span></span><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="'+(S.dir>0?'M5 8V2M2.5 4.5 5 2l2.5 2.5':'M5 2v6M2.5 5.5 5 8l2.5-2.5')+'"/></svg>';
-  b.firstChild.textContent=s[1]; b.title='Sortowanie: '+s[1]+', '+(S.dir>0?s[2]:s[3]).replace(/^Od /,'od ');
+  b.firstChild.textContent=s[1]; b.title='Sortowanie: '+s[1]+', '+(S.dir>0?s[2]:s[3]).replace(/^(Od|Odwrotnie)\b/,m=>m.toLowerCase());
 }
 function sortMenu(){
   const r=$('#sortBtn').getBoundingClientRect(), s=SORTS.find(x=>x[0]===S.sort)||SORTS[0];
@@ -2235,13 +2236,15 @@ function renderSide(){
 }
 
 /* --- widok --- */
+// kolejność rodzajów jak w filtrze: najpierw JPG, potem PNG, PSD, TIFF…
+const tOrd=t=>{ const i=TYPES.indexOf(t); return i<0?TYPES.length:i; };
 function sortFiles(fs){
   const d=S.dir, byName=(a,b)=>coll.compare(a.name,b.name);
   const by={
     name:(a,b)=>byName(a,b)*d,
     date:(a,b)=>(a.mtime-b.mtime)*d||byName(a,b),
     size:(a,b)=>(a.size-b.size)*d||byName(a,b),
-    type:(a,b)=>(a.type||'').localeCompare(b.type||'')*d||byName(a,b),
+    type:(a,b)=>(tOrd(a.type)-tOrd(b.type))*d||byName(a,b),
     dims:(a,b)=>((a.dims?a.dims[0]*a.dims[1]:0)-(b.dims?b.dims[0]*b.dims[1]:0))*d||byName(a,b),
     stars:(a,b)=>(starOf(a.path)-starOf(b.path))*d||byName(a,b)
   }[S.sort]||byName;
@@ -2253,6 +2256,8 @@ function setGrouped(fs,keyOf,order,head){
   view=[]; heads=new Map();
   for(const k of [...g.keys()].sort(order)){ const list=g.get(k); heads.set(view.length,Object.assign({count:list.length},head(k,list[0]))); view.push(...list); }
 }
+// nagłówki grup to foldery (głęboki widok, biblioteka), a nie rodzaje plików
+const byFolder=()=>{ for(const g of heads.values()) return !!g.target; return false; };
 function finishView(keepPath){
   sel=keepPath?view.findIndex(it=>samePath(it.path,keepPath)):-1; anchor=sel;
   picked=new Set(sel>=0?[view[sel]]:[]);
@@ -2285,6 +2290,9 @@ function applyView(keepPath){
     const base=curPath.replace(/[\\/]+$/,'');
     setGrouped(fs,it=>it.rel,(a,b)=>a===''?-1:b===''?1:coll.compare(a,b),
       k=>({rel:k,label:k?k.split(/[\\/]/).join(' / '):(api.basename(curPath)||curPath),target:k?base+SEP+k:curPath}));
+  } else if(S.sort==='type'&&new Set(fs.map(it=>it.type)).size>1){ // grupy według rodzaju pliku, foldery nad nimi
+    setGrouped(fs,it=>it.type,(a,b)=>(tOrd(a)-tOrd(b))*S.dir,k=>({label:TLABEL(k)}));
+    const h=heads; heads=new Map(); h.forEach((g,i)=>heads.set(i+ds.length,g)); view=[...ds,...view];
   } else view=[...ds,...fs];
   finishView(keepPath);
 }
@@ -2517,7 +2525,7 @@ function groupHead(g,tag){
   const el=document.createElement(tag); el.className='grp';
   const box=tag==='tr'?el.appendChild(document.createElement('td')):el; if(tag==='tr') box.colSpan=5;
   const b=document.createElement('b'); b.textContent=g.label;
-  b.title='Otwórz ten folder'; b.onclick=()=>go(g.target);
+  if(g.target){ b.title='Otwórz ten folder'; b.onclick=()=>go(g.target); } else b.className='plain';
   const c=document.createElement('span'); c.textContent=g.count+' '+plural(g.count,'obraz','obrazy','obrazów');
   box.append(b,c); return el;
 }
@@ -3019,7 +3027,7 @@ function status(msg){
   const nf=view.filter(x=>x.kind==='file').length, q=$('#q').value;
   const nd=view.length-nf;
   let t=nf?nf.toLocaleString('pl'):(nd?nd+' '+plural(nd,'folder','foldery','folderów'):'0');
-  if(heads) t+=' w '+heads.size+' '+plural(heads.size,'folderze','folderach','folderach');
+  if(heads&&byFolder()) t+=' w '+heads.size+' '+plural(heads.size,'folderze','folderach','folderach');
   if(picked.size>1) t+=' · zaznaczone '+picked.size;
   s.textContent=t; s.title=(q?'Wyniki: ':'')+nf+' '+plural(nf,'obraz','obrazy','obrazów');
   renderInsp();
@@ -3519,7 +3527,7 @@ document.addEventListener('contextmenu',e=>{
   else en.push({label:'Otwórz podgląd',key:'Enter',run:()=>openViewer(it)});
   en.push({label:'Otwórz w '+edIn()+(n>1?' ('+n+')':''),key:MOD+'E',run:()=>openInEditor(many.map(x=>x.path))});
   if(n===1) en.push({label:'Otwórz w domyślnym programie',key:MOD+'Enter',run:()=>api.openDefault(it.path)});
-  if(n===1&&(heads||virt)) en.push({label:'Przejdź do folderu „'+(api.basename(api.dirname(it.path))||api.dirname(it.path))+'”',run:()=>go(api.dirname(it.path),it.path)});
+  if(n===1&&((heads&&byFolder())||virt)) en.push({label:'Przejdź do folderu „'+(api.basename(api.dirname(it.path))||api.dirname(it.path))+'”',run:()=>go(api.dirname(it.path),it.path)});
   en.push({label:'Pokaż w '+FINDER,run:()=>api.showInFolder(it.path)});
   en.push('-');
   en.push({label:bLabel(many)+(n>1?' ('+n+')':''),key:'B',run:()=>basketToggle(many)});

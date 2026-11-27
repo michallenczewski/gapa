@@ -212,6 +212,8 @@ function markModes(){
 function setMode(m){if(S.mode===m)return;S.mode=m;save();markModes();render();if(m!=='list')requestAnimationFrame(()=>applyCols(S.cols||colsFor(S.size)));else setSize(S.lic);}
 document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>setMode(b.dataset.v));
 function setNames(v){S.names=v;save();document.body.classList.toggle('nonames',!v);}
+// ścieżka u góry: domyślnie tylko „… / bieżący folder”; z ustawieniem — tyle folderów, ile się zmieści
+function setFullPath(v){ S.fullPath=!!v; save(); crLast=''; if(crumbList.length) crumbsFit(); }
 function setGridLines(v){S.gridlines=v;save();document.body.classList.toggle('gridlines',!!v);if(S.mode!=='list'&&S.cols)applyCols(S.cols);}
 function setDirNames(v){S.dirNames=v;save();document.body.classList.toggle('nodirnames',!v);}
 function setSide(v){S.side=v;save();document.body.classList.toggle('noside',!v);press($('#sideBtn'),v);}
@@ -315,6 +317,7 @@ function renderSettings(){
     +sw('Nazwy plików',S.names!==false,()=>setNames(!(S.names!==false)),'N')
     +sw('Nazwy folderów',S.dirNames!==false,()=>setDirNames(!(S.dirNames!==false)),'⇧ N')
     +sw('Linie siatki',!!S.gridlines,()=>setGridLines(!S.gridlines),'G','Cienkie linie między miniaturami')
+    +sw('Pełna ścieżka',!!S.fullPath,()=>setFullPath(!S.fullPath),'','U góry wszystkie foldery nadrzędne, ile się zmieści; bez tego tylko bieżący folder i „…”')
 ));
   const edOpts=edList&&edList.list.length?edList.list.map(x=>[x.name.replace(/^Affinity Photo.*/,'Affinity'),x.path===edList.current,async()=>{ editorName=await api.editorSet(x.path); edList.current=x.path; }]):[];
   G.push(grp('Działanie',
@@ -364,6 +367,7 @@ function setMenu(){
     '-',
     {label:'Nazwy plików',box:S.names!==false,key:'N',run:()=>setNames(!(S.names!==false))},
     {label:'Linie siatki',box:!!S.gridlines,key:'G',run:()=>setGridLines(!S.gridlines)},
+    {label:'Pełna ścieżka',box:!!S.fullPath,run:()=>setFullPath(!S.fullPath)},
     {label:'Dźwięki',box:S.sound!==false,key:'S',run:()=>{S.sound=!(S.sound!==false);save();if(S.sound)SFX('on');}},
     {label:'Wszystkie ustawienia…',key:isMac?'⌘,':'Ctrl+,',run:settingsMenu},
     '-',
@@ -772,7 +776,7 @@ const crMeasure=document.createElement('canvas').getContext('2d');
 let crLast='';
 function crumbsFit(){
   const c=$('#crumbs'), pb=$('#pathbox'), hd=pb.parentElement, n=crumbList.length; if(!n) return;
-  const key=hd.clientWidth+'|'+crumbList.map(x=>x.path).join('|')+'|'+document.body.className;
+  const key=hd.clientWidth+'|'+crumbList.map(x=>x.path).join('|')+'|'+document.body.className+'|'+!!S.fullPath;
   if(key===crLast&&c.childElementCount) return; crLast=key;
   // miejsce na ścieżkę: szerokość paska minus pozostałe elementy (rozpychacze o flex-grow liczą się jako zero) i odstępy
   const pd=pb.style.display; pb.style.display='none';
@@ -791,6 +795,7 @@ function crumbsFit(){
   const segA=crumbList.map(x=>w(x.name)+12), sep=w('/')+2, more=w('…')+12+1, last=w(crumbList[n-1].name,true)+12;
   let total=last; for(let i=0;i<n-1;i++) total+=segA[i]+sep;
   let hide=0;
+  if(!S.fullPath){ crumbsDraw(n-1); return; }   // bez pełnej ścieżki: tylko „… / bieżący folder” (… otwiera listę wyższych)
   while(hide<n-1&&total>avail){ total-=segA[hide]+sep; if(hide===0) total+=more+sep; hide++; }
   crumbsDraw(hide);
 }

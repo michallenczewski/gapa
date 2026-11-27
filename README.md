@@ -110,6 +110,9 @@ Najczęstsze skróty leżą pod lewą ręką, żeby prawa mogła zostać na mysz
 | ↑ ↓ (PDF) | poprzednia / następna strona |
 | + − albo Ctrl/⌘ + kółko (PDF) | powiększ / pomniejsz strony; 0 wraca do dopasowania |
 
+Ścieżka u góry pokazuje domyślnie tylko bieżący folder i „…”; klik w „…” rozwija listę folderów nadrzędnych. W ustawieniach (menu pod przyciskiem z suwakami albo „Wszystkie ustawienia…”) można włączyć **Pełną ścieżkę** — wtedy Gapa pokazuje tyle folderów nadrzędnych, ile mieści się w pasku.
+
+
 W podglądzie (także po powiększeniu) prawy przycisk myszy otwiera w miejscu kursora to samo menu co „…” w pasku, razem z gwiazdkami. W pasku podglądu obok „…” jest ikona pełnego ekranu. Gdy interfejs jest schowany albo okno jest na pełnym ekranie, po poruszeniu myszą w prawym górnym rogu pojawia się mała pastylka z dwoma przyciskami: pokaż interfejs oraz wejdź na pełny ekran albo z niego wyjdź. Po dwóch sekundach bez ruchu pastylka znika razem z kursorem.
 
 Pliki można przeciągać z Gapy prosto do Photoshopa, 3ds Maxa czy Findera/Eksploratora.

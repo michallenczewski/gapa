@@ -448,6 +448,7 @@ body.bare #grid .nm{display:none}
 /* przycisk ustawień zostaje do końca; wcześniej chowają się przyciski z własnym skrótem */
 #setBtn{flex:none;position:relative}
 #setBtn.dot::after{content:"";position:absolute;top:5px;right:5px;width:6px;height:6px;border-radius:50%;background:var(--text);box-shadow:0 0 0 2px var(--bg)}
+#setBtn.dl::before{content:"";position:absolute;left:7px;right:7px;bottom:2px;height:2px;border-radius:1px;background:linear-gradient(to right,var(--text) var(--upd,0%),var(--line) var(--upd,0%))}
 @media (max-width:960px){#scope,#mode,#inspBtn{display:none}}
 @media (max-width:520px){#sortBtn,#typesBtn{display:none}}
 
@@ -1696,8 +1697,7 @@ $('#setBtn').onclick=e=>{ e.stopPropagation(); if(!ctx.hidden&&ctx.dataset.of===
 function setMenu(){
   const r=$('#setBtn').getBoundingClientRect(), t=S.theme||'auto', u=updSt||{};
   const upd=u.state==='available'?{label:'Zainstaluj wersję '+u.version,run:updAsk}
-    :u.state==='downloading'?{label:'Pobieram '+u.version+(u.size?' · '+Math.round(u.got/u.size*100)+'%':''),dim:true,keep:true,run:()=>{}}
-    :u.state==='ready'?{label:isMac?'Gapa '+u.version+' w Pobranych':'Instaluję '+u.version+'…',dim:true,keep:true,run:()=>{}}
+    :u.state==='downloading'||u.state==='ready'?{label:updLabel(u),dim:true,keep:true,run:()=>{}}
     :api.updateCheck?{label:'Sprawdź aktualizacje',run:updManual}:null;
   showMenu(r.right,r.bottom+6,null,[
     {label:'Jasny motyw',check:t==='light',run:()=>setTheme('light')},
@@ -3995,12 +3995,24 @@ const inSheet=()=>!!(sheet&&stage.classList.contains('sheetmode'));
 let peekState=null; if(api.peekGet&&!PEEK) api.peekGet().then(r=>{ peekState=r; });
 /* --- aktualizacje: dyskretna informacja w stopce, klik pobiera i instaluje --- */
 let updSt=null;
+const updPct=s=>s.size?Math.min(100,Math.floor(s.got/s.size*100)):0;
+function updLabel(u){
+  if(u.state==='ready') return isMac?'Gapa '+u.version+' w Pobranych':'Instaluję '+u.version+'…';
+  if(u.size&&u.got>=u.size) return 'Sprawdzam pobrany plik…';
+  return 'Pobieram '+u.version+(u.size?' · '+updPct(u)+'% z '+Math.round(u.size/1048576)+' MB':'…');
+}
 function updShow(s){
+  // postęp pobierania: cienka kreska pod przyciskiem ustawień, procent w podpowiedzi i w otwartym menu
+  const prev=updSt&&updSt.state;
   // nowa wersja: kropka na przycisku ustawień, a w jego menu „Zainstaluj wersję …” (wytyczne interakcji, punkt 8)
   updSt=s; const b=$('#setBtn'); if(!b) return;
-  const on=s.state==='available'||s.state==='downloading'||s.state==='ready';
-  b.classList.toggle('dot',on);
-  b.title=(s.state==='available'?'Ustawienia · nowa wersja '+s.version:s.state==='ready'&&isMac?'Ustawienia · Gapa '+s.version+' w Pobranych':'Ustawienia')+' ('+(isMac?'⌘,':'Ctrl+,')+')';
+  const dl=s.state==='downloading';
+  b.classList.toggle('dot',s.state==='available'||(s.state==='ready'&&isMac));
+  b.classList.toggle('dl',dl); b.style.setProperty('--upd',(dl?updPct(s):0)+'%');
+  b.title=(s.state==='available'?'Ustawienia · nowa wersja '+s.version:dl||s.state==='ready'?'Ustawienia · '+updLabel(s):'Ustawienia')+' ('+(isMac?'⌘,':'Ctrl+,')+')';
+  if(!ctx.hidden&&ctx.dataset.of==='set'&&(dl||s.state==='ready')){ const l=ctx.lastElementChild&&ctx.lastElementChild.querySelector('.l'); if(l) l.textContent=updLabel(s); }
+  if(dl&&prev!=='downloading') zoomTip('Pobieram Gapę '+s.version+' — postęp widać pod przyciskiem ustawień');
+  if(s.state==='available'&&prev==='downloading'&&s.error) zoomTip('Nie udało się pobrać: '+s.error);
   if(b.dataset.tip!==undefined){ b.dataset.tip=b.title; b.removeAttribute('title'); }
   if(s.state==='ready'&&isMac) zoomTip('Zamknij Gapę (⌘Q) i przeciągnij nową wersję do Aplikacji, zastępując starą.');
 }

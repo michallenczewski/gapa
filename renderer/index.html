@@ -449,6 +449,7 @@ body.bare #grid .nm{display:none}
 /* przycisk ustawień zostaje do końca; wcześniej chowają się przyciski z własnym skrótem */
 #setBtn{flex:none;position:relative}
 #setBtn.dot::after{content:"";position:absolute;top:5px;right:5px;width:6px;height:6px;border-radius:50%;background:var(--text);box-shadow:0 0 0 2px var(--bg)}
+#setBtn.dl::before{content:"";position:absolute;left:7px;right:7px;bottom:2px;height:2px;border-radius:1px;background:linear-gradient(to right,var(--text) var(--upd,0%),var(--line) var(--upd,0%))}
 @media (max-width:960px){#scope,#mode,#inspBtn{display:none}}
 @media (max-width:520px){#sortBtn,#typesBtn{display:none}}
 

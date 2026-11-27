@@ -39,11 +39,12 @@ svg{display:block}
 header{grid-column:1/4;display:flex;align-items:center;gap:6px;padding:0 12px;min-width:0;overflow:hidden}
 
 .ib{width:30px;height:30px;border-radius:7px;color:var(--muted);display:flex;align-items:center;justify-content:center;flex:none;transition:background-color .15s,color .15s}
+/* uwaga: ugięcie .ib musi mieć co najmniej taką wagę selektora jak najechanie (.ib:hover:not(:disabled)), inaczej najechanie je przykrywa */
 /* wzorzec przycisków (projekt/wzorzec_przyciskow.html, bloki KOPIUJ) — przeniesiony dosłownie, klasy dopasowane do Gapy:
    ikona unosi się przy najechaniu, ugina na klasie .wcis (JS, trzymana co najmniej 90 ms) i wraca sprężyną */
 .ib>svg,.tb>svg,.seg button>svg,.act>svg,.sec>svg{transition:transform .35s var(--spring)}
 .ib:hover:not(:disabled)>svg,.tb:hover>svg,.seg button:hover>svg,.act:hover>svg,.sec:hover>svg{transform:translateY(-1px)}
-.ib.wcis>svg,.tb.wcis>svg,.seg button.wcis>svg,.act.wcis>svg,.sec.wcis>svg{transform:scale(.84);transition:transform .09s ease-out}
+.ib.wcis:not(:disabled)>svg,.tb.wcis>svg,.seg button.wcis>svg,.act.wcis>svg,.sec.wcis>svg{transform:scale(.84);transition:transform .09s ease-out}
 .ib.tak{animation:tak .55s ease-out}
 @keyframes tak{0%{background:var(--hover)}100%{background:transparent}}
 .ib.tak>svg>*{transform-box:fill-box;transform-origin:center;animation:wskocz .5s var(--spring) both}

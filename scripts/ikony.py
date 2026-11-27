@@ -1,4 +1,4 @@
-"""Ikony Gapy z jednego źródła (wytyczne: projekt/logo/WYTYCZNE_IKONY.md).
+"""Ikony Gapy z jednego źródła (wytyczne: ../rodzina/ikony/WYTYCZNE_IKONY.md).
 
 Źródłem jest projekt/logo/gapa.svg (tło 1024 × 1024 od krawędzi do krawędzi, promień 225 px).
 Skrypt renderuje: build/icon-win.png i renderer/icon-win.png (Windows: tło 0–1023),

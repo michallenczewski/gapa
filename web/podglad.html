@@ -3851,7 +3851,7 @@ function showTip(el){
 }
 document.addEventListener('mouseover',e=>{
   const el=e.target.closest('[title],[data-tip]'); if(!el||el===tipFor) return;
-  if(el.matches(BTSEL)) return;   // przyciski mają własną podpowiedź z wytycznych (po 1,5 s) — bez drugiego dymka
+  if(el.matches(BTSEL)) return;   // przyciski mają własną podpowiedź z wytycznych (po 0,5 s) — bez drugiego dymka
   if(el.hasAttribute('title')){ el.dataset.tip=el.getAttribute('title'); el.removeAttribute('title'); }
   hideTip(); if(!el.dataset.tip) return;
   const nm=el.matches('.nav li,.tile,tr')?el.querySelector('.nm'):null;
@@ -4134,7 +4134,7 @@ document.addEventListener('pointerover',e=>{
   const el=e.target.closest&&e.target.closest(BTSEL); if(!el||el===btEl) return;
   if(el.title){ el.dataset.tip=el.title; el.removeAttribute('title'); }   // także gdy program zmieni title później
   btHide(); btEl=el;
-  btT=setTimeout(()=>{ if(btEl===el) btShow(el); }, Date.now()-btLast<400?0:1500);
+  btT=setTimeout(()=>{ if(btEl===el) btShow(el); }, Date.now()-btLast<400?0:500);
 });
 document.addEventListener('pointerout',e=>{ const el=e.target.closest&&e.target.closest(BTSEL); if(el&&el===btEl&&!el.contains(e.relatedTarget)) btHide(); });
 addEventListener('pointerdown',btHide,true); addEventListener('wheel',btHide,{passive:true}); addEventListener('keydown',btHide,true);

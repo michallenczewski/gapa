@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><title>Gapa — ikona (źródło; wersja Windows, tło od krawędzi do krawędzi). Twarz „o_o”: dwa kółka i kreska w prawie czarnym kolorze na tle w złamanej bieli.</title>
-<rect width="1024" height="1024" rx="225" fill="#f3f1ea"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><title>Gapa — ikona (źródło; wersja Windows, tło od krawędzi do krawędzi). Twarz „o_o”: dwa kółka i kreska w prawie czarnym kolorze na czysto białym tle.</title>
+<rect width="1024" height="1024" rx="225" fill="#ffffff"/>
 <g transform="scale(6.4) translate(0 -3)"><circle cx="50" cy="70" r="16" fill="none" stroke="#1c1c1f" stroke-width="11"/><circle cx="110" cy="70" r="16" fill="none" stroke="#1c1c1f" stroke-width="11"/><path d="M64 112H96" stroke="#1c1c1f" stroke-width="11" stroke-linecap="round"/></g>
 </svg>
